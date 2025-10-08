@@ -17,7 +17,7 @@ import Reports from "../pages/Reports";
 import ManageRoles from "../pages/ManageRoles";
 import Gradeass from "../pages/Gradeass";
 import UserManagement from "../pages/UserManagement";
-
+//routes will be displayed here
 export default function DashboardLayout() {
   return (
     <div className="h-screen flex bg-white">
