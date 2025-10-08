@@ -1,18 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { FormInput } from "@/components/FormInput";
 import { SocialLogin } from "@/components/SocialLogin";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
-const DEMO_USERS = [
-	{ id: "admin1", email: "admin@test.com", role: "admin" as const, name: "Admin User" },
-	{ id: "instructor1", email: "instructor@test.com", role: "instructor" as const, name: "Instructor User" },
-	{ id: "creator1", email: "creator@test.com", role: "contentCreator" as const, name: "Content Creator" },
-	{ id: "student1", email: "student@test.com", role: "user" as const, name: "Student User" },
-];
+import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 
 const CAROUSEL_IMAGES = [
 	{
@@ -40,13 +33,23 @@ const CAROUSEL_IMAGES = [
 export default function Login() {
 	const navigate = useNavigate();
 	const { login } = useAuth();
-
+	
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [rememberMe, setRememberMe] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
+
+	// carousel state
 	const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+	// Example registered accounts for demo; replace with real data or fetch from API as needed
+	const registeredEmails = [
+		{ email: "admin@example.com", role: "admin" },
+		{ email: "instructor@example.com", role: "instructor" },
+		{ email: "creator@example.com", role: "contentCreator" },
+		{ email: "student@example.com", role: "user" },
+	];
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -54,32 +57,31 @@ export default function Login() {
 		setLoading(true);
 
 		try {
-			const demoUser = DEMO_USERS.find((user) => user.email === email);
+			// Safely read the Vite env var while avoiding TypeScript's missing ImportMeta.env type
+			const apiUrl = (import.meta as any).env?.VITE_API_URL || process.env.VITE_API_URL || "";
+			const response = await fetch(`${apiUrl}/auth/login`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ email, password }),
+			});
 
-			if (demoUser) {
-				console.log("Logging in user:", demoUser);
-				login(demoUser);
-				console.log("Navigating to /app");
-				navigate("/app");
-			} else {
-				setError(
-					"Please use one of the demo emails: admin@test.com, instructor@test.com, creator@test.com, or student@test.com"
-				);
+			const data = await response.json();
+
+			if (!response.ok) {
+				setError(data.error || "Login failed. Please try again.");
+				setLoading(false);
+				return;
 			}
+
+			login(data.user);
+			navigate("/app");
 		} catch (err) {
 			console.error("Login error:", err);
-			setError("Login failed. Please try again.");
+			setError("Unable to connect to server. Please try again later.");
 		} finally {
 			setLoading(false);
-		}
-	};
-
-	const quickLogin = (userType: "admin" | "instructor" | "creator" | "student") => {
-		const user = DEMO_USERS.find((u) => u.email.startsWith(userType));
-		if (user) {
-			console.log("Quick logging in user:", user);
-			login(user);
-			navigate("/app");
 		}
 	};
 
@@ -88,74 +90,106 @@ export default function Login() {
 	};
 
 	const prevImage = () => {
-		setCurrentImageIndex((prev) => (prev - 1 + CAROUSEL_IMAGES.length) % CAROUSEL_IMAGES.length);
+		setCurrentImageIndex(
+			(prev) => (prev - 1 + CAROUSEL_IMAGES.length) % CAROUSEL_IMAGES.length
+		);
 	};
 
 	const goToImage = (index: number) => {
 		setCurrentImageIndex(index);
 	};
 
+	const getRoleBadgeColor = (role: string) => {
+		switch (role) {
+			case "admin":
+				return "bg-red-100 text-red-700";
+			case "instructor":
+				return "bg-blue-100 text-blue-700";
+			case "contentCreator":
+				return "bg-green-100 text-green-700";
+			case "user":
+				return "bg-purple-100 text-purple-700";
+			default:
+				return "bg-gray-100 text-gray-700";
+		}
+	};
+
+	const getRoleLabel = (role: string) => {
+		switch (role) {
+			case "admin":
+				return "Administrator";
+			case "instructor":
+				return "Instructor";
+			case "contentCreator":
+				return "Content Creator";
+			case "user":
+				return "Student";
+			default:
+				return role;
+		}
+	};
+
 	return (
 		<div className="min-h-screen bg-white flex">
+			{/* Left Side - Login Form */}
 			<div className="w-full lg:w-1/2 px-6 md:px-16 lg:px-26 py-12 flex flex-col">
 				<Logo />
 
 				<div className="flex-1 flex items-center justify-center max-w-[512px] mx-auto w-full">
 					<div className="w-full flex flex-col gap-10">
 						<div className="flex flex-col gap-4">
-							<h1 className="text-[#313131] font-poppins text-[40px] font-bold leading-normal">Login</h1>
-							<p className="text-[#313131] font-poppins text-base opacity-75">Login to access your account</p>
+							<h1 className="text-[#313131] font-poppins text-[40px] font-bold leading-normal">
+								Login
+							</h1>
+							<p className="text-[#313131] font-poppins text-base opacity-75">
+								Login to access your account
+							</p>
 						</div>
 
-						{/* Quick Login Section for Testing */}
-						<div className="bg-gray-50 p-4 rounded-lg">
-							<h3 className="text-sm font-medium text-gray-700 mb-3">Quick Login (Testing):</h3>
-							<div className="grid grid-cols-2 gap-2">
-								<button
-									onClick={() => quickLogin("admin")}
-									className="px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
-								>
-									Admin
-								</button>
-								<button
-									onClick={() => quickLogin("instructor")}
-									className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
-								>
-									Instructor
-								</button>
-								<button
-									onClick={() => quickLogin("creator")}
-									className="px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition-colors"
-								>
-									Creator
-								</button>
-								<button
-									onClick={() => quickLogin("student")}
-									className="px-3 py-2 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 transition-colors"
-								>
-									Student
-								</button>
+						{/* Registered Users Information */}
+						<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+							<div className="flex items-start gap-2 mb-3">
+								<AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+								<div>
+									<h3 className="text-sm font-semibold text-blue-900 mb-1">
+										Registered Users Only
+									</h3>
+									<p className="text-xs text-blue-700">
+										Only pre-registered email addresses can login to this system.
+									</p>
+								</div>
 							</div>
-						</div>
 
-						{/* Demo Credentials */}
-						<div className="bg-blue-50 p-4 rounded-lg">
-							<h3 className="text-sm font-medium text-blue-700 mb-2">Demo Credentials:</h3>
-							<div className="text-xs text-blue-600 space-y-1">
-								<div>
-									<strong>Admin:</strong> admin@test.com
+							{registeredEmails.length > 0 && (
+								<div className="mt-3 space-y-2">
+									<p className="text-xs font-medium text-blue-900">
+										Available Accounts:
+									</p>
+									<div className="grid grid-cols-1 gap-2">
+										{registeredEmails.map((item, index) => (
+											<div
+												key={index}
+												className="flex items-center justify-between bg-white rounded px-3 py-2 border border-blue-100"
+											>
+												<span className="text-xs text-gray-700 font-mono">
+													{item.email}
+												</span>
+												<span
+													className={`text-[10px] px-2 py-1 rounded-full font-medium ${getRoleBadgeColor(
+														item.role
+													)}`}
+												>
+													{getRoleLabel(item.role)}
+												</span>
+											</div>
+										))}
+									</div>
+									<p className="text-[10px] text-blue-600 mt-2">
+										💡 Hint: Password format is [role]123 (e.g.,
+										admin123, student123)
+									</p>
 								</div>
-								<div>
-									<strong>Instructor:</strong> instructor@test.com
-								</div>
-								<div>
-									<strong>Creator:</strong> creator@test.com
-								</div>
-								<div>
-									<strong>Student:</strong> student@test.com
-								</div>
-								<div className="mt-2 text-blue-500">Password: Any password works for demo</div>
-							</div>
+							)}
 						</div>
 
 						<form onSubmit={handleSubmit} className="flex flex-col gap-10">
@@ -165,7 +199,8 @@ export default function Login() {
 									type="email"
 									value={email}
 									onChange={(e) => setEmail(e.target.value)}
-									placeholder="Enter demo email (e.g., admin@test.com)"
+									placeholder="Enter registered email"
+									required
 								/>
 
 								<FormInput
@@ -173,7 +208,8 @@ export default function Login() {
 									type="password"
 									value={password}
 									onChange={(e) => setPassword(e.target.value)}
-									placeholder="Any password for demo"
+									placeholder="Enter your password"
+									required
 								/>
 
 								<div className="flex items-center justify-between">
@@ -181,7 +217,9 @@ export default function Login() {
 										<Checkbox
 											id="remember"
 											checked={rememberMe}
-											onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+											onCheckedChange={(checked) =>
+												setRememberMe(checked as boolean)
+											}
 											className="w-6 h-6 border-[#313131] border-2"
 										/>
 										<label
@@ -201,88 +239,88 @@ export default function Login() {
 							</div>
 
 							{error && (
-								<div className="text-sm text-red-600 bg-red-50 p-3 rounded">{error}</div>
+								<div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
+									<AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+									<span>{error}</span>
+								</div>
 							)}
 
-							<div className="flex flex-col gap-4">
-								<button
-									type="submit"
-									disabled={loading}
-									className="w-full h-12 bg-[#515DEF] rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:bg-[#515DEF]/90 transition-colors disabled:opacity-60"
-								>
-									{loading ? "Logging in..." : "Login"}
-								</button>
-
-								<p className="text-center text-sm font-poppins">
-									<span className="text-[#313131]">Don't have an account? </span>
-									<Link
-										to="/signup"
-										className="text-[#FF8682] font-bold hover:underline"
-									>
-										Sign up
-									</Link>
-								</p>
-							</div>
-
-							<SocialLogin />
+							<button
+								type="submit"
+								disabled={loading}
+								className="w-full py-4 bg-gradient-to-r from-[#515DEF] to-[#7B68EE] text-white rounded-lg font-poppins text-base font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								{loading ? "Logging in..." : "Login"}
+							</button>
 						</form>
+
+						<SocialLogin />
+
+						<div className="text-center">
+							<span className="text-[#313131] text-sm">
+								Don't have an account?{" "}
+							</span>
+							<Link
+								to="/signup"
+								className="text-[#FF8682] text-sm font-semibold hover:underline"
+							>
+								Contact Administrator
+							</Link>
+						</div>
 					</div>
 				</div>
 			</div>
 
-			{/* Image Carousel Section */}
-			<div className="hidden lg:flex lg:w-1/2 items-center justify-center p-16 bg-gradient-to-br from-blue-50 to-purple-50">
-				<div className="relative w-full max-w-[616px] h-[816px]">
-					{/* Main Image */}
-					<div className="relative w-full h-full overflow-hidden rounded-[30px] shadow-2xl">
-						<img
-							src={CAROUSEL_IMAGES[currentImageIndex].url}
-							alt={CAROUSEL_IMAGES[currentImageIndex].title}
-							className="w-full h-full object-cover transition-opacity duration-500"
-						/>
+			{/* Right Side - Image Carousel */}
+			<div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden">
+				<div className="absolute inset-0">
+					<img
+						src={CAROUSEL_IMAGES[currentImageIndex].url}
+						alt={CAROUSEL_IMAGES[currentImageIndex].title}
+						className="w-full h-full object-cover"
+					/>
+					<div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+				</div>
 
-						{/* Overlay Content */}
-						<div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-8 text-white">
-							<h3 className="text-2xl font-bold mb-2">
-								{CAROUSEL_IMAGES[currentImageIndex].title}
-							</h3>
-							<p className="text-sm opacity-90">
-								{CAROUSEL_IMAGES[currentImageIndex].description}
-							</p>
+				<div className="relative z-10 flex flex-col justify-end p-12 text-white">
+					<h2 className="text-4xl font-bold mb-4">
+						{CAROUSEL_IMAGES[currentImageIndex].title}
+					</h2>
+					<p className="text-xl mb-8 text-white/90">
+						{CAROUSEL_IMAGES[currentImageIndex].description}
+					</p>
+
+					<div className="flex items-center gap-4">
+						<button
+							onClick={prevImage}
+							className="p-2 bg-white/20 hover:bg-white/30 rounded-full backdrop-blur-sm transition-all"
+							aria-label="Previous image"
+						>
+							<ChevronLeft className="w-6 h-6" />
+						</button>
+
+						<div className="flex gap-2">
+							{CAROUSEL_IMAGES.map((_, index) => (
+								<button
+									key={index}
+									onClick={() => goToImage(index)}
+									className={`h-2 rounded-full transition-all ${
+										index === currentImageIndex
+											? "w-8 bg-white"
+											: "w-2 bg-white/50 hover:bg-white/70"
+									}`}
+									aria-label={`Go to image ${index + 1}`}
+								/>
+							))}
 						</div>
-					</div>
 
-					{/* Navigation Arrows */}
-					<button
-						onClick={prevImage}
-						className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
-						aria-label="Previous image"
-					>
-						<ChevronLeft className="w-6 h-6 text-gray-800" />
-					</button>
-
-					<button
-						onClick={nextImage}
-						className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
-						aria-label="Next image"
-					>
-						<ChevronRight className="w-6 h-6 text-gray-800" />
-					</button>
-
-					{/* Dot Indicators */}
-					<div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2">
-						{CAROUSEL_IMAGES.map((_, index) => (
-							<button
-								key={index}
-								onClick={() => goToImage(index)}
-								className={`transition-all ${
-									index === currentImageIndex
-										? "w-8 h-2.5 bg-white rounded-full"
-										: "w-2.5 h-2.5 bg-white/50 hover:bg-white/75 rounded-full"
-								}`}
-								aria-label={`Go to image ${index + 1}`}
-							/>
-						))}
+						<button
+							onClick={nextImage}
+							className="p-2 bg-white/20 hover:bg-white/30 rounded-full backdrop-blur-sm transition-all"
+							aria-label="Next image"
+						>
+							<ChevronRight className="w-6 h-6" />
+						</button>
 					</div>
 				</div>
 			</div>

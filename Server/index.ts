@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
-import { register } from "./routes/auth";
+import { login, register, getRegisteredEmails } from "./routes/auth";
 
 export function createServer() {
   const app = express();
@@ -12,19 +12,23 @@ export function createServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Example API routes
+  // API routes
   app.get("/api/ping", (_req, res) => {
     const ping = process.env.PING_MESSAGE ?? "ping";
     res.json({ message: ping });
   });
 
   app.get("/api/demo", handleDemo);
+  app.post("/api/auth/login", login);
   app.post("/api/auth/register", register);
-  // app.post("/api/auth/login", login);
+  app.get("/api/auth/registered-emails", getRegisteredEmails);
 
   return app;
 }
 
-// your existing code in auth.ts
+const PORT = process.env.PORT || 5000;
+const app = createServer();
 
-// Remove duplicate register function from index.ts
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
