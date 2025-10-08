@@ -6,7 +6,7 @@ import { SocialLogin } from "@/components/SocialLogin";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-
+// Mock user data for demonstration purposes
 const DEMO_USERS = [
 	{ id: "admin1", email: "admin@test.com", role: "admin" as const, name: "Admin User" },
 	{ id: "instructor1", email: "instructor@test.com", role: "instructor" as const, name: "Instructor User" },
