@@ -7,6 +7,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 
+// Mock user data for demonstration purposes
+const DEMO_USERS = [
+  { id: "admin1", email: "admin@test.com", role: "admin" as const, name: "Admin User" },
+  { id: "instructor1", email: "instructor@test.com", role: "instructor" as const, name: "Instructor User" },
+  { id: "creator1", email: "creator1@test.com", role: "contentCreator" as const, name: "Content Creator" },
+  { id: "student1", email: "student@test.com", role: "user" as const, name: "Student User" },
+];
+
 const CAROUSEL_IMAGES = [
 	{
 		url: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&h=800&fit=crop",
