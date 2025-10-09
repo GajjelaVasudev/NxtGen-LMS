@@ -12,7 +12,7 @@ import DashboardLayout from "./layouts/DashboardLayout";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import RequireAuth from "@/components/RequireAuth";
-
+//improvements added for responsive UI
 const queryClient = new QueryClient();
 
 export default function App() {
