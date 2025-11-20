@@ -2,10 +2,7 @@
   "name": "fusion-starter",
   "private": true,
   "type": "module",
-  "pkg": {
-    "assets": ["dist/spa/*"],
-    "scripts": ["dist/server/**/*.js"]
-  },
+  
   "scripts": {
     "dev": "vite",
     "build": "vite build",
