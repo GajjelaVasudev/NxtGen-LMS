@@ -6,7 +6,7 @@
     "outDir": "dist/Server",
     "module": "NodeNext",
     "target": "ES2020",
-    "moduleResolution": "node",
+    "moduleResolution": "NodeNext",
     "resolveJsonModule": true,
     "allowJs": false,
     "declaration": false,
