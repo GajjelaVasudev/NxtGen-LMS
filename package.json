@@ -3,26 +3,26 @@
   "private": true,
   "type": "module",
   "pkg": {
-    "assets": [
-      "dist/spa/*"
-    ],
-    "scripts": [
-      "dist/server/**/*.js"
-    ]
+    "assets": ["dist/spa/*"],
+    "scripts": ["dist/server/**/*.js"]
   },
   "scripts": {
-  "dev": "vite",
-  "build": "vite build",
-  "build:server": "tsc -p tsconfig.server.json",
-  "build:all": "npm run build && npm run build:server",
-  "start": "node dist/Server/index.js",
-  "preview": "vite preview",
-  "dev:server": "tsx watch Server/index.ts"
-}
-,
+    "dev": "vite",
+    "build": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:all": "npm run build && npm run build:server",
+    "start": "node dist/Server/index.js",
+    "preview": "vite preview",
+    "dev:server": "tsx watch Server/index.ts"
+  },
   "dependencies": {
+    "vite": "^7.1.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.3",
+    "@vitejs/plugin-react-swc": "^4.0.0",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "cors": "^2.8.5",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -65,12 +65,10 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@types/three": "^0.176.0",
-    "@vitejs/plugin-react-swc": "^4.0.0",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "emoji-picker-react": "^4.14.0",
@@ -95,11 +93,7 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.176.0",
     "ts-node-dev": "^2.0.0",
-    "tsx": "^4.20.3",
-    "typescript": "^5.9.3",
-    "vaul": "^1.1.2",
-    "vite": "^7.1.2",
     "vitest": "^3.2.4"
   },
-  "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"
+  "packageManager": "pnpm@10.14.0"
 }
