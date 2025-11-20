@@ -1,0 +1,156 @@
+/* Scoped landing styles — do NOT include @tailwind directives here. */
+/* Font import (must come first) */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap");
+
+/* Scope all landing variables and base styles under .landing-root */
+.landing-root {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+
+  --card: 0 0% 93%;
+  --card-foreground: 0 0% 0%;
+
+  --primary: 207 74% 40%;
+  --primary-foreground: 0 0% 100%;
+
+  --brand-blue: 207 74% 40%;
+  --brand-yellow: 61 81% 52%;
+  --brand-cyan: 191 100% 64%;
+
+  --gray-text: 0 0% 55%;
+  --gray-light: 0 0% 93%;
+  --gray-medium: 0 0% 59%;
+
+  /* sidebar / other vars (if used) */
+  --sidebar-background: 0 0% 98%;
+  --sidebar-foreground: 240 5% 26%;
+}
+
+/* Basic resets / base styles scoped to landing */
+.landing-root {
+  font-family: "Inter", -apple-system, Roboto, Helvetica, sans-serif;
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utility mappings used in landing markup */
+.landing-root .text-brand-blue { color: hsl(var(--brand-blue)); }
+.landing-root .text-brand-yellow { color: hsl(var(--brand-yellow)); }
+.landing-root .bg-brand-cyan { background-color: hsl(var(--brand-cyan)); }
+.landing-root .bg-brand-blue { background-color: hsl(var(--brand-blue)); }
+.landing-root .text-gray-text { color: hsl(var(--gray-text)); }
+.landing-root .bg-gray-light { background-color: hsl(var(--gray-light)); }
+.landing-root .text-gray-medium { color: hsl(var(--gray-medium)); }
+
+/* Ensure images are responsive */
+.landing-root img { max-width: 100%; height: auto; display: block; }
+
+/* Inputs / form controls (scoped) */
+.landing-root input[type="text"],
+.landing-root input[type="email"],
+.landing-root input,
+.landing-root textarea {
+  appearance: none;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: white;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.6rem;
+  font-size: 0.95rem;
+  outline: none;
+  transition: box-shadow .15s ease, border-color .15s ease, transform .06s ease;
+  box-shadow: 0 1px 0 rgba(16,24,40,0.02);
+}
+
+.landing-root input:focus,
+.landing-root textarea:focus {
+  border-color: hsl(var(--brand-blue));
+  box-shadow: 0 6px 18px rgba(27,104,179,0.08);
+  transform: translateY(-1px);
+}
+
+/* Primary CTA styling (Create Free Account) — scoped */
+.landing-root .cta-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: hsl(var(--brand-blue));
+  color: white;
+  padding: 0.6rem 1.1rem;
+  border-radius: 1.1rem;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 8px 30px rgba(27,104,179,0.12);
+  transition: transform .08s ease, box-shadow .12s ease, opacity .12s ease;
+}
+
+.landing-root .cta-create:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 42px rgba(27,104,179,0.14);
+}
+
+.landing-root .cta-create:active {
+  transform: translateY(0);
+  opacity: 0.98;
+}
+
+/* Secondary / light CTA (header buttons) */
+.landing-root .btn-outline {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.08);
+  padding: 0.6rem 1rem;
+  border-radius: 1rem;
+  font-weight: 600;
+}
+
+/* Hero layout tweaks */
+.landing-root .max-w-4xl {
+  max-width: 58rem;
+}
+
+/* Feature cards */
+.landing-root .feature-card {
+  background: hsl(var(--card));
+  border-radius: 0.9rem;
+  padding: 1.25rem;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.landing-root .feature-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 40px rgba(16,24,40,0.06);
+}
+
+/* Review visuals */
+.landing-root .review-avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  background: rgba(0,0,0,0.06);
+}
+
+/* Footer and utilities */
+.landing-root footer { color: hsl(var(--gray-medium)); }
+
+/* Accessibility: focus outlines */
+.landing-root a:focus,
+.landing-root button:focus,
+.landing-root input:focus {
+  outline: 3px solid rgba(27,104,179,0.12);
+  outline-offset: 3px;
+}
+
+/* Responsiveness: compact form on very small screens */
+@media (max-width: 640px) {
+  .landing-root .text-3xl { font-size: 1.6rem; }
+  .landing-root .max-w-4xl { padding-left: 1rem; padding-right: 1rem; }
+  .landing-root form { flex-direction: column; gap: 0.75rem; }
+  .landing-root input.w-64 { width: 100%; }
+  .landing-root .cta-create { width: 100%; justify-content: center; }
+}
+
+/* Optional utility to preserve original .rounded usage in markup */
+.landing-root .rounded { border-radius: 0.25rem; }
