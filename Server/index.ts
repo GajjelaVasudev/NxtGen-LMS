@@ -8,6 +8,8 @@ import { login, register, getRegisteredEmails, requestOtp, verifyOtp, socialLogi
 
 export function createServer() {
   const app = express();
+  // When behind a proxy (Render, Heroku, etc.) trust the proxy so req.protocol reflects https
+  app.set('trust proxy', true);
 
   // Middleware
   // allow CORS for local development; tighten origin in production
@@ -42,13 +44,15 @@ export function createServer() {
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
   const BASE_URL = process.env.BASE_URL || "http://localhost:5173"; // client origin for postMessage fallback
 
+  const CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback";
+
   if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
     passport.use(
       new GoogleStrategy(
         {
           clientID: GOOGLE_CLIENT_ID,
           clientSecret: GOOGLE_CLIENT_SECRET,
-          callbackURL: "/api/auth/google/callback",
+          callbackURL: CALLBACK_URL,
         },
         // verify
         function (_accessToken, _refreshToken, profile, done) {
