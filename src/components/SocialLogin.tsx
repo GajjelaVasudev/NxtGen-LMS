@@ -1,4 +1,68 @@
+import React from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+
 export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const doSocial = async (provider: string) => {
+    // Open OAuth popup to server endpoint which will postMessage back the user
+    const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+    const url = `${API}/auth/google`;
+
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2.5;
+
+    const popup = window.open(
+      url,
+      "oauth_popup",
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
+    );
+
+    if (!popup) {
+      alert("Unable to open popup. Please allow popups for this site.");
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      // ensure message origin is same origin (server uses BASE_URL env which should match client origin)
+      if (event.origin !== window.location.origin) return;
+      const data = event.data || {};
+      if (data?.type !== "oauth") return;
+      window.removeEventListener("message", handleMessage);
+      try {
+        if (data.error) {
+          alert("Social login failed: " + data.error);
+          return;
+        }
+        const user = data.user;
+        if (!user) {
+          alert("Social login failed: no user returned");
+          return;
+        }
+        login(user);
+        navigate("/app");
+      } finally {
+        try {
+          popup.close();
+        } catch (e) {}
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    // fallback: if popup closed without message, cleanup
+    const poll = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(poll);
+        window.removeEventListener("message", handleMessage);
+      }
+    }, 500);
+  };
+
   return (
     <>
       <div className="flex items-center gap-4 w-full">
@@ -7,25 +71,10 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
         <div className="h-[0.5px] flex-1 bg-[#313131] opacity-25"></div>
       </div>
 
-      <div className="flex items-start gap-4 w-full">
-        <button className="flex-1 flex items-center justify-center py-4 px-6 border border-[#515DEF] rounded hover:bg-gray-50 transition-colors">
+      <div className="flex items-start w-full">
+        <button onClick={() => doSocial("google")} className="w-full flex items-center justify-center py-4 px-6 border border-[#515DEF] rounded hover:bg-gray-50 transition-colors">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M24 12.0733C24 5.40554 18.6274 0 12 0C5.37258 0 0 5.40544 0 12.0733C0 18.0994 4.38823 23.0943 10.125 24V15.5633H7.07812V12.0733H10.125V9.41343C10.125 6.38748 11.9166 4.71615 14.6575 4.71615C15.9705 4.71615 17.3438 4.95203 17.3438 4.95203V7.92313H15.8306C14.3398 7.92313 13.875 8.85384 13.875 9.80857V12.0733H17.2031L16.6711 15.5633H13.875V24C19.6118 23.0943 24 18.0995 24 12.0733Z" fill="#1877F2"/>
-          </svg>
-        </button>
-
-        <button className="flex-1 flex items-center justify-center py-4 px-6 border border-[#515DEF] rounded hover:bg-gray-50 transition-colors">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21.8055 10.0415H21V10H12V14H17.6515C16.827 16.3285 14.6115 18 12 18C8.6865 18 6 15.3135 6 12C6 8.6865 8.6865 6 12 6C13.5295 6 14.921 6.577 15.9805 7.5195L18.809 4.691C17.023 3.0265 14.634 2 12 2C6.4775 2 2 6.4775 2 12C2 17.5225 6.4775 22 12 22C17.5225 22 22 17.5225 22 12C22 11.3295 21.931 10.675 21.8055 10.0415Z" fill="#FFC107"/>
-            <path d="M3.153 7.3455L6.4385 9.755C7.3275 7.554 9.4805 6 12 6C13.5295 6 14.921 6.577 15.9805 7.5195L18.809 4.691C17.023 3.0265 14.634 2 12 2C8.159 2 4.828 4.1685 3.153 7.3455Z" fill="#FF3D00"/>
-            <path d="M12 22.0003C14.583 22.0003 16.93 21.0118 18.7045 19.4043L15.6095 16.7853C14.5718 17.5745 13.3037 18.0014 12 18.0003C9.399 18.0003 7.1905 16.3418 6.3585 14.0273L3.0975 16.5398C4.7525 19.7783 8.1135 22.0003 12 22.0003Z" fill="#4CAF50"/>
-            <path d="M21.8055 10.0415H21V10H12V14H17.6515C17.2571 15.1082 16.5467 16.0766 15.608 16.7855L15.6095 16.7845L18.7045 19.4035C18.4855 19.6025 22 17 22 12C22 11.3295 21.931 10.675 21.8055 10.0415Z" fill="#1976D2"/>
-          </svg>
-        </button>
-
-        <button className="flex-1 flex items-center justify-center py-4 px-6 border border-[#515DEF] rounded hover:bg-gray-50 transition-colors">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M17.5172 12.5555C17.5078 10.957 18.232 9.75234 19.6945 8.86406C18.8766 7.69219 17.6391 7.04766 16.0078 6.92344C14.4633 6.80156 12.7734 7.82344 12.1547 7.82344C11.5008 7.82344 10.0055 6.96563 8.82891 6.96563C6.40078 7.00313 3.82031 8.90156 3.82031 12.7641C3.82031 13.9055 4.02891 15.0844 4.44609 16.2984C5.00391 17.8969 7.01484 21.8133 9.1125 21.75C10.2094 21.7242 10.9852 20.9719 12.4125 20.9719C13.7977 20.9719 14.5148 21.75 15.7383 21.75C17.8547 21.7195 19.6734 18.1594 20.2031 16.5563C17.3648 15.218 17.5172 12.6375 17.5172 12.5555V12.5555ZM15.0539 5.40703C16.2422 3.99609 16.1344 2.71172 16.0992 2.25C15.0492 2.31094 13.8352 2.96484 13.1437 3.76875C12.382 4.63125 11.9344 5.69766 12.0305 6.9C13.1648 6.98672 14.2008 6.40313 15.0539 5.40703V5.40703Z" fill="#313131"/>
           </svg>
         </button>
       </div>
