@@ -59,41 +59,22 @@ export default function Login() {
         setLoading(true);
 
         try {
-            // Prefer the dev proxy during development so requests go through Vite -> backend
             const API = import.meta.env.DEV
                 ? "/api"
                 : ((import.meta.env.VITE_API_URL as string) || "/api");
 
-            // Request a one-time OTP for this login attempt (server will send email)
-            const otpReq = await fetch(`${API}/auth/request-otp`, {
+            const res = await fetch(`${API}/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
+                body: JSON.stringify({ email, password }),
             });
 
-            if (!otpReq.ok) {
-                const errBody = await otpReq.json().catch(() => ({ message: otpReq.statusText }));
-                throw new Error(errBody?.message || `HTTP ${otpReq.status}`);
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({ message: res.statusText }));
+                throw new Error(body?.error || body?.message || `HTTP ${res.status}`);
             }
 
-            // Minimal UI change: prompt the user for the OTP (keeps page appearance unchanged)
-            const enteredOtp = window.prompt("Enter the 6-digit OTP sent to your email:");
-            if (!enteredOtp) {
-                throw new Error("OTP entry cancelled");
-            }
-
-            const verify = await fetch(`${API}/auth/login-otp`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, otp: enteredOtp }),
-            });
-
-            if (!verify.ok) {
-                const errBody = await verify.json().catch(() => ({ message: verify.statusText }));
-                throw new Error(errBody?.message || `HTTP ${verify.status}`);
-            }
-
-            const data = await verify.json();
+            const data = await res.json();
             login(data.user);
             navigate("/app");
         } catch (err: any) {
