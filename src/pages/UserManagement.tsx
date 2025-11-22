@@ -333,7 +333,7 @@ export default function UserManagement() {
   };
 
   return (
-    <main className="flex-1 h-full overflow-y-auto bg-gray-50">
+    <main className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
         {/* Page Header */}
         <div className="mb-6">

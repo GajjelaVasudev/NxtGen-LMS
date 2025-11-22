@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Eye,
   CheckCircle2,
@@ -68,19 +68,21 @@ function loadEnrollments(): { courseId: string; purchasedAt: number }[] {
 function loadTodos(): TodoItem[] {
   try {
     const raw = localStorage.getItem(TODO_KEY);
-    return raw ? (JSON.parse(raw) as TodoItem[]) : [
-      { id: "1", title: "Human Interaction Designs", date: "Tuesday, 30 June 2024", completed: false },
-      { id: "2", title: "Design system Basics", date: "Monday, 24 June 2024", completed: false },
-      { id: "3", title: "Introduction to UI", date: "Friday, 10 June 2024", completed: true },
-      { id: "4", title: "Basics of Figma", date: "Friday, 05 June 2024", completed: true },
-    ];
+    return raw ? (JSON.parse(raw) as TodoItem[]) : [];
   } catch {
     return [];
   }
 }
 
 function saveTodos(todos: TodoItem[]) {
-  localStorage.setItem(TODO_KEY, JSON.stringify(todos));
+  try {
+    localStorage.setItem(TODO_KEY, JSON.stringify(todos));
+    // notify other parts of the app if needed
+    window.dispatchEvent(new CustomEvent("todos:updated"));
+  } catch {
+    // Fail silently for storage errors (quota etc.)
+    console.warn("Failed to persist todos");
+  }
 }
 
 function loadAssignments() {
@@ -103,6 +105,13 @@ function loadSubmissions() {
 
 // Student Overview Component
 function StudentOverview() {
+  const { user } = useAuth();
+
+  const displayName =
+    user?.name ||
+    user?.email?.split?.("@")[0] ||
+    "Student";
+
   const [courses, setCourses] = useState<Course[]>(() => loadCourses());
   const [enrollments, setEnrollments] = useState(() => loadEnrollments());
   const [todos, setTodos] = useState<TodoItem[]>(() => loadTodos());
@@ -231,13 +240,14 @@ function StudentOverview() {
     saveTodos(updated);
   };
 
+  // make sure component root is scrollable inside the dashboard layout
   return (
-    <div className="flex-1 bg-gray-50 min-h-0">
+    <div className="flex-1 h-full overflow-y-auto bg-gray-50">
       <div className="max-w-[1160px] mx-auto p-6 lg:p-8">
         {/* Welcome Section */}
         <div className="mb-6">
           <h1 className="text-[30px] font-normal text-[#1C1D1D] mb-4 font-sora">
-            Welcome Back Student
+            Welcome Back {displayName}
           </h1>
           <p className="text-[19px] font-normal text-[#1C1D1D] font-sora">
             Here's your learning progress overview
@@ -323,10 +333,9 @@ function StudentOverview() {
               </h2>
               <button
                 onClick={() => setShowAddTodo(true)}
-                className="flex items-center gap-1 text-[#1B68B3] hover:text-[#155a9a]"
+                className="px-3 py-1 border rounded text-sm"
               >
-                <Plus className="w-4 h-4" />
-                <span className="text-sm">Add</span>
+                Add
               </button>
             </div>
 
@@ -361,46 +370,50 @@ function StudentOverview() {
             )}
 
             <div className="max-h-[300px] overflow-y-auto space-y-4">
-              {todos.map((todo, index) => (
-                <div key={todo.id} className={`${index < todos.length - 1 ? 'pb-4 border-b border-[#ECECEC]' : ''}`}>
-                  <div className="flex items-start gap-3">
-                    <button
-                      onClick={() => toggleTodo(todo.id)}
-                      className={`w-4 h-4 border border-[#1B68B3] mt-1 flex-shrink-0 flex items-center justify-center ${
-                        todo.completed ? 'bg-[#1B68B3]' : 'bg-[rgba(255,75,0,0.06)]'
-                      }`}
-                    >
-                      {todo.completed && (
-                        <svg className="w-2 h-2" viewBox="0 0 10 8" fill="none">
-                          <path
-                            d="M0.882133 3.92939L3.63887 6.41533L9.15233 1.44346"
-                            stroke="white"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                    <div className="flex-1">
-                      <h3 className={`text-[13px] font-medium text-[#121212] opacity-70 font-poppins ${
-                        todo.completed ? 'line-through' : ''
-                      }`}>
-                        {todo.title}
-                      </h3>
-                      <p className="text-[12px] text-[#41475E] opacity-50 mt-1 font-poppins">
-                        {todo.date}
-                      </p>
+              {todos.length === 0 ? (
+                <div className="text-center text-sm text-gray-500">No todos — add your first task</div>
+              ) : (
+                todos.map((todo, index) => (
+                  <div key={todo.id} className={`${index < todos.length - 1 ? 'pb-4 border-b border-[#ECECEC]' : ''}`}>
+                    <div className="flex items-start gap-3">
+                      <button
+                        onClick={() => toggleTodo(todo.id)}
+                        className={`w-4 h-4 border border-[#1B68B3] mt-1 flex-shrink-0 flex items-center justify-center ${
+                          todo.completed ? 'bg-[#1B68B3]' : 'bg-[rgba(255,75,0,0.06)]'
+                        }`}
+                      >
+                        {todo.completed && (
+                          <svg className="w-2 h-2" viewBox="0 0 10 8" fill="none">
+                            <path
+                              d="M0.882133 3.92939L3.63887 6.41533L9.15233 1.44346"
+                              stroke="white"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                      <div className="flex-1">
+                        <h3 className={`text-[13px] font-medium text-[#121212] opacity-70 font-poppins ${
+                          todo.completed ? 'line-through' : ''
+                        }`}>
+                          {todo.title}
+                        </h3>
+                        <p className="text-[12px] text-[#41475E] opacity-50 mt-1 font-poppins">
+                          {todo.date}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeTodo(todo.id)}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => removeTodo(todo.id)}
-                      className="text-gray-400 hover:text-red-500 p-1"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

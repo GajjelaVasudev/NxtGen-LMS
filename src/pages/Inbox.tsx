@@ -119,8 +119,8 @@ export default function Inbox() {
   }, [messages]);
 
   return (
-    <main className="flex-1 h-full overflow-hidden bg-gray-50">
-      <div className="h-full flex">
+    <main className="flex-1 min-h-0 overflow-hidden bg-gray-50">
+      <div className="min-h-0 flex">
         {/* Message List */}
         <div className="w-1/3 bg-white border-r flex flex-col">
           {/* Header */}
@@ -202,7 +202,7 @@ export default function Inbox() {
         </div>
 
         {/* Message Detail */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col">
           {selectedMessage ? (
             <>
               {/* Message Header */}

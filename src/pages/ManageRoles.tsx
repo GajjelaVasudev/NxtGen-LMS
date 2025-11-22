@@ -1,7 +1,7 @@
 // src/pages/ManageRoles.tsx
 export default function ManageRoles() {
   return (
-    <main className="flex-1 p-6 overflow-y-auto bg-white">
+    <main className="flex-1 p-6 min-h-0 overflow-y-auto bg-white">
       <div>
         <h1 className="text-2xl font-bold text-nxtgen-text-primary mb-6">
           Manage Roles

@@ -281,7 +281,7 @@ export default function Assignments() {
   };
 
   return (
-    <main className="flex-1 h-full overflow-y-auto bg-white">
+    <main className="flex-1 min-h-0 overflow-y-auto bg-white">
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex items-center justify-between mb-6 gap-4">
           <h1 className="text-2xl font-bold text-nxtgen-text-primary">Assignments</h1>

@@ -133,7 +133,7 @@ export default function CourseView() {
 
   if (!course) {
     return (
-      <div className="flex-1 h-full overflow-y-auto bg-white">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-white">
         <div className="max-w-7xl mx-auto p-6">
           <div className="text-center py-12">
             <p className="text-gray-500 mb-4">Course not found</p>
@@ -212,7 +212,7 @@ export default function CourseView() {
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-gray-50">
+    <div className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-6">

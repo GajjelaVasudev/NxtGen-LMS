@@ -251,7 +251,7 @@ export default function Settings() {
   );
 
   return (
-    <main className="flex-1 h-full overflow-y-auto bg-gray-50 dark:bg-gray-900">
+    <main className="flex-1 min-h-0 overflow-y-auto bg-gray-50 dark:bg-gray-900">
       <div className="max-w-6xl mx-auto p-6">
         {/* Page Header */}
         <div className="mb-6">

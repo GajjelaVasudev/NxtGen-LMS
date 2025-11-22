@@ -464,7 +464,7 @@ export default function Discussions() {
 
   if (showInbox) {
     return (
-      <main className="flex-1 h-full flex bg-white">
+      <main className="flex-1 min-h-0 flex bg-white">
         {/* Conversations List */}
         <div className="w-80 border-r flex flex-col">
           <div className="p-4 border-b flex items-center justify-between">
@@ -630,7 +630,7 @@ export default function Discussions() {
   }
 
   return (
-    <main className="flex-1 h-full flex flex-col bg-white">
+    <main className="flex-1 min-h-0 flex flex-col bg-white">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
         <div>
@@ -662,7 +662,7 @@ export default function Discussions() {
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-gray-50 min-h-0">
         {filteredDiscussions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
+          <div className="flex flex-col items-center justify-center min-h-0 text-gray-400 py-20">
             <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
               <Send className="w-10 h-10 text-gray-400" />
             </div>

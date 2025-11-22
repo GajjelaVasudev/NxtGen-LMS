@@ -77,7 +77,7 @@ export default function ManageCourse() {
   }, [courses, query, sort]);
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-white">
+    <div className="flex-1 min-h-0 overflow-y-auto bg-white">
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex items-center justify-between mb-6 gap-4">
           <h1 className="text-2xl font-bold text-nxtgen-text-primary">Manage Courses</h1>
@@ -327,7 +327,7 @@ export function AddCourse() {
   }
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-white">
+    <div className="flex-1 min-h-0 overflow-y-auto bg-white">
       <div className="max-w-3xl mx-auto p-6">
         <div className="flex items-center gap-4 mb-6">
           <button

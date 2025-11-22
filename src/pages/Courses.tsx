@@ -54,7 +54,7 @@ export default function Courses() {
     .filter(Boolean) as (Course & { purchasedAt: number })[];
 
   return (
-    <main className="flex-1 h-full overflow-y-auto bg-white">
+    <main className="flex-1 min-h-0 overflow-y-auto bg-white">
       <div className="max-w-7xl mx-auto p-6">
         <h1 className="text-2xl font-bold text-nxtgen-text-primary mb-6">My Courses</h1>
 
