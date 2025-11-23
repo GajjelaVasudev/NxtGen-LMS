@@ -22,7 +22,14 @@ export default function CourseCatalog() {
       ]);
       if (!mounted) return;
       setCourses(cRes.courses || []);
-      setEnrollments(eRes.enrollments || []);
+      // Normalize enrollment rows to use client-friendly keys
+      const rawEnrolls = eRes.enrollments || [];
+      const norm = rawEnrolls.map((row: any) => ({
+        ...row,
+        courseId: row.course_id || row.courseId,
+        userId: row.user_id || row.userId,
+      }));
+      setEnrollments(norm);
     })();
     return () => { mounted = false; };
   }, [user]);
@@ -39,12 +46,18 @@ export default function CourseCatalog() {
         body: JSON.stringify({ email: user.email }),
       });
       const body = await res.json().catch(() => null);
-      if (!res.ok || !body?.success) {
+      if (!res.ok) {
         console.error('Enroll failed', { status: res.status, body });
         return alert("Failed to enroll");
       }
+      // treat both success and alreadyEnrolled as success
+      if (!body || body.success !== true) {
+        console.error('Enroll failed - unexpected body', { status: res.status, body });
+        return alert('Failed to enroll');
+      }
       const eJson = await fetch(`${API}/enrollments?userId=${user.id}`).then((r) => r.json()).catch(() => ({ enrollments: [] }));
-      setEnrollments(eJson.enrollments || []);
+      const raw = eJson.enrollments || [];
+      setEnrollments(raw.map((row: any) => ({ ...row, courseId: row.course_id || row.courseId, userId: row.user_id || row.userId })));
     } catch (err) {
       console.error('Enroll exception', err);
       alert('Failed to enroll');

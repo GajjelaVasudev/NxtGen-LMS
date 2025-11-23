@@ -20,7 +20,8 @@ export default function CourseDetails() {
       const e = await fetch(`${API}/enrollments${user?.id ? `?userId=${user.id}` : ""}`).then(r => r.json()).catch(() => ({ enrollments: [] }));
       if (!mounted) return;
       setCourse(c.course || null);
-      setEnrollments(e.enrollments || []);
+      const raw = e.enrollments || [];
+      setEnrollments(raw.map((row: any) => ({ ...row, courseId: row.course_id || row.courseId, userId: row.user_id || row.userId })));
     })();
     return () => { mounted = false; };
   }, [courseId, user]);
@@ -37,12 +38,17 @@ export default function CourseDetails() {
         body: JSON.stringify({ email: user.email }),
       });
       const body = await res.json().catch(() => null);
-      if (!res.ok || !body?.success) {
+      if (!res.ok) {
         console.error('Enroll failed', { status: res.status, body });
         return alert('Enroll failed');
       }
+      if (!body || body.success !== true) {
+        console.error('Enroll failed - unexpected body', { status: res.status, body });
+        return alert('Enroll failed');
+      }
       const e = await fetch(`${API}/enrollments?userId=${user.id}`).then(r => r.json()).catch(() => ({ enrollments: [] }));
-      setEnrollments(e.enrollments || []);
+      const raw = e.enrollments || [];
+      setEnrollments(raw.map((row: any) => ({ ...row, courseId: row.course_id || row.courseId, userId: row.user_id || row.userId })));
       setEnrolled(true);
     } catch (err) {
       console.error('Enroll exception', err);
