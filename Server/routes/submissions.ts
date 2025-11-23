@@ -108,7 +108,8 @@ export const listInstructorSubmissions: RequestHandler = async (req, res) => {
   try {
     console.log('[instructor/submissions] incoming');
     let instructorId = String(req.headers['x-user-id'] || req.query.instructorId || "");
-    if (!instructorId) return res.status(401).json({ success: false, error: 'Missing x-user-id header' });
+    console.log('[instructor/submissions] instructorId raw:', instructorId);
+    if (!instructorId) return res.status(403).json({ success: false, error: 'Forbidden: missing x-user-id header (instructor required)' });
     if (!instructorId.includes('-')) {
       const { canonicalizeUserId } = await import('../utils/userHelpers.js');
       const canonical = await canonicalizeUserId(instructorId);
@@ -123,7 +124,7 @@ export const listInstructorSubmissions: RequestHandler = async (req, res) => {
     if (courseId) assignmentsQuery = assignmentsQuery.eq('course_id', courseId);
     const { data: assignments, error: assignErr } = await assignmentsQuery;
     if (assignErr) {
-      console.error('[instructor/submissions] assignments lookup error', assignErr);
+      console.error('[instructor/submissions] DB error: assignments lookup', assignErr);
       return res.status(500).json({ success: false, error: assignErr.message });
     }
     const assignList: any[] = assignments || [];
@@ -136,7 +137,7 @@ export const listInstructorSubmissions: RequestHandler = async (req, res) => {
 
     const { data: subs, error: subsErr } = await supabase.from('assignment_submissions').select('*').in('assignment_id', assignmentIds).order('submitted_at', { ascending: false });
     if (subsErr) {
-      console.error('[instructor/submissions] submissions lookup error', subsErr);
+      console.error('[instructor/submissions] DB error: submissions lookup', subsErr);
       return res.status(500).json({ success: false, error: subsErr.message });
     }
     const submissions = subs || [];
@@ -161,7 +162,7 @@ export const listInstructorSubmissions: RequestHandler = async (req, res) => {
       raw: s
     }));
 
-    console.log(`[instructor/submissions] returning ${out.length} results`);
+    console.log(`[instructor/submissions] returning ${out.length} results for instructorId=${instructorId}`);
     return res.json({ success: true, submissions: out });
   } catch (err: any) {
     console.error('[instructor/submissions] unexpected error', err);
