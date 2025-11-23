@@ -183,6 +183,19 @@ export const getUserById: RequestHandler = async (req, res) => {
         console.warn('[auth] Supabase lookup by email returned error', { key, error });
       } else if (data) {
         return res.json({ user: data });
+      } else {
+        // If no DB user found but this email is a known demo user, create the DB row so frontend can canonicalize to UUID
+        const demo = REGISTERED_USERS.find((u) => u.email.toLowerCase() === key.toLowerCase());
+        if (demo) {
+          try {
+            const insertRow = { email: demo.email, role: demo.role };
+            const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
+            if (createErr) console.warn('[auth/getUserById] failed to create DB user for demo email', { key, createErr });
+            if (created) return res.json({ user: created });
+          } catch (exCreate) {
+            console.error('[auth/getUserById] exception creating DB user for demo email', exCreate);
+          }
+        }
       }
     }
 
