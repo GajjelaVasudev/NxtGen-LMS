@@ -217,9 +217,17 @@ export const getUserById: RequestHandler = async (req, res) => {
 };
 
 // Ensure a user row exists for the given email. Returns the DB id or null on failure.
-export async function getOrCreateUserInDb(email: string, role: string = 'user'): Promise<{ id: string | null; error?: any }> {
+export async function getOrCreateUserInDb(email: string, _role: string = 'user'): Promise<{ id: string | null; error?: any }> {
   const lc = String(email || '').toLowerCase();
   console.log('[auth/getOrCreate] ensure user exists', { email: lc });
+  // determine role based on demo emails
+  let assignedRole: string;
+  if (lc === 'admin@gmail.com') assignedRole = 'admin';
+  else if (lc === 'instructor@gmail.com') assignedRole = 'instructor';
+  else if (lc === 'contentcreator@gmail.com') assignedRole = 'content_creator';
+  else if (lc === 'student@gmail.com') assignedRole = 'student';
+  else assignedRole = 'student';
+  console.log('[auth/getOrCreate] assigning role', assignedRole, 'to', lc);
   try {
     // Try find first
     const { data: found, error: findErr } = await supabase.from('users').select('id').ilike('email', lc).maybeSingle();
@@ -229,7 +237,7 @@ export async function getOrCreateUserInDb(email: string, role: string = 'user'):
     if (found && found.id) return { id: found.id };
 
     // Not found -> attempt insert with lowercase email
-    const insertRow = { email: lc, role };
+    const insertRow = { email: lc, role: assignedRole };
     const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id').maybeSingle();
     if (createErr) {
       // If unique constraint (race) occurred, query again
