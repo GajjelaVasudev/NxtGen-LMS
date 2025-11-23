@@ -14,31 +14,7 @@ type Assignment = {
   createdAt: number;
 };
 
-const ASSIGNMENTS_KEY = "nxtgen_assignments";
-const COURSES_KEY = "nxtgen_courses";
-
-function loadAssignments(): Assignment[] {
-  try {
-    const raw = localStorage.getItem(ASSIGNMENTS_KEY);
-    return raw ? (JSON.parse(raw) as Assignment[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveAssignments(assignments: Assignment[]) {
-  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignments));
-  window.dispatchEvent(new CustomEvent("assignments:updated"));
-}
-
-function loadCourses() {
-  try {
-    const raw = localStorage.getItem(COURSES_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
+const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
 export default function CreateAssignment() {
   const { user } = useAuth();
@@ -46,8 +22,8 @@ export default function CreateAssignment() {
   const { id } = useParams();
   const isEditing = !!id;
 
-  const [assignments] = useState<Assignment[]>(() => loadAssignments());
-  const [courses] = useState(() => loadCourses());
+  const [assignments] = useState<Assignment[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
   
   const [form, setForm] = useState({
     title: "",
@@ -72,6 +48,22 @@ export default function CreateAssignment() {
     }
   }, [id, isEditing]);
 
+  useEffect(() => {
+    // load courses from server
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch(`${API}/courses`);
+        const json = await res.json();
+        if (!mounted) return;
+        setCourses(json.courses || []);
+      } catch (err) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   const handleImageUpload = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -88,47 +80,27 @@ export default function CreateAssignment() {
       alert("Please fill all required fields");
       return;
     }
-
-    const selectedCourse = courses.find((c: any) => c.id === form.courseId);
-    if (!selectedCourse) {
-      alert("Selected course not found");
-      return;
-    }
-
-    const existing = loadAssignments();
-    
-    if (isEditing) {
-      const updated = existing.map(a => 
-        a.id === id 
-          ? { 
-              ...a, 
-              title: form.title,
-              description: form.description,
-              courseId: form.courseId,
-              courseName: selectedCourse.title,
-              dueDate: form.dueDate,
-              imageUrl: form.imageUrl
-            }
-          : a
-      );
-      saveAssignments(updated);
-    } else {
-      const newAssignment: Assignment = {
-        id: String(Date.now()),
+    try {
+      const body = {
+        course_id: form.courseId,
         title: form.title,
         description: form.description,
-        courseId: form.courseId,
-        courseName: selectedCourse.title,
-        instructorId: user.id,
-        dueDate: form.dueDate,
-        imageUrl: form.imageUrl,
-        createdAt: Date.now()
+        due_at: form.dueDate,
       };
-      
-      saveAssignments([newAssignment, ...existing]);
+      const res = await fetch(`${API}/assignments`, {
+        method: isEditing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.error || "Failed to save assignment");
+        return;
+      }
+      navigate("/app/assignments");
+    } catch (err) {
+      alert("Failed to save assignment");
     }
-
-    navigate("/app/assignments");
   };
 
   return (

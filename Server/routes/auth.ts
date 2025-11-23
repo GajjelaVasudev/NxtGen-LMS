@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
 import nodemailer from "nodemailer";
+import { supabase } from "../supabaseClient.js";
 
 type UserRecord = {
   id: string;
@@ -86,7 +87,7 @@ function sendOtpEmail(to: string, code: string) {
   }
 }
 
-export const login: RequestHandler = (req, res) => {
+export const login: RequestHandler = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -105,10 +106,30 @@ export const login: RequestHandler = (req, res) => {
   }
 
   const { password: _, ...userWithoutPassword } = user;
-  return res.json({ success: true, user: userWithoutPassword, message: "Login successful" });
+
+  // Try to ensure this demo user exists in Supabase and return the canonical DB row (id as UUID)
+  try {
+    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role').ilike('email', user.email).single();
+    if (found && !findErr) {
+      return res.json({ success: true, user: found, message: 'Login successful (DB user)' });
+    }
+
+    // Create the user in DB
+    const insertRow = { email: user.email, role: user.role };
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').single();
+    if (created && !createErr) {
+      console.log('[auth] Created DB user during login', { email: user.email, id: created.id });
+      return res.json({ success: true, user: created, message: 'Login successful (created DB user)' });
+    }
+    console.warn('[auth] Could not create/find DB user during login, falling back to demo user', { findErr, createErr });
+  } catch (ex) {
+    console.error('[auth] Exception ensuring DB user during login', ex);
+  }
+
+  return res.json({ success: true, user: userWithoutPassword, message: 'Login successful (demo user fallback)' });
 };
 
-export const register: RequestHandler = (_req, res) => {
+export const register: RequestHandler = async (_req, res) => {
   // Allow manual signup for students only
   const { email, password, name } = _req.body || {};
   if (!email || !password) return res.status(400).json({ error: "email and password required" });
@@ -125,6 +146,19 @@ export const register: RequestHandler = (_req, res) => {
     requestedRole: null,
   };
   REGISTERED_USERS.push(newUser);
+
+  // Also create a DB user so frontend receives canonical UUID
+  try {
+    const insertRow = { email: newUser.email, role: newUser.role };
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
+    if (createErr) {
+      console.warn('[auth/register] failed to create DB user', { email: newUser.email, createErr });
+    }
+    if (created) return res.json({ success: true, user: created });
+  } catch (ex) {
+    console.error('[auth/register] exception creating DB user', ex);
+  }
+
   const { password: _, ...userWithoutPassword } = newUser;
   return res.json({ success: true, user: userWithoutPassword });
 };
@@ -135,18 +169,37 @@ export const getRegisteredEmails: RequestHandler = (_req, res) => {
   return res.json({ emails });
 };
 
-// Helper: find user by id (programmatic)
-export function findUserById(id: string) {
-  return REGISTERED_USERS.find((u) => String(u.id) === String(id));
-}
+// NOTE: demo numeric id mapping removed — do not fall back to in-memory demo ids
 
 // GET /api/users/:id
-export const getUserById: RequestHandler = (req, res) => {
-  const id = req.params.id;
-  const user = findUserById(id);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  const { password: _, ...userWithoutPassword } = user;
-  return res.json({ user: userWithoutPassword });
+export const getUserById: RequestHandler = async (req, res) => {
+  const key = String(req.params.id || "");
+
+  // If the key looks like an email, try Supabase by email
+  try {
+    if (key.includes("@")) {
+      const { data, error } = await supabase.from("users").select("id, email, role").ilike("email", key).maybeSingle();
+      if (error) {
+        console.warn('[auth] Supabase lookup by email returned error', { key, error });
+      } else if (data) {
+        return res.json({ user: data });
+      }
+    }
+
+    // Otherwise, try by id (UUID) in Supabase
+    if (key && key.includes("-")) {
+      const { data, error } = await supabase.from("users").select("id, email, role").eq("id", key).maybeSingle();
+      if (error) {
+        console.warn('[auth] Supabase lookup by id returned error', { key, error });
+      } else if (data) {
+        return res.json({ user: data });
+      }
+    }
+  } catch (ex) {
+    console.error('[auth] Exception querying Supabase for user', ex);
+  }
+  // No Supabase user found
+  return res.status(404).json({ error: 'User not found' });
 };
 
 // NEW: request OTP endpoint
@@ -173,7 +226,7 @@ export const requestOtp: RequestHandler = async (req, res) => {
 };
 
 // NEW: verify OTP and login
-export const verifyOtp: RequestHandler = (req, res) => {
+export const verifyOtp: RequestHandler = async (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp) return res.status(400).json({ error: "Email and otp required" });
 
@@ -193,11 +246,28 @@ export const verifyOtp: RequestHandler = (req, res) => {
   if (!user) return res.status(404).json({ error: "User not found" });
   if (user.approved === false) return res.status(403).json({ error: "Account pending approval by administrator" });
   const { password: _, ...userWithoutPassword } = user;
+
+  // Ensure DB user exists and return DB row when possible
+  try {
+    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role').ilike('email', email).maybeSingle();
+    if (findErr) {
+      console.warn('[auth/verifyOtp] Supabase lookup error', { email, findErr });
+    }
+    if (found) return res.json({ success: true, user: found, message: 'OTP verified' });
+
+    const insertRow = { email: user.email, role: user.role };
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
+    if (createErr) console.warn('[auth/verifyOtp] failed to create DB user', { email, createErr });
+    if (created) return res.json({ success: true, user: created, message: 'OTP verified' });
+  } catch (ex) {
+    console.error('[auth/verifyOtp] exception ensuring DB user', ex);
+  }
+
   return res.json({ success: true, user: userWithoutPassword, message: "OTP verified" });
 };
 
 // NEW: simple demo social login
-export const socialLogin: RequestHandler = (req, res) => {
+export const socialLogin: RequestHandler = async (req, res) => {
   const provider = (req.body?.provider || req.query?.provider || "").toLowerCase();
   if (!provider) return res.status(400).json({ error: "provider required" });
 
@@ -211,6 +281,21 @@ export const socialLogin: RequestHandler = (req, res) => {
 
   if (user.approved === false) return res.status(403).json({ error: "Account pending approval by administrator" });
   const { password: _, ...userWithoutPassword } = user;
+
+  // Ensure DB user exists so social login returns DB UUID
+  try {
+    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role').ilike('email', user.email).maybeSingle();
+    if (findErr) console.warn('[auth/socialLogin] Supabase lookup error', { email: user.email, findErr });
+    if (found) return res.json({ success: true, user: found, provider });
+
+    const insertRow = { email: user.email, role: user.role };
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
+    if (createErr) console.warn('[auth/socialLogin] failed to create DB user', { email: user.email, createErr });
+    if (created) return res.json({ success: true, user: created, provider });
+  } catch (ex) {
+    console.error('[auth/socialLogin] exception ensuring DB user', ex);
+  }
+
   return res.json({ success: true, user: userWithoutPassword, provider });
 };
 

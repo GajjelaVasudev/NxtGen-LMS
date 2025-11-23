@@ -11,35 +11,29 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { loadInboxMessages } from "@/utils/inboxHelpers";
 import { Logo } from "@/components/Logo";
 
-const INBOX_KEY = "nxtgen_inbox";
-
-function loadInboxMessages() {
-  try {
-    const raw = localStorage.getItem(INBOX_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
 export default function Sidebar() {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    const updateUnreadCount = () => {
-      const messages = loadInboxMessages();
-      const unread = messages.filter((msg: any) => !msg.read).length;
-      setUnreadCount(unread);
+    const updateUnreadCount = async () => {
+      try {
+        const messages = await loadInboxMessages(user?.id, user?.role);
+        const unread = (messages || []).filter((msg: any) => !msg.read).length;
+        setUnreadCount(unread);
+      } catch {
+        setUnreadCount(0);
+      }
     };
 
     updateUnreadCount();
-    
+
     const handler = () => updateUnreadCount();
     window.addEventListener("inbox:updated", handler);
-    
+
     return () => window.removeEventListener("inbox:updated", handler);
   }, []);
 

@@ -12,7 +12,7 @@ export type User = {
 type AuthContextValue = {
   user: User | null;
   isAuthenticated: boolean;
-  login: (user: User) => void;
+  login: (user: Partial<User> & { email?: string }) => Promise<void>;
   logout: () => void;
   hasRole: (roles: Role | Role[]) => boolean;
 };
@@ -39,8 +39,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const login = (u: User) => {
-    setUser(u);
+  // If a stale numeric/fake id is loaded from localStorage, attempt to refresh
+  // Do not depend on numeric demo ids. We will canonicalize users after login by querying the server.
+  useEffect(() => {
+    (async () => {
+      try {
+        if (user && user.id && !String(user.id).includes('-') && user.email) {
+          // Canonicalize stored demo user by email (will replace numeric id with DB UUID)
+          await login({ email: user.email });
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
+
+  const login = async (u: Partial<User> & { email?: string }) => {
+    try {
+      // Require an email to canonicalize the user from the DB
+      const email = u?.email;
+      if (!email) {
+        console.warn('Auth.login requires an email to canonicalize user');
+        setUser(null);
+        return;
+      }
+
+      // Always fetch canonical user by email from the server so we get the DB UUID and role
+      const url = `/api/users/${encodeURIComponent(String(email))}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.warn('Failed to fetch canonical user record', { url, status: res.status });
+        setUser(null);
+        return;
+      }
+      const body = await res.json();
+      const serverUser = body?.user || body?.data || body;
+      if (!serverUser || !serverUser.id) {
+        console.warn('No user returned from server', serverUser);
+        setUser(null);
+        return;
+      }
+
+      const finalUser: User = {
+        id: String(serverUser.id),
+        email: serverUser.email || email,
+        role: serverUser.role || 'user',
+        name: serverUser.name || u.name,
+      };
+
+      setUser(finalUser);
+      try { window.dispatchEvent(new CustomEvent('inbox:updated')); } catch {}
+    } catch (err) {
+      console.error('Error in Auth.login', err);
+      setUser(null);
+    }
   };
 
   const logout = () => {

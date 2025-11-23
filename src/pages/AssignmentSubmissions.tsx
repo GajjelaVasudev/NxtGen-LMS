@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, Eye } from "lucide-react";
 
 type Assignment = {
@@ -26,61 +27,59 @@ type Submission = {
   graded: boolean;
 };
 
-const ASSIGNMENTS_KEY = "nxtgen_assignments";
-const SUBMISSIONS_KEY = "nxtgen_submissions";
-const INBOX_KEY = "nxtgen_inbox";
-
-function loadAssignments(): Assignment[] {
-  try {
-    const raw = localStorage.getItem(ASSIGNMENTS_KEY);
-    return raw ? (JSON.parse(raw) as Assignment[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function loadSubmissions(): Submission[] {
-  try {
-    const raw = localStorage.getItem(SUBMISSIONS_KEY);
-    return raw ? (JSON.parse(raw) as Submission[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveSubmissions(submissions: Submission[]) {
-  localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(submissions));
-  window.dispatchEvent(new CustomEvent("submissions:updated")); // Add this event
-}
-
-function addInboxMessage(message: any) {
-  try {
-    const messages = JSON.parse(localStorage.getItem(INBOX_KEY) || "[]");
-    const newMessage = {
-      ...message,
-      id: String(Date.now()),
-      createdAt: Date.now(),
-      read: false
-    };
-    localStorage.setItem(INBOX_KEY, JSON.stringify([newMessage, ...messages]));
-  } catch (error) {
-    console.error("Failed to add inbox message:", error);
-  }
-}
+const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
 export default function AssignmentSubmissions() {
   const { assignmentId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const [assignment, setAssignment] = useState<Assignment | null>(null);
-  const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [gradeForm, setGradeForm] = useState({ grade: "", feedback: "" });
 
   useEffect(() => {
-    const assignments = loadAssignments();
-    const found = assignments.find(a => a.id === assignmentId);
-    setAssignment(found || null);
+    let mounted = true;
+    (async () => {
+      try {
+        if (!assignmentId) return;
+        const [aRes, sRes] = await Promise.all([
+          fetch(`/api/assignments/${assignmentId}`).then(r => r.json()).catch(() => ({ data: null })),
+          fetch(`/api/assignments/${assignmentId}/submissions`).then(r => r.json()).catch(() => ({ data: [] })),
+        ]);
+        if (!mounted) return;
+        if (aRes && aRes.data) {
+          const a = aRes.data;
+          setAssignment({
+            id: a.id,
+            title: a.title,
+            description: a.description,
+            courseId: a.course_id,
+            courseName: a.course_name || "",
+            instructorId: a.created_by,
+            dueDate: a.due_at || a.dueDate || new Date(a.created_at).toISOString(),
+            createdAt: a.created_at ? new Date(a.created_at).getTime() : Date.now(),
+          });
+        }
+        if (sRes && sRes.data) {
+          setSubmissions((sRes.data || []).map((s: any) => ({
+            id: s.id,
+            assignmentId: s.assignment_id,
+            userId: s.user_id,
+            userName: s.user_name || s.user_id,
+            imageUrl: s.content?.imageUrl || s.content?.image_url || "",
+            submittedAt: new Date(s.submitted_at).getTime(),
+            grade: s.grade,
+            feedback: s.feedback,
+            graded: s.status === 'graded'
+          })));
+        }
+      } catch (err) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
   }, [assignmentId]);
 
   const assignmentSubmissions = submissions.filter(s => s.assignmentId === assignmentId);
@@ -101,25 +100,37 @@ export default function AssignmentSubmissions() {
       alert("Please enter a valid grade (0-100)");
       return;
     }
-
-    const updatedSubmissions = submissions.map(s => {
-      if (s.id === selectedSubmission.id) {
-        // Add grade notification to student's inbox
-        addInboxMessage({
-          type: 'assignment-graded',
-          title: 'Assignment Graded',
-          message: `Your assignment "${assignment?.title}" has been graded: ${grade}/100. ${gradeForm.feedback || 'No feedback provided.'}`
+    (async () => {
+      try {
+        const res = await fetch(`/api/submissions/${selectedSubmission.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+          body: JSON.stringify({ grade, feedback: gradeForm.feedback })
         });
-        
-        return { ...s, grade, feedback: gradeForm.feedback, graded: true };
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error || "Failed to grade");
+
+        // update local state
+        setSubmissions(prev => prev.map(s => s.id === selectedSubmission.id ? { ...s, grade, feedback: gradeForm.feedback, graded: true } : s));
+        setSelectedSubmission(null);
+        setGradeForm({ grade: "", feedback: "" });
+
+        // notify student via inbox
+        await fetch(`/api/inbox/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" , "x-user-id": user?.id || ""},
+          body: JSON.stringify({
+            fromUserId: user?.id || "",
+            fromName: user?.name || user?.email || "Instructor",
+            toUserId: (json.data && json.data.user_id) || selectedSubmission.userId,
+            subject: "Assignment Graded",
+            content: `Your assignment \"${assignment?.title}\" has been graded: ${grade}/100. ${gradeForm.feedback || 'No feedback provided.'}`
+          })
+        });
+      } catch (err) {
+        alert("Failed to submit grade");
       }
-      return s;
-    });
-    
-    setSubmissions(updatedSubmissions);
-    saveSubmissions(updatedSubmissions);
-    setSelectedSubmission(null);
-    setGradeForm({ grade: "", feedback: "" });
+    })();
   };
 
   if (!assignment) {

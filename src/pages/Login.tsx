@@ -75,7 +75,7 @@ export default function Login() {
             }
 
             const data = await res.json();
-            login(data.user);
+            await login(data.user);
             navigate("/app");
         } catch (err: any) {
             console.error("Login error:", err);

@@ -21,6 +21,16 @@ import {
   deleteMessages,
   starMessage,
 } from "./routes/messages.js";
+import { getAssignments, createAssignment, getAssignment } from "./routes/assignments.js";
+import {
+  listUserSubmissions,
+  listAssignmentSubmissions,
+  createSubmission,
+  updateSubmission,
+} from "./routes/submissions.js";
+import { supabase } from "./supabaseClient.js";
+
+
 
 export function createServer() {
   const app = express();
@@ -33,13 +43,42 @@ export function createServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Global request logger (temporary) — logs method and path for every request
+  app.use((req, _res, next) => {
+    try {
+      console.log(`[http] ${req.method} ${req.originalUrl}`);
+    } catch (e) {
+      // ignore logging errors
+    }
+    next();
+  });
+
   // API routes
   app.get("/api/ping", (_req, res) => {
     const ping = process.env.PING_MESSAGE ?? "ping";
     res.json({ message: ping });
   });
+  app.get("/test-db", async (_req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .limit(5);
+
+    if (error) {
+      console.error("Supabase Error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json({ success: true, data });
+  } catch (err: any) {
+    console.error("Unexpected Error:", err.message);
+    return res.status(500).json({ error: "Unexpected server error" });
+  }
+});
 
   app.get("/api/demo", handleDemo);
+  // NOTE: dev seed endpoint removed for deployment
   app.post("/api/auth/login", login);
   app.post("/api/auth/register", register);
   app.get("/api/auth/registered-emails", getRegisteredEmails);
@@ -55,6 +94,10 @@ export function createServer() {
   app.get('/api/auth/role-requests', listRoleRequests);
   app.post('/api/auth/approve-role', approveRole);
   app.post('/api/auth/deny-role', denyRole);
+  app.get("/api/assignments", getAssignments);
+  app.get("/api/assignments/:id", getAssignment);
+  app.post("/api/assignments", createAssignment);
+
 
   // --- Google OAuth (popup flow) ---
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -91,7 +134,7 @@ export function createServer() {
     app.get(
       "/api/auth/google/callback",
       passport.authenticate("google", { session: false, failureRedirect: "/api/auth/google/failure" }),
-      (req, res) => {
+      async (req, res) => {
         // @ts-ignore -- passport attaches user
         const profile = (req as any).user;
         const emails = profile?.emails || [];
@@ -112,8 +155,26 @@ export function createServer() {
           return res.send(`<html><body><script>window.opener.postMessage({ type: 'oauth', error: 'Account pending administrator approval' }, '${BASE_URL}'); window.close();</script></body></html>`);
         }
 
+        // Ensure DB user exists and use DB row for payload (so caller receives UUID)
+        let payloadUser: any = null;
+        try {
+          const { data: found, error: findErr } = await supabase.from('users').select('id, email, role').ilike('email', email).maybeSingle();
+          if (findErr) console.warn('[auth/google] Supabase lookup error', { email, findErr });
+          if (found) payloadUser = found;
+          else {
+            const insertRow = { email, role: (user as any).role || 'user' };
+            const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
+            if (createErr) console.warn('[auth/google] failed to create DB user', { email, createErr });
+            if (created) payloadUser = created;
+          }
+        } catch (ex) {
+          console.error('[auth/google] exception ensuring DB user', ex);
+        }
+
+        const outUser = payloadUser || user;
+
         // send user back to opener window via postMessage and close
-        const payload = JSON.stringify(user).replace(/</g, '\\u003c');
+        const payload = JSON.stringify(outUser).replace(/</g, '\u003c');
         return res.send(`
           <html>
             <body>
@@ -158,6 +219,15 @@ export function createServer() {
   app.post("/api/inbox/mark-read", markRead);
   app.post("/api/inbox/delete", deleteMessages);
   app.post("/api/inbox/star", starMessage);
+  // Assignments
+  app.get("/api/assignments", getAssignments);
+  app.post("/api/assignments", createAssignment);
+
+  // Submissions
+  app.get("/api/submissions", listUserSubmissions);
+  app.get("/api/assignments/:assignmentId/submissions", listAssignmentSubmissions);
+  app.post("/api/assignments/:assignmentId/submissions", createSubmission);
+  app.put("/api/submissions/:submissionId", updateSubmission);
   // Discussions and direct-messages removed: Inbox handles notifications, teacher and admin messages
 
   return app;

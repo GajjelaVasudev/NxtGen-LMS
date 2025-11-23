@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, Bell, ChevronDown, User, Settings, LogOut, FileText, BookOpen, BarChart3, Shield, Users, GraduationCap } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { loadInboxMessages } from "@/utils/inboxHelpers";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function Header() {
@@ -25,13 +26,15 @@ export default function Header() {
   // Load notifications count
   useEffect(() => {
     const updateNotifications = () => {
-      try {
-        const messages = JSON.parse(localStorage.getItem("nxtgen_inbox") || "[]");
-        const unread = messages.filter((msg: any) => !msg.read).length;
-        setUnreadNotifications(unread);
-      } catch {
-        setUnreadNotifications(0);
-      }
+      (async () => {
+        try {
+          const msgs = await loadInboxMessages(user?.id, user?.role);
+          const unread = (msgs || []).filter((msg: any) => !msg.read).length;
+          setUnreadNotifications(unread);
+        } catch {
+          setUnreadNotifications(0);
+        }
+      })();
     };
 
     updateNotifications();

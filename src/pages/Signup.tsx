@@ -67,16 +67,23 @@ export default function Signup() {
 
 		setLoading(true);
 		try {
-			const user = {
-				id: String(Date.now()),
-				email,
-				role,
-				name: `${firstName} ${lastName}`,
-			};
-			login(user);
+			const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+			const res = await fetch(`${API}/auth/register`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ email, password, name: `${firstName} ${lastName}`, role }),
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body?.error || body?.message || `HTTP ${res.status}`);
+			}
+			const data = await res.json();
+			// server should return created user; use canonical record
+			await login(data.user || data);
 			navigate("/app");
-		} catch (err) {
-			setError("Failed to create account. Try again.");
+		} catch (err: any) {
+			console.error(err);
+			setError(err?.message || "Failed to create account. Try again.");
 		} finally {
 			setLoading(false);
 		}

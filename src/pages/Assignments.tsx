@@ -37,114 +37,72 @@ type InboxMessage = {
   read: boolean;
 };
 
-const ASSIGNMENTS_KEY = "nxtgen_assignments";
-const SUBMISSIONS_KEY = "nxtgen_submissions";
-const INBOX_KEY = "nxtgen_inbox";
-const COURSES_KEY = "nxtgen_courses";
-const ENROLL_KEY = "nxtgen_enrollments";
-const NOTIFIED_KEY = "nxtgen_notified_assignments";
-
-function loadAssignments(): Assignment[] {
-  try {
-    const raw = localStorage.getItem(ASSIGNMENTS_KEY);
-    return raw ? (JSON.parse(raw) as Assignment[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveAssignments(assignments: Assignment[]) {
-  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignments));
-  window.dispatchEvent(new CustomEvent("assignments:updated"));
-}
-
-function loadSubmissions(): Submission[] {
-  try {
-    const raw = localStorage.getItem(SUBMISSIONS_KEY);
-    return raw ? (JSON.parse(raw) as Submission[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveSubmissions(submissions: Submission[]) {
-  localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(submissions));
-  window.dispatchEvent(new CustomEvent("submissions:updated"));
-}
-
-function loadInboxMessages(): InboxMessage[] {
-  try {
-    const raw = localStorage.getItem(INBOX_KEY);
-    return raw ? (JSON.parse(raw) as InboxMessage[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveInboxMessages(messages: InboxMessage[]) {
-  localStorage.setItem(INBOX_KEY, JSON.stringify(messages));
-  window.dispatchEvent(new CustomEvent("inbox:updated"));
-}
-
-function loadNotifiedAssignments(): string[] {
-  try {
-    const raw = localStorage.getItem(NOTIFIED_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveNotifiedAssignments(assignmentIds: string[]) {
-  localStorage.setItem(NOTIFIED_KEY, JSON.stringify(assignmentIds));
-}
-
-function loadCourses() {
-  try {
-    const raw = localStorage.getItem(COURSES_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function loadEnrollments() {
-  try {
-    const raw = localStorage.getItem(ENROLL_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function addInboxMessage(message: Omit<InboxMessage, 'id' | 'createdAt' | 'read'>) {
-  const messages = loadInboxMessages();
-  const newMessage: InboxMessage = {
-    ...message,
-    id: String(Date.now()),
-    createdAt: Date.now(),
-    read: false
-  };
-  saveInboxMessages([newMessage, ...messages]);
-}
+const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
 export default function Assignments() {
   const { user, hasRole } = useAuth();
   const navigate = useNavigate();
-  const [assignments, setAssignments] = useState<Assignment[]>(() => loadAssignments());
-  const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [search, setSearch] = useState("");
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
 
   useEffect(() => {
-    const handler = () => setAssignments(loadAssignments());
-    window.addEventListener("assignments:updated", handler);
-    return () => window.removeEventListener("assignments:updated", handler);
+    let mounted = true;
+    const load = async () => {
+      if (!user) return;
+      try {
+        const [cRes, eRes, sRes] = await Promise.all([
+          fetch(`${API}/courses`).then(r => r.json()).catch(() => ({ courses: [] })),
+          fetch(`${API}/enrollments?userId=${user.id}`).then(r => r.json()).catch(() => ({ enrollments: [] })),
+          fetch(`${API}/submissions?userId=${user.id}`).then(r => r.json()).catch(() => ({ data: [] })),
+        ]);
+
+        if (!mounted) return;
+        setCourses(cRes.courses || []);
+        setEnrollments(eRes.enrollments || []);
+        setSubmissions((sRes.data && Array.isArray(sRes.data)) ? sRes.data.map((s: any) => ({
+          id: s.id,
+          assignmentId: s.assignment_id,
+          userId: s.user_id,
+          userName: s.user_name || s.user_id,
+          imageUrl: s.content?.imageUrl || s.content?.image_url || "",
+          submittedAt: new Date(s.submitted_at).getTime(),
+          grade: s.grade,
+          feedback: s.feedback,
+          graded: s.status === 'graded'
+        })) : []);
+
+        // Fetch assignments for enrolled courses
+        const courseIds = (eRes.enrollments || []).map((en: any) => en.course_id || en.courseId || en.courseId);
+        const assignmentPromises = courseIds.map((cid: string) => fetch(`${API}/assignments?courseId=${cid}`).then(r => r.json()).catch(() => ({ data: [] })));
+        const assignmentsResults = await Promise.all(assignmentPromises);
+        const all = assignmentsResults.flatMap((ar: any) => (ar.data || ar.assignments || []));
+        const mapped = (all || []).map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          description: a.description,
+          courseId: a.course_id || a.courseId,
+          courseName: (cRes.courses || []).find((c: any) => c.id === (a.course_id || a.courseId))?.title || "",
+          instructorId: a.created_by || a.created_by || a.instructorId,
+          dueDate: a.due_at || a.dueAt || a.dueDate || new Date(a.created_at).toISOString(),
+          imageUrl: a.image_url || a.imageUrl || undefined,
+          createdAt: a.created_at ? new Date(a.created_at).getTime() : Date.now()
+        }));
+        setAssignments(mapped);
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    load();
+    return () => { mounted = false; };
   }, []);
 
   // Get user's enrolled courses
-  const enrollments = loadEnrollments();
-  const enrolledCourseIds = enrollments.map((e: any) => e.courseId);
+  const enrolledCourseIds = enrollments.map((e: any) => e.course_id || e.courseId);
 
   // Filter assignments based on role
   const filteredAssignments = assignments.filter(assignment => {
@@ -162,44 +120,13 @@ export default function Assignments() {
 
   // Check for due assignments and add to inbox (improved)
   useEffect(() => {
-    if (!user || hasRole && hasRole(["instructor", "admin"])) return;
-
-    const now = Date.now();
-    const userSubmissions = submissions.filter(s => s.userId === user.id);
-    const notifiedAssignments = loadNotifiedAssignments();
-    const newlyNotified: string[] = [];
-    
-    filteredAssignments.forEach(assignment => {
-      const dueDate = new Date(assignment.dueDate).getTime();
-      const hasSubmitted = userSubmissions.some(s => s.assignmentId === assignment.id);
-      const alreadyNotified = notifiedAssignments.includes(assignment.id);
-      
-      if (!hasSubmitted && !alreadyNotified) {
-        const timeUntilDue = dueDate - now;
-        const dayInMs = 24 * 60 * 60 * 1000;
-        
-        // Alert 1 day before due (only once)
-        if (timeUntilDue > 0 && timeUntilDue <= dayInMs) {
-          addInboxMessage({
-            type: 'assignment-due',
-            title: 'Assignment Due Soon',
-            message: `Assignment "${assignment.title}" is due tomorrow in ${assignment.courseName}`,
-            assignmentId: assignment.id
-          });
-          newlyNotified.push(assignment.id);
-        }
-      }
-    });
-
-    if (newlyNotified.length > 0) {
-      saveNotifiedAssignments([...notifiedAssignments, ...newlyNotified]);
-    }
+  // Note: due-date notification logic moved to server or will be implemented later
   }, [filteredAssignments, submissions, user, hasRole]);
 
   const isOverdue = (dueDate: string) => new Date(dueDate).getTime() < Date.now();
 
   const getUserSubmission = (assignmentId: string) => {
-    return submissions.find(s => s.assignmentId === assignmentId && s.userId === user?.id);
+    return submissions.find(s => String(s.assignment_id || s.assignmentId) === String(assignmentId) && s.userId === user?.id);
   };
 
   const getAssignmentSubmissions = (assignmentId: string) => {
@@ -220,30 +147,41 @@ export default function Assignments() {
 
     try {
       const imageUrl = await handleImageUpload(imageFile);
-      const assignment = assignments.find(a => a.id === assignmentId);
-      
-      const newSubmission: Submission = {
-        id: String(Date.now()),
-        assignmentId,
-        userId: user.id,
-        userName: user.name || user.email,
-        imageUrl,
-        submittedAt: Date.now(),
-        graded: false
-      };
+      // Create submission via API
+      const res = await fetch(`${API}/assignments/${assignmentId}/submissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        body: JSON.stringify({ content: { imageUrl } }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || "Failed to submit");
 
-      const updatedSubmissions = [...submissions, newSubmission];
-      setSubmissions(updatedSubmissions);
-      saveSubmissions(updatedSubmissions);
-      
+      // update local view
+      setSubmissions((s) => [{
+        id: json.data.id,
+        assignmentId: json.data.assignment_id,
+        userId: json.data.user_id,
+        userName: user.name || user.email,
+        imageUrl: imageUrl,
+        submittedAt: new Date(json.data.submitted_at).getTime(),
+        graded: json.data.status === 'graded'
+      }, ...s]);
+
       setSelectedAssignment(null);
-      
-      // Notify instructor
+
+      // Notify instructor via server inbox
+      const assignment = assignments.find(a => a.id === assignmentId);
       if (assignment) {
-        addInboxMessage({
-          type: 'assignment-due',
-          title: 'New Assignment Submission',
-          message: `${user.name || user.email} submitted assignment "${assignment.title}"`
+        await fetch(`${API}/inbox/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fromUserId: user.id,
+            fromName: user.name || user.email,
+            toUserId: assignment.instructorId,
+            subject: "New Assignment Submission",
+            content: `${user.name || user.email} submitted assignment \"${assignment.title}\"`
+          })
         });
       }
     } catch (error) {

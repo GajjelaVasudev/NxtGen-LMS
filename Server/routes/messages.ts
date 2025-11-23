@@ -1,131 +1,181 @@
 import { RequestHandler } from "express";
-import fs from "fs/promises";
-import path from "path";
-import { fileURLToPath } from "url";
-import { findUserById } from "./auth.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DATA_DIR = path.resolve(__dirname, "..", "data");
-const INBOX_FILE = path.join(DATA_DIR, "inbox.json");
-
-async function ensureDataDir() {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-  } catch {
-    // ignore
-  }
-}
-
-async function readJson<T>(file: string, fallback: T): Promise<T> {
-  try {
-    const raw = await fs.readFile(file, "utf-8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-async function writeJson<T>(file: string, data: T) {
-  await ensureDataDir();
-  await fs.writeFile(file, JSON.stringify(data, null, 2), "utf-8");
-}
-
-type InboxMessage = {
-  id: string;
-  fromUserId: string;
-  fromName: string;
-  toUserId?: string | null; // optional for specific student
-  toName?: string | null;
-  recipientRole?: string | null; // e.g. 'instructor' or 'student' or 'admin'
-  category?: string | null; // 'notification' | 'teacher' | 'admin'
-  subject: string;
-  content: string;
-  timestamp: number;
-  read?: boolean;
-  starred?: boolean;
-};
+import { supabase } from "../supabaseClient.js";
 
 // ---------- Inbox endpoints (notifications + teacher/admin messages) ----------
 
 // GET /api/inbox?userId=...&role=...
 export const getInbox: RequestHandler = async (req, res) => {
-  const { userId, role } = req.query;
-  const messages: InboxMessage[] = await readJson(INBOX_FILE, []);
-  // Return messages addressed to userId OR messages targeted to user's role OR admin announcements (recipientRole = 'admin' handled below)
-  const filtered = messages.filter((m) => {
-    // If explicit personal message
-    if (m.toUserId && userId && String(m.toUserId) === String(userId)) return true;
-    // If targeted to user's role (e.g., student)
-    if (m.recipientRole && role && String(m.recipientRole) === String(role)) return true;
-    // Admin announcements with no specific recipient or role should be visible to all
-    if (!m.toUserId && !m.recipientRole) return true;
-    return false;
-  }).sort((a, b) => b.timestamp - a.timestamp);
-  res.json({ messages: filtered });
+  console.log('[inbox] getInbox called', { method: req.method, url: req.originalUrl, query: req.query });
+  try {
+    let userId = String(req.query.userId || "");
+    const role = String(req.query.role || "");
+
+    // If no userId/role present, return only global broadcasts (to_user_id IS NULL AND to_role IS NULL)
+    if (!userId && !role) {
+      const { data, error } = await supabase
+        .from("inbox_messages")
+        .select("*")
+        .is("to_user_id", null)
+        .is("to_role", null)
+        .order("created_at", { ascending: false })
+        .limit(200);
+
+      if (error) {
+        console.error("Supabase getInbox broadcasts error:", error);
+        return res.status(500).json({ success: false, error: error.message });
+      }
+      return res.json({ success: true, data: data || [] });
+    }
+
+    // Reject numeric/demo IDs — require a UUID for userId
+    if (userId && !userId.includes("-")) {
+      return res.status(400).json({ success: false, error: 'userId must be a UUID' });
+    }
+
+    // Build OR query: messages addressed to user, targeted to role, or global broadcasts
+    const clauses: string[] = [];
+    if (userId) clauses.push(`to_user_id.eq.${userId}`);
+    if (role) clauses.push(`to_role.eq.${role}`);
+    // include broadcasts
+    clauses.push("to_user_id.is.null");
+
+    const orQuery = clauses.join(",");
+
+    const { data, error } = await supabase
+      .from("inbox_messages")
+      .select("*")
+      .or(orQuery)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+
+    if (error) {
+      console.error("Supabase getInbox error:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.json({ success: true, data: data || [] });
+  } catch (err: any) {
+    console.error("Unexpected getInbox error:", err);
+    return res.status(500).json({ success: false, error: "Unexpected server error" });
+  }
 };
 
 // POST /api/inbox/send
-// Used for: teacher -> student private messages (set toUserId),
-// admin announcements (recipientRole: 'student' or null for all), and automated notifications
 export const sendInboxMessage: RequestHandler = async (req, res) => {
-  const payload = req.body || {};
-  if (!payload.fromUserId || !payload.fromName || !payload.subject || !payload.content) {
-    return res.status(400).json({ error: "fromUserId, fromName, subject and content required" });
+  console.log('[inbox] sendInboxMessage called', { method: req.method, url: req.originalUrl, body: req.body, headers: { 'x-user-id': req.headers['x-user-id'] } });
+  try {
+    const payload = req.body || {};
+    const senderId = String(payload.fromUserId || req.headers["x-user-id"] || "");
+    const fromName = payload.fromName || payload.from_name || null;
+    const subject = payload.subject;
+    const body = payload.content || payload.body || null;
+
+    if (!senderId || !fromName || !subject || !body) {
+      return res.status(400).json({ success: false, error: "fromUserId, fromName, subject and content required" });
+    }
+
+    // verify sender role from Supabase only
+    let role: string | null = null;
+    try {
+      const { data: userData, error: userErr } = await supabase.from("users").select("role").eq("id", senderId).maybeSingle();
+      if (userErr) {
+        console.warn('[inbox] Supabase error looking up sender role', { senderId, userErr });
+        return res.status(500).json({ success: false, error: userErr.message || 'Supabase lookup error' });
+      }
+      if (!userData) {
+        return res.status(403).json({ success: false, error: 'Sender not recognized' });
+      }
+      role = (userData as any)?.role || null;
+    } catch (ex) {
+      console.error('[inbox] Exception during Supabase user lookup', ex);
+      return res.status(500).json({ success: false, error: 'Unexpected server error' });
+    }
+
+    if (!role || (role !== "admin" && role !== "instructor")) {
+      return res.status(403).json({ success: false, error: "Only admin or instructor may send inbox messages" });
+    }
+
+    const insertRow: any = {
+      from_user_id: senderId,
+      to_user_id: payload.toUserId || payload.to_user_id || null,
+      to_role: payload.recipientRole || payload.recipient_role || null,
+      course_id: payload.course_id || payload.courseId || null,
+      subject: subject,
+      body: body,
+      metadata: Object.assign({}, payload.metadata || {}, { fromName, toName: payload.toName || payload.to_name || null }),
+    };
+
+    // Require to_user_id to be UUID when provided
+    if (insertRow.to_user_id && !String(insertRow.to_user_id).includes('-')) {
+      return res.status(400).json({ success: false, error: 'to_user_id must be a UUID' });
+    }
+
+    const { data, error } = await supabase.from("inbox_messages").insert([insertRow]).select().single();
+    if (error) {
+      console.error("Supabase sendInboxMessage error:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.json({ success: true, data });
+  } catch (err: any) {
+    console.error("Unexpected sendInboxMessage error:", err);
+    return res.status(500).json({ success: false, error: "Unexpected server error" });
   }
-  // Enforce only admin or instructor can send messages via API
-  const senderId = payload.fromUserId || (req.headers['x-user-id'] as string);
-  const sender = senderId ? findUserById(String(senderId)) : undefined;
-  if (!sender || (sender.role !== 'admin' && sender.role !== 'instructor')) {
-    return res.status(403).json({ error: 'Only admin or instructor may send inbox messages' });
-  }
-  const messages: InboxMessage[] = await readJson(INBOX_FILE, []);
-  const msg: InboxMessage = {
-    id: String(Date.now()),
-    fromUserId: payload.fromUserId,
-    fromName: payload.fromName,
-    toUserId: payload.toUserId || null,
-    toName: payload.toName || null,
-    recipientRole: payload.recipientRole || null,
-    category: payload.category || null,
-    subject: payload.subject,
-    content: payload.content,
-    timestamp: Date.now(),
-    read: false,
-    starred: false,
-  };
-  // Prepend new messages so newest appear first
-  messages.unshift(msg);
-  await writeJson(INBOX_FILE, messages);
-  res.json({ success: true, message: msg });
 };
 
 // POST /api/inbox/mark-read
 export const markRead: RequestHandler = async (req, res) => {
-  const { ids } = req.body;
-  if (!Array.isArray(ids)) return res.status(400).json({ error: "ids array required" });
-  const messages: InboxMessage[] = await readJson(INBOX_FILE, []);
-  const updated = messages.map(m => ids.includes(m.id) ? { ...m, read: true } : m);
-  await writeJson(INBOX_FILE, updated);
-  res.json({ success: true });
+  console.log('[inbox] markRead called', { method: req.method, url: req.originalUrl, body: req.body });
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ success: false, error: "ids array required" });
+
+    const { error } = await supabase.from("inbox_messages").update({ is_read: true }).in("id", ids);
+    if (error) {
+      console.error("Supabase markRead error:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Unexpected markRead error:", err);
+    return res.status(500).json({ success: false, error: "Unexpected server error" });
+  }
 };
 
 // POST /api/inbox/delete
 export const deleteMessages: RequestHandler = async (req, res) => {
-  const { ids } = req.body;
-  if (!Array.isArray(ids)) return res.status(400).json({ error: "ids array required" });
-  const messages: InboxMessage[] = await readJson(INBOX_FILE, []);
-  const remaining = messages.filter(m => !ids.includes(m.id));
-  await writeJson(INBOX_FILE, remaining);
-  res.json({ success: true });
+  console.log('[inbox] deleteMessages called', { method: req.method, url: req.originalUrl, body: req.body });
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ success: false, error: "ids array required" });
+
+    const { error } = await supabase.from("inbox_messages").delete().in("id", ids);
+    if (error) {
+      console.error("Supabase deleteMessages error:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Unexpected deleteMessages error:", err);
+    return res.status(500).json({ success: false, error: "Unexpected server error" });
+  }
 };
 
 // POST /api/inbox/star
 export const starMessage: RequestHandler = async (req, res) => {
-  const { id, starred } = req.body;
-  if (!id) return res.status(400).json({ error: "id required" });
-  const messages: InboxMessage[] = await readJson(INBOX_FILE, []);
-  const updated = messages.map(m => m.id === id ? { ...m, starred: !!starred } : m);
-  await writeJson(INBOX_FILE, updated);
-  res.json({ success: true });
+  console.log('[inbox] starMessage called', { method: req.method, url: req.originalUrl, body: req.body });
+  try {
+    const { id, starred } = req.body;
+    if (!id) return res.status(400).json({ success: false, error: "id required" });
+
+    const { error } = await supabase.from("inbox_messages").update({ is_starred: !!starred }).eq("id", id);
+    if (error) {
+      console.error("Supabase starMessage error:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Unexpected starMessage error:", err);
+    return res.status(500).json({ success: false, error: "Unexpected server error" });
+  }
 };

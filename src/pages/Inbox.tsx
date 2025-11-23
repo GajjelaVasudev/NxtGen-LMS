@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Mail, Star, Trash2, Reply, Forward } from "lucide-react";
 import { Link } from "react-router-dom";
-import { loadInboxMessages } from "@/utils/inboxHelpers";
+import { loadInboxMessages, sendInboxMessage, markRead, deleteMessages, starMessage } from "@/utils/inboxHelpers";
 
 const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
@@ -26,31 +26,21 @@ export default function Inbox() {
 
   const fetchMessages = async () => {
     try {
-      const q = user ? `?userId=${user.id}&role=${user.role}` : "";
-      const res = await fetch(`${API}/inbox${q}`);
-      if (res.ok) {
-        const body = await res.json();
-        const serverMsgs = body.messages || [];
-        // load local notifications (assignments/new content etc.) and merge
-        const local = loadInboxMessages() || [];
-        const localAsServer = local.map((l: any) => ({
-          id: l.id,
-          fromUserId: 'system',
-          fromName: 'System',
-          subject: l.title,
-          content: l.message,
-          timestamp: l.createdAt,
-          read: l.read,
-          category: l.type,
-          recipientRole: l.recipientRole || null,
-        }));
-        // merge and sort by timestamp desc
-        const merged = [...localAsServer, ...serverMsgs].sort((a, b) => (b.timestamp || b.createdAt || 0) - (a.timestamp || a.createdAt || 0));
-        setMessages(merged);
-      } else {
-        console.warn("Inbox fetch failed", res.status);
-        setMessages([]);
-      }
+      const msgs = await loadInboxMessages(user?.id, user?.role);
+      // map to the local message shape used by this page
+      const mapped = msgs.map(m => ({
+        id: m.id,
+        fromUserId: (m as any).from_user_id || 'system',
+        fromName: (m as any).from_name || 'System',
+        subject: m.title,
+        content: m.message,
+        timestamp: m.createdAt,
+        read: m.read,
+        category: m.type,
+        recipientRole: m.recipientRole || null,
+        starred: (m as any).is_starred || false,
+      }));
+      setMessages(mapped.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
     } catch (err) {
       console.warn("Inbox fetch error", err);
       setMessages([]);
@@ -66,7 +56,7 @@ export default function Inbox() {
   const openMessage = (m: any) => {
     setSelectedMessage(m);
     if (!m.read) {
-      fetch(`${API}/inbox/mark-read`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [m.id] }) });
+      markRead([m.id]);
       setMessages(prev => prev.map(x => x.id === m.id ? { ...x, read: true } : x));
     }
   };
@@ -90,26 +80,27 @@ export default function Inbox() {
       subject: form.subject,
       content: form.content
     };
-    const res = await fetch(`${API}/inbox/send`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    if (res.ok) {
+
+    try {
+      await sendInboxMessage(payload, user.id);
       setForm({ toUserId: "", toName: "", subject: "", content: "" });
       setComposeOpen(false);
       fetchMessages();
       setPopup({ type: 'success', message: 'Message sent' });
-    } else {
+    } catch (err) {
       setPopup({ type: 'error', message: 'Failed to send message' });
     }
   };
 
   const deleteSelected = async (ids: string[]) => {
     if (!window.confirm("Delete selected message(s)?")) return;
-    await fetch(`${API}/inbox/delete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+    await deleteMessages(ids);
     fetchMessages();
     if (selectedMessage && ids.includes(selectedMessage.id)) setSelectedMessage(null);
   };
 
   const toggleStar = async (id: string, starred: boolean) => {
-    await fetch(`${API}/inbox/star`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, starred }) });
+    await starMessage(id, starred);
     setMessages(prev => prev.map(m => m.id === id ? { ...m, starred } : m));
   };
 

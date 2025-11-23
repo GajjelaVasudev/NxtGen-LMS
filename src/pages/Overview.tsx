@@ -8,45 +8,24 @@ type Course = { id: string; title: string; thumbnail?: string; description?: str
 type Assignment = { id: string; title: string; courseId: string; courseName: string; instructorId: string; dueDate: string; createdAt: number; };
 
 const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
-const TODO_KEY = "nxtgen_todos";
-const ASSIGNMENTS_KEY = "nxtgen_assignments";
-const SUBMISSIONS_KEY = "nxtgen_submissions";
-
-function loadTodos(): Todo[] {
-  try {
-    const raw = localStorage.getItem(TODO_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTodos(todos: Todo[]) {
-  try {
-    localStorage.setItem(TODO_KEY, JSON.stringify(todos));
-  } catch {}
-}
-
-function loadAssignments(): Assignment[] {
-  try {
-    const raw = localStorage.getItem(ASSIGNMENTS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function loadSubmissions() {
-  try {
-    const raw = localStorage.getItem(SUBMISSIONS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
 
 export default function Overview() {
   const { user } = useAuth();
+  function loadTodos(): Todo[] {
+    try {
+      const raw = localStorage.getItem("nxtgen_todos");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveTodos(todos: Todo[]) {
+    try {
+      localStorage.setItem("nxtgen_todos", JSON.stringify(todos));
+    } catch {}
+  }
+
   const [todos, setTodos] = useState<Todo[]>(() => loadTodos());
   const [text, setText] = useState("");
   const [courses, setCourses] = useState<Course[]>([]);
@@ -73,11 +52,45 @@ export default function Overview() {
     return () => { mounted = false; };
   }, [user]);
 
-  // Load local assignments/submissions (existing app shape)
+  // Load assignments & submissions from server for enrolled courses
   useEffect(() => {
-    setAssignments(loadAssignments());
-    setSubmissions(loadSubmissions());
-  }, []);
+    let mounted = true;
+    (async () => {
+      try {
+        if (!user) return;
+        const userId = user.id;
+        // fetch user submissions
+        const sRes = await fetch(`${API}/submissions?userId=${userId}`).then(r => r.json()).catch(() => ({ data: [] }));
+        const subs = (sRes.data || []).map((s: any) => ({
+          id: s.id,
+          assignmentId: s.assignment_id,
+          userId: s.user_id,
+        }));
+        if (!mounted) return;
+        setSubmissions(subs);
+
+        // fetch assignments for enrolled courses
+        const courseIds = enrollments.map(e => (e as any).course_id || e.courseId);
+        const assignmentPromises = courseIds.map((cid: string) => fetch(`${API}/assignments?courseId=${cid}`).then(r => r.json()).catch(() => ({ data: [] })));
+        const results = await Promise.all(assignmentPromises);
+        if (!mounted) return;
+        const all = results.flatMap((r: any) => r.data || r.assignments || []);
+        const mapped = (all || []).map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          courseId: a.course_id,
+          courseName: a.course_name || "",
+          instructorId: a.created_by,
+          dueDate: a.due_at || a.dueDate || new Date(a.created_at).toISOString(),
+          createdAt: a.created_at ? new Date(a.created_at).getTime() : Date.now(),
+        }));
+        setAssignments(mapped);
+      } catch (err) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
+  }, [user, enrollments]);
 
   // Persist todos
   useEffect(() => {
@@ -101,7 +114,7 @@ export default function Overview() {
   }
 
   // Derived data
-  const enrolledCourseIds = enrollments.map((e) => e.courseId);
+  const enrolledCourseIds = enrollments.map((e) => (e as any).course_id || e.courseId);
   const enrolledCourses = courses.filter(c => enrolledCourseIds.includes(c.id));
   const pendingAssignments = assignments.filter(a =>
     enrolledCourseIds.includes(a.courseId) &&

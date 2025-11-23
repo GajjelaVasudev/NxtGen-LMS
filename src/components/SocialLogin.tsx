@@ -7,7 +7,6 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
   const navigate = useNavigate();
 
   const doSocial = async (provider: string) => {
-    // Open OAuth popup to server endpoint which will postMessage back the user
     const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
     const url = `${API}/auth/google`;
 
@@ -27,8 +26,7 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
       return;
     }
 
-    const handleMessage = (event: MessageEvent) => {
-      // ensure message origin is same origin (server uses BASE_URL env which should match client origin)
+    const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       const data = event.data || {};
       if (data?.type !== "oauth") return;
@@ -43,7 +41,7 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
           alert("Social login failed: no user returned");
           return;
         }
-        login(user);
+        await login(user);
         navigate("/app");
       } finally {
         try {
@@ -54,7 +52,6 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
 
     window.addEventListener("message", handleMessage);
 
-    // fallback: if popup closed without message, cleanup
     const poll = setInterval(() => {
       if (popup.closed) {
         clearInterval(poll);
