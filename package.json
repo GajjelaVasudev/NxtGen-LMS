@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:server": "tsc -p tsconfig.server.json",
+    "prestart": "npm run build:all",
+    "build:server": "npm install --include=dev --no-audit --no-progress && tsc -p tsconfig.server.json",
     "build:all": "npm run build && npm run build:server",
     "start": "node dist/Server/index.js",
     "preview": "vite preview",

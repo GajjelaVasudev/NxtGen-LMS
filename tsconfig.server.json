@@ -4,6 +4,7 @@
     "noEmit": false,
     "allowImportingTsExtensions": false,
     "outDir": "dist/Server",
+    "rootDir": "Server",
     "module": "NodeNext",
     "target": "ES2020",
     "moduleResolution": "NodeNext",
