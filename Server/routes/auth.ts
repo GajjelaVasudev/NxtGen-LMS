@@ -191,7 +191,10 @@ export const getUserById: RequestHandler = async (req, res) => {
             const insertRow = { email: demo.email, role: demo.role };
             const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
             if (createErr) console.warn('[auth/getUserById] failed to create DB user for demo email', { key, createErr });
-            if (created) return res.json({ user: created });
+            if (created) {
+              console.log('[auth/getUserById] auto-created DB user for demo email', { key, id: created.id });
+              return res.json({ user: created });
+            }
           } catch (exCreate) {
             console.error('[auth/getUserById] exception creating DB user for demo email', exCreate);
           }

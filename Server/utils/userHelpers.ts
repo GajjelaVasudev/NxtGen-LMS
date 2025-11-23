@@ -21,7 +21,10 @@ export async function canonicalizeUserId(raw: string | undefined | null): Promis
         try {
           const { data: created, error: createErr } = await supabase.from('users').insert([{ email: demo.email, role: demo.role }]).select('id').maybeSingle();
           if (createErr) console.warn('[userHelpers] failed to create demo DB user', { key, createErr });
-          if (created && created.id) return created.id as string;
+          if (created && created.id) {
+            console.log('[userHelpers] created DB user for demo', { email: demo.email, id: created.id });
+            return created.id as string;
+          }
         } catch (ex) {
           console.error('[userHelpers] exception creating demo DB user', ex);
         }
@@ -44,7 +47,10 @@ export async function canonicalizeUserId(raw: string | undefined | null): Promis
       if (data && data.id) return data.id as string;
       const { data: created, error: createErr } = await supabase.from('users').insert([{ email: demo.email, role: demo.role }]).select('id').maybeSingle();
       if (createErr) console.warn('[userHelpers] failed to create DB user for demo numeric id', { key, createErr });
-      if (created && created.id) return created.id as string;
+      if (created && created.id) {
+        console.log('[userHelpers] created DB user for demo (numeric id mapping)', { demoId: key, email: demo.email, id: created.id });
+        return created.id as string;
+      }
     } catch (ex) {
       console.error('[userHelpers] exception creating/finding demo user', ex);
     }
