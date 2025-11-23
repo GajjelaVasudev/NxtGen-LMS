@@ -14,7 +14,6 @@ import ManageCourse, { AddCourse } from "@/pages/ManageCourse";
 import CourseCatalog from "@/pages/CourseCatalog";
 import CourseDetails from "@/pages/CourseDetails";
 import Inbox from "@/pages/Inbox";
-import Discussions from "@/pages/Discussions";
 import Settings from "@/pages/Settings";
 import Reports from "@/pages/Reports";
 import ManageRoles from "@/pages/ManageRoles";
@@ -33,7 +32,7 @@ export default function DashboardLayout() {
 
         {/* Central content area: allow content scrolling while header/sidebar stay fixed */}
         <div className="flex-1 min-h-0 overflow-auto">
-          <div className="min-h-full">
+          <div className="min-h-0">
             <Routes>
               <Route index element={<Overview />} />
 
@@ -61,7 +60,6 @@ export default function DashboardLayout() {
 
               {/* Messaging / Settings */}
               <Route path="inbox" element={<Inbox />} />
-              <Route path="discussions" element={<Discussions />} />
               <Route path="settings" element={<Settings />} />
 
               {/* Reports / Admin */}

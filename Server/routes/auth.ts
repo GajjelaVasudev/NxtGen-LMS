@@ -135,6 +135,20 @@ export const getRegisteredEmails: RequestHandler = (_req, res) => {
   return res.json({ emails });
 };
 
+// Helper: find user by id (programmatic)
+export function findUserById(id: string) {
+  return REGISTERED_USERS.find((u) => String(u.id) === String(id));
+}
+
+// GET /api/users/:id
+export const getUserById: RequestHandler = (req, res) => {
+  const id = req.params.id;
+  const user = findUserById(id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const { password: _, ...userWithoutPassword } = user;
+  return res.json({ user: userWithoutPassword });
+};
+
 // NEW: request OTP endpoint
 export const requestOtp: RequestHandler = async (req, res) => {
   const { email } = req.body;

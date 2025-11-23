@@ -4,7 +4,23 @@ import cors from "cors";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { handleDemo } from "./routes/demo.js";
-import { login, register, getRegisteredEmails, requestOtp, verifyOtp, socialLogin, findOrCreateSocialUser, requestRole, listRoleRequests, approveRole, denyRole } from "./routes/auth.js";
+import { login, register, getRegisteredEmails, requestOtp, verifyOtp, socialLogin, findOrCreateSocialUser, requestRole, listRoleRequests, approveRole, denyRole, getUserById } from "./routes/auth.js";
+import {
+  getCourses,
+  getCourse,
+  createCourse,
+  updateCourse,
+  deleteCourse,
+  listEnrollments,
+  enrollCourse,
+} from "./routes/courses.js";
+import {
+  getInbox,
+  sendInboxMessage,
+  markRead,
+  deleteMessages,
+  starMessage,
+} from "./routes/messages.js";
 
 export function createServer() {
   const app = express();
@@ -27,6 +43,7 @@ export function createServer() {
   app.post("/api/auth/login", login);
   app.post("/api/auth/register", register);
   app.get("/api/auth/registered-emails", getRegisteredEmails);
+  app.get("/api/users/:id", getUserById);
 
   // OTP + social endpoints
   app.post("/api/auth/request-otp", requestOtp);
@@ -124,6 +141,24 @@ export function createServer() {
       return res.send(`<html><body><script>window.opener.postMessage({ type: 'oauth', error: 'Google OAuth not configured on server' }, '${BASE_URL}'); window.close();</script></body></html>`);
     });
   }
+
+  // register courses API
+  app.get("/api/courses", getCourses);
+  app.get("/api/courses/:id", getCourse);
+  app.post("/api/courses", createCourse);
+  app.put("/api/courses/:id", updateCourse);
+  app.delete("/api/courses/:id", deleteCourse);
+
+  app.get("/api/enrollments", listEnrollments);
+  app.post("/api/courses/:id/enroll", enrollCourse);
+
+  // messages / discussions routes
+  app.get("/api/inbox", getInbox);
+  app.post("/api/inbox/send", sendInboxMessage);
+  app.post("/api/inbox/mark-read", markRead);
+  app.post("/api/inbox/delete", deleteMessages);
+  app.post("/api/inbox/star", starMessage);
+  // Discussions and direct-messages removed: Inbox handles notifications, teacher and admin messages
 
   return app;
 }

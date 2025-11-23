@@ -1,201 +1,152 @@
-import React, { useState, useEffect } from "react";
-import {
-  Mail,
-  Search,
-  Filter,
-  MoreVertical,
-  Star,
-  Archive,
-  Trash2,
-  Reply,
-  Forward,
-  Bell,
-  User,
-  AlertTriangle
-} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Mail, Star, Trash2, Reply, Forward } from "lucide-react";
+import { Link } from "react-router-dom";
+import { loadInboxMessages } from "@/utils/inboxHelpers";
 
-type InboxMessage = {
-  id: string;
-  from: string;
-  to: string;
-  subject: string;
-  content: string;
-  timestamp: string;
-  read: boolean;
-  type: "direct_message" | "notification" | "system";
-  starred?: boolean;
-};
-
-const INBOX_STORAGE = "nxtgen_inbox";
-
-const initialMessages: InboxMessage[] = [
-  {
-    id: "1",
-    from: "Sarah Johnson",
-    to: "current_user",
-    subject: "Assignment Feedback",
-    content: "Great work on your React assignment! I've left some detailed feedback on your code structure.",
-    timestamp: "2024-01-28 10:30 AM",
-    read: false,
-    type: "direct_message"
-  },
-  {
-    id: "2",
-    from: "system",
-    to: "current_user",
-    subject: "New Course Available",
-    content: "A new advanced JavaScript course has been added to your learning path.",
-    timestamp: "2024-01-28 09:15 AM",
-    read: true,
-    type: "system"
-  }
-];
+const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
 export default function Inbox() {
-  const [messages, setMessages] = useState<InboxMessage[]>(() => {
-    const stored = localStorage.getItem(INBOX_STORAGE);
-    return stored ? JSON.parse(stored) : initialMessages;
-  });
-
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<any[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<any | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [form, setForm] = useState({ toUserId: "", toName: "", subject: "", content: "" });
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [selectedMessage, setSelectedMessage] = useState<InboxMessage | null>(null);
+  const [studentSearchId, setStudentSearchId] = useState("");
+  const [studentResult, setStudentResult] = useState<any | null>(null);
+  const [searchingStudent, setSearchingStudent] = useState(false);
+  const [popup, setPopup] = useState<{ type: 'error' | 'info' | 'success'; message: string } | null>(null);
 
-  // Filter messages
-  const filteredMessages = messages.filter(message => {
-    const matchesSearch = message.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         message.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         message.content.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === "all" || message.type === filterType;
-    return matchesSearch && matchesType;
-  });
-
-  const unreadCount = messages.filter(m => !m.read).length;
-
-  const markAsRead = (messageId: string) => {
-    setMessages(prev => 
-      prev.map(m => 
-        m.id === messageId ? { ...m, read: true } : m
-      )
-    );
-  };
-
-  const toggleStar = (messageId: string) => {
-    setMessages(prev => 
-      prev.map(m => 
-        m.id === messageId ? { ...m, starred: !m.starred } : m
-      )
-    );
-  };
-
-  const deleteMessage = (messageId: string) => {
-    if (window.confirm("Delete this message?")) {
-      setMessages(prev => prev.filter(m => m.id !== messageId));
-      setSelectedMessage(null);
-    }
-  };
-
-  const getMessageIcon = (type: string) => {
-    switch (type) {
-      case "direct_message": return <Mail size={16} className="text-blue-500" />;
-      case "notification": return <Bell size={16} className="text-yellow-500" />;
-      case "system": return <AlertTriangle size={16} className="text-green-500" />;
-      default: return <Mail size={16} className="text-gray-500" />;
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "direct_message": return "Message";
-      case "notification": return "Notification";
-      case "system": return "System";
-      default: return "Unknown";
-    }
-  };
-
-  // Save messages when they change
   useEffect(() => {
-    localStorage.setItem(INBOX_STORAGE, JSON.stringify(messages));
-  }, [messages]);
+    if (!popup) return;
+    const t = setTimeout(() => setPopup(null), 4000);
+    return () => clearTimeout(t);
+  }, [popup]);
+
+  const fetchMessages = async () => {
+    try {
+      const q = user ? `?userId=${user.id}&role=${user.role}` : "";
+      const res = await fetch(`${API}/inbox${q}`);
+      if (res.ok) {
+        const body = await res.json();
+        const serverMsgs = body.messages || [];
+        // load local notifications (assignments/new content etc.) and merge
+        const local = loadInboxMessages() || [];
+        const localAsServer = local.map((l: any) => ({
+          id: l.id,
+          fromUserId: 'system',
+          fromName: 'System',
+          subject: l.title,
+          content: l.message,
+          timestamp: l.createdAt,
+          read: l.read,
+          category: l.type,
+          recipientRole: l.recipientRole || null,
+        }));
+        // merge and sort by timestamp desc
+        const merged = [...localAsServer, ...serverMsgs].sort((a, b) => (b.timestamp || b.createdAt || 0) - (a.timestamp || a.createdAt || 0));
+        setMessages(merged);
+      } else {
+        console.warn("Inbox fetch failed", res.status);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.warn("Inbox fetch error", err);
+      setMessages([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages();
+    const iv = setInterval(fetchMessages, 3000);
+    return () => clearInterval(iv);
+  }, [user]);
+
+  const openMessage = (m: any) => {
+    setSelectedMessage(m);
+    if (!m.read) {
+      fetch(`${API}/inbox/mark-read`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [m.id] }) });
+      setMessages(prev => prev.map(x => x.id === m.id ? { ...x, read: true } : x));
+    }
+  };
+
+  const sendMessage = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!user) {
+      setPopup({ type: 'error', message: 'Sign in to send messages' });
+      return;
+    }
+    // Only instructors and admins may send messages
+    if (!(user.role === 'instructor' || user.role === 'admin')) {
+      setPopup({ type: 'error', message: 'Only instructors and admins can send messages' });
+      return;
+    }
+    const payload = {
+      fromUserId: user.id,
+      fromName: user.name || user.email,
+      toUserId: form.toUserId || null,
+      toName: form.toName || null,
+      subject: form.subject,
+      content: form.content
+    };
+    const res = await fetch(`${API}/inbox/send`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (res.ok) {
+      setForm({ toUserId: "", toName: "", subject: "", content: "" });
+      setComposeOpen(false);
+      fetchMessages();
+      setPopup({ type: 'success', message: 'Message sent' });
+    } else {
+      setPopup({ type: 'error', message: 'Failed to send message' });
+    }
+  };
+
+  const deleteSelected = async (ids: string[]) => {
+    if (!window.confirm("Delete selected message(s)?")) return;
+    await fetch(`${API}/inbox/delete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+    fetchMessages();
+    if (selectedMessage && ids.includes(selectedMessage.id)) setSelectedMessage(null);
+  };
+
+  const toggleStar = async (id: string, starred: boolean) => {
+    await fetch(`${API}/inbox/star`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, starred }) });
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, starred } : m));
+  };
+
+  const filtered = messages.filter(m => {
+    const q = searchQuery.toLowerCase();
+    return !q || (m.subject || "").toLowerCase().includes(q) || (m.fromName || "").toLowerCase().includes(q) || (m.content || "").toLowerCase().includes(q);
+  });
 
   return (
-    <main className="flex-1 min-h-0 overflow-hidden bg-gray-50">
-      <div className="min-h-0 flex">
+    <main className="flex-1 min-h-0 flex bg-gray-50">
+      <div className="flex-1 min-h-0 flex">
         {/* Message List */}
-        <div className="w-1/3 bg-white border-r flex flex-col">
-          {/* Header */}
+        <div className="w-80 bg-white border-r flex flex-col">
           <div className="p-4 border-b">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-bold text-gray-900">Inbox</h1>
-              <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
-                {unreadCount} unread
-              </span>
+            <div className="flex items-center justify-between mb-3">
+              <h1 className="text-lg font-bold">Inbox</h1>
+              {(user && (user.role === 'instructor' || user.role === 'admin')) && (
+                <button onClick={() => setComposeOpen(true)} className="px-3 py-1 bg-blue-600 text-white rounded">Compose</button>
+              )}
             </div>
 
-            {/* Search */}
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search messages..."
-                className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="relative mb-3">
+              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search messages..." className="w-full pl-3 pr-3 py-2 border rounded text-sm" />
             </div>
-
-            {/* Filter */}
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Messages</option>
-              <option value="direct_message">Direct Messages</option>
-              <option value="notification">Notifications</option>
-              <option value="system">System Messages</option>
-            </select>
           </div>
 
-          {/* Message List */}
-          <div className="flex-1 overflow-y-auto">
-            {filteredMessages.map((message) => (
-              <div
-                key={message.id}
-                onClick={() => {
-                  setSelectedMessage(message);
-                  if (!message.read) markAsRead(message.id);
-                }}
-                className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
-                  selectedMessage?.id === message.id ? "bg-blue-50 border-l-4 border-l-blue-600" : ""
-                } ${!message.read ? "bg-blue-25" : ""}`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {getMessageIcon(message.type)}
-                    <span className={`font-medium text-sm ${!message.read ? "text-gray-900" : "text-gray-700"}`}>
-                      {message.from}
-                    </span>
-                    {!message.read && (
-                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                    )}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {filtered.map(m => (
+              <div key={m.id} onClick={() => openMessage(m)} className={`p-3 border-b cursor-pointer ${selectedMessage?.id === m.id ? "bg-blue-50 border-l-4 border-l-blue-600" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className={`font-medium ${!m.read ? "text-gray-900" : "text-gray-700"}`}>{m.fromName}</div>
+                    <div className="text-xs text-gray-500 truncate">{m.subject}</div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                      {getTypeLabel(message.type)}
-                    </span>
-                    {message.starred && (
-                      <Star size={14} className="text-yellow-500 fill-current" />
-                    )}
-                  </div>
+                  <div className="text-xs text-gray-400">{new Date(m.timestamp).toLocaleDateString()}</div>
                 </div>
-                <h3 className={`text-sm mb-1 ${!message.read ? "font-semibold" : ""}`}>
-                  {message.subject}
-                </h3>
-                <p className="text-xs text-gray-600 truncate mb-2">
-                  {message.content}
-                </p>
-                <p className="text-xs text-gray-500">{message.timestamp}</p>
+                {m.starred && <div className="mt-2 text-yellow-500"><Star size={14} /></div>}
               </div>
             ))}
           </div>
@@ -205,70 +156,44 @@ export default function Inbox() {
         <div className="flex-1 min-h-0 flex flex-col">
           {selectedMessage ? (
             <>
-              {/* Message Header */}
-              <div className="p-4 border-b bg-white">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center text-white font-bold">
-                      {selectedMessage.from.charAt(0)}
-                    </div>
-                    <div>
-                      <h2 className="font-semibold text-gray-900">{selectedMessage.from}</h2>
-                      <p className="text-sm text-gray-500">{selectedMessage.timestamp}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => toggleStar(selectedMessage.id)}
-                      className="p-2 hover:bg-gray-100 rounded"
-                    >
-                      <Star size={16} className={selectedMessage.starred ? "text-yellow-500 fill-current" : "text-gray-400"} />
-                    </button>
-                    <button className="p-2 hover:bg-gray-100 rounded">
-                      <Archive size={16} className="text-gray-400" />
-                    </button>
-                    <button 
-                      onClick={() => deleteMessage(selectedMessage.id)}
-                      className="p-2 hover:bg-gray-100 rounded"
-                    >
-                      <Trash2 size={16} className="text-gray-400" />
-                    </button>
-                    <button className="p-2 hover:bg-gray-100 rounded">
-                      <MoreVertical size={16} className="text-gray-400" />
-                    </button>
-                  </div>
+              <div className="p-4 border-b bg-white flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-gray-900">{selectedMessage.subject}</h2>
+                  <div className="text-xs text-gray-500">{selectedMessage.fromName} • {new Date(selectedMessage.timestamp).toLocaleString()}</div>
                 </div>
-                <h1 className="text-xl font-bold text-gray-900 mb-2">{selectedMessage.subject}</h1>
                 <div className="flex items-center gap-2">
-                  {getMessageIcon(selectedMessage.type)}
-                  <span className="text-sm text-gray-600">{getTypeLabel(selectedMessage.type)}</span>
+                  <button onClick={() => toggleStar(selectedMessage.id, !selectedMessage.starred)} className="p-2 hover:bg-gray-100 rounded">
+                    <Star className={selectedMessage.starred ? "text-yellow-500" : "text-gray-400"} />
+                  </button>
+                  <button onClick={() => deleteSelected([selectedMessage.id])} className="p-2 hover:bg-gray-100 rounded">
+                    <Trash2 className="text-gray-400" />
+                  </button>
+                  <button onClick={() => {
+                    if (!(user && (user.role === 'instructor' || user.role === 'admin'))) {
+                      setPopup({ type: 'error', message: 'Only instructors and admins can reply' });
+                      return;
+                    }
+                    setForm(f => ({ ...f, toUserId: selectedMessage.fromUserId || '', toName: selectedMessage.fromName || '' }));
+                    setStudentResult(selectedMessage.fromUserId ? { id: selectedMessage.fromUserId, name: selectedMessage.fromName } : null);
+                    setComposeOpen(true);
+                  }} className="p-2 hover:bg-gray-100 rounded">Reply</button>
                 </div>
               </div>
 
-              {/* Message Content */}
-              <div className="flex-1 p-4 bg-white overflow-y-auto">
+              <div className="flex-1 p-4 bg-white overflow-y-auto min-h-0">
                 <div className="prose max-w-none">
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                    {selectedMessage.content}
-                  </p>
+                  <p className="text-gray-700 whitespace-pre-wrap">{selectedMessage.content}</p>
                 </div>
               </div>
 
-              {/* Message Actions */}
-              {selectedMessage.type === "direct_message" && (
-                <div className="p-4 border-t bg-white">
+              <div className="p-4 border-t bg-white">
+                <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
                   <div className="flex gap-2">
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                      <Reply size={16} />
-                      Reply
-                    </button>
-                    <button className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2">
-                      <Forward size={16} />
-                      Forward
-                    </button>
+                    <input value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Reply subject" className="flex-1 border px-3 py-2 rounded" />
+                    <button className="px-4 py-2 bg-blue-600 text-white rounded">Reply</button>
                   </div>
-                </div>
-              )}
+                </form>
+              </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-gray-50">
@@ -281,6 +206,72 @@ export default function Inbox() {
           )}
         </div>
       </div>
+
+      {/* Compose modal (simple inline panel) */}
+      {composeOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
+          <div className="bg-white w-full max-w-xl p-6 rounded shadow-lg">
+            <h3 className="text-lg font-semibold mb-3">Compose Message</h3>
+            <form onSubmit={sendMessage} className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <input value={studentSearchId} onChange={(e) => setStudentSearchId(e.target.value)} placeholder="Search student by ID" className="col-span-2 border px-3 py-2 rounded" />
+                <button type="button" onClick={async () => {
+                  if (!studentSearchId) return;
+                  setSearchingStudent(true);
+                  try {
+                    const r = await fetch(`${API}/users/${studentSearchId}`);
+                    if (r.ok) {
+                      const b = await r.json();
+                      setStudentResult(b.user);
+                      setForm(f => ({ ...f, toUserId: b.user.id, toName: b.user.name }));
+                    } else {
+                      setStudentResult(null);
+                      setPopup({ type: 'error', message: 'Student ID not found' });
+                    }
+                  } catch (err) {
+                    console.warn('Student lookup error', err);
+                    setStudentResult(null);
+                    setPopup({ type: 'error', message: 'Student lookup failed' });
+                  } finally {
+                    setSearchingStudent(false);
+                  }
+                }} className="col-span-1 px-3 py-2 bg-gray-100 border rounded">Find</button>
+              </div>
+              {studentResult && (
+                <div className="p-2 bg-gray-50 rounded text-sm">
+                  Found: <strong>{studentResult.name}</strong> (ID: {studentResult.id})
+                </div>
+              )}
+
+              <input value={form.toName} onChange={(e) => setForm(f => ({ ...f, toName: e.target.value }))} placeholder="To (leave empty for role/system)" className="w-full border px-3 py-2 rounded" />
+              <input value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Subject" className="w-full border px-3 py-2 rounded" />
+              <textarea value={form.content} onChange={(e) => setForm(f => ({ ...f, content: e.target.value }))} rows={6} className="w-full border px-3 py-2 rounded" placeholder="Write your message..." />
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-500">You are sending as: {user?.name || user?.email}</div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setComposeOpen(false)} className="px-4 py-2 border rounded">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Send</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Popup (in-app) */}
+      {popup && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pointer-events-none">
+          <div className="mt-16 pointer-events-auto bg-white border rounded shadow-lg px-4 py-3 max-w-lg w-full mx-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-1">
+                <div className={`text-sm ${popup.type === 'error' ? 'text-red-700' : popup.type === 'success' ? 'text-green-700' : 'text-gray-800'}`}>{popup.message}</div>
+                <div className="mt-3 text-right">
+                  <button onClick={() => setPopup(null)} className="px-3 py-1 bg-gray-100 rounded">OK</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

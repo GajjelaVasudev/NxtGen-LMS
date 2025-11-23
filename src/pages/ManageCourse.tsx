@@ -1,328 +1,187 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { Search, ArrowLeft, Edit2, Trash2, AlertCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { ArrowLeft, AlertCircle, Edit2, Trash2 } from "lucide-react";
 
-type VideoItem = { 
-  id: string; 
-  title: string; 
-  fileName?: string; 
-  url?: string; // Changed from dataUrl to url
-  fileSize?: number;
-};
+const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
-type AssignmentItem = { id: string; title: string; files: { fileName: string; dataUrl?: string }[] };
-type QuizItem =
-  | { id: string; type: "mcq"; questions: { id: string; q: string; opts: string[]; answer: number }[] }
-  | { id: string; type: "written" }
-  | { id: string; type: "file-upload" };
-
-type Course = {
-  id: string;
-  title: string;
-  thumbnail?: string;
-  videos?: VideoItem[];
-  quizzes?: QuizItem[];
-  assignments?: AssignmentItem[];
-  description?: string;
-  price?: number;
-  createdAt: number;
-  creator?: string;
-};
-
-const STORAGE_KEY = "nxtgen_courses";
-
-function loadCourses(): Course[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Course[]) : [];
-  } catch {
-    return [];
-  }
+async function apiFetchCourse(id: string) {
+  return fetch(`${API}/courses/${id}`).then(r => r.json()).catch(() => ({ course: null }));
+}
+async function apiCreateCourse(course: any, userId?: string) {
+  return fetch(`${API}/courses`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(userId ? { "x-user-id": userId } : {}) },
+    body: JSON.stringify(course),
+  }).then(r => r.json());
+}
+async function apiUpdateCourse(id: string, course: any) {
+  return fetch(`${API}/courses/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(course),
+  }).then(r => r.json());
 }
 
-function saveCourses(courses: Course[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
-    window.dispatchEvent(new CustomEvent("courses:updated"));
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      alert('Storage quota exceeded. Please use video URLs instead of uploading large files.');
-      throw error;
-    }
-    throw error;
-  }
+// --- Additional API helpers used by the Manage list ---
+async function apiFetchAllCourses() {
+  return fetch(`${API}/courses`).then(r => r.json()).catch(() => ({ courses: [] }));
+}
+async function apiDeleteCourse(id: string) {
+  return fetch(`${API}/courses/${id}`, { method: "DELETE" }).then(r => r.json()).catch(() => ({ ok: false }));
 }
 
-/**
- * ManageCourse page - list, search, sort, edit link
- */
 export default function ManageCourse() {
-  const { hasRole } = useAuth();
-  const [courses, setCourses] = useState<Course[]>(() => loadCourses());
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<"latest" | "oldest">("latest");
+  const { user } = useAuth();
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const handler = () => setCourses(loadCourses());
-    window.addEventListener("courses:updated", handler);
-    return () => window.removeEventListener("courses:updated", handler);
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      const res = await apiFetchAllCourses();
+      if (mounted) setCourses(res.courses || []);
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const arr = courses.filter((c) => !q || c.title.toLowerCase().includes(q));
-    arr.sort((a, b) => (sort === "latest" ? b.createdAt - a.createdAt : a.createdAt - b.createdAt));
-    return arr;
-  }, [courses, query, sort]);
+  async function onDelete(id: string) {
+    if (!confirm("Delete this course?")) return;
+    const res = await apiDeleteCourse(id);
+    if (res.ok) {
+      setCourses((c) => c.filter((x: any) => x.id !== id));
+    } else {
+      alert("Failed to delete course");
+    }
+  }
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-white">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-6 gap-4">
-          <h1 className="text-2xl font-bold text-nxtgen-text-primary">Manage Courses</h1>
-
-          <div className="flex items-center gap-3">
-            <div className="relative flex items-center border rounded overflow-hidden">
-              <div className="px-3">
-                <Search size={18} />
-              </div>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search courses..."
-                className="px-3 py-2 outline-none"
-              />
-            </div>
-
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as any)}
-              className="px-3 py-2 border rounded"
-              aria-label="Sort by"
-            >
-              <option value="latest">Latest added</option>
-              <option value="oldest">Oldest</option>
-            </select>
-
-            {hasRole && hasRole(["instructor", "admin", "contentCreator"]) ? (
-              <Link to="/app/managecourse/add" className="px-4 py-2 bg-[#515DEF] text-white rounded hover:bg-[#414BCF] transition-colors">
-                Add Course
-              </Link>
-            ) : null}
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Manage Courses</h1>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/app/managecourse/add')} className="px-4 py-2 bg-blue-600 text-white rounded">Create Course</button>
           </div>
         </div>
 
-        {/* Course cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.length === 0 ? (
-            <div className="col-span-full text-center text-gray-500 py-12">
-              <p className="text-lg mb-2">No courses found</p>
-              {hasRole && hasRole(["instructor", "admin", "contentCreator"]) && (
-                <Link to="/app/managecourse/add" className="text-blue-600 hover:underline">
-                  Create your first course
-                </Link>
-              )}
-            </div>
-          ) : (
-            filtered.map((c) => (
-              <div key={c.id} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                <div className="h-40 bg-gray-100 rounded-md mb-4 overflow-hidden">
-                  {c.thumbnail ? (
-                    <img src={c.thumbnail} alt={c.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      No thumbnail
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Loading...</div>
+        ) : courses.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-600 mb-4">No courses yet.</p>
+            <button onClick={() => navigate('/app/managecourse/add')} className="px-4 py-2 bg-blue-600 text-white rounded">Add your first course</button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {courses.map((c) => (
+              <div key={c.id} className="p-4 border rounded bg-gray-50 flex items-start gap-4">
+                {c.thumbnail && <img src={c.thumbnail} alt={c.title} className="w-28 h-20 object-cover rounded" />}
+                <div className="flex-1">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-semibold">{c.title}</div>
+                      <div className="text-xs text-gray-500">{c.description}</div>
                     </div>
-                  )}
-                </div>
-                <h3 className="font-semibold mb-2">{c.title}</h3>
-                <p className="text-sm text-gray-600 mb-3 line-clamp-3">{c.description || "No description"}</p>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-500">Price: ₹{c.price ?? 0}</div>
-                  <div className="flex items-center gap-2">
-                    {hasRole && hasRole(["instructor", "admin", "contentCreator"]) && (
-                      <Link
-                        to={`/app/managecourse/edit/${c.id}`}
-                        className="text-sm px-3 py-1 border rounded hover:bg-gray-50"
-                      >
-                        Edit
-                      </Link>
-                    )}
-                    <div className="text-xs text-gray-400">
-                      {new Date(c.createdAt).toLocaleDateString()}
+                    <div className="flex items-center gap-2">
+                      <Link to={`/app/managecourse/edit/${c.id}`} className="text-blue-600">Edit</Link>
+                      <button onClick={() => onDelete(c.id)} className="text-red-600">Delete</button>
                     </div>
                   </div>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-/**
- * AddCourse page (also handles edit when :id param present)
- * exported named so route can import { AddCourse }
- */
 export function AddCourse() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useAuth();
   const isEditing = !!id;
-  
-  const [form, setForm] = useState<Partial<Course>>({
-    title: "",
-    thumbnail: "",
-    videos: [],
-    quizzes: [],
-    assignments: [],
-    description: "",
-    price: 0,
-  });
 
+  const [form, setForm] = useState<any>({ title: "", thumbnail: "", videos: [], quizzes: [], assignments: [], description: "", price: 0 });
+
+  // video editing helpers (used by the UI below)
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [editingVideoTitle, setEditingVideoTitle] = useState("");
 
-  useEffect(() => {
-    if (id) {
-      const c = loadCourses().find((x) => x.id === id);
-      if (c) setForm(c);
-    }
-  }, [id]);
-
-  function updateField<K extends keyof Course>(k: K, v: Course[K] | any) {
-    setForm((s) => ({ ...s, [k]: v }));
+  function startEditingVideo(v: any) {
+    setEditingVideoId(v.id);
+    setEditingVideoTitle(v.title || "");
   }
-
-  // Video handlers - Now uses URL instead of file upload
-  function addVideoByUrl(url: string, title?: string) {
-    const vid: VideoItem = { 
-      id: String(Date.now()), 
-      title: title || "Video Lesson",
-      url: url,
-      fileName: url.split('/').pop() || 'video'
-    };
-    const next = [...(form.videos ?? []), vid];
-    updateField("videos", next);
-  }
-
-  function startEditingVideo(video: VideoItem) {
-    setEditingVideoId(video.id);
-    setEditingVideoTitle(video.title);
-  }
-
-  function saveVideoTitle(videoId: string) {
-    const updated = (form.videos ?? []).map(v => 
-      v.id === videoId ? { ...v, title: editingVideoTitle } : v
-    );
-    updateField("videos", updated);
+  function saveVideoTitle(id: string) {
+    setForm((s: any) => ({ ...s, videos: (s.videos || []).map((vv: any) => (vv.id === id ? { ...vv, title: editingVideoTitle } : vv)) }));
     setEditingVideoId(null);
     setEditingVideoTitle("");
   }
-
   function removeVideo(id: string) {
-    updateField("videos", (form.videos ?? []).filter((v) => v.id !== id));
+    setForm((s: any) => ({ ...s, videos: (s.videos || []).filter((v: any) => v.id !== id) }));
+  }
+  function addVideoByUrl(url: string, title: string) {
+    const id = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    setForm((s: any) => ({ ...s, videos: [...(s.videos || []), { id, title, url }] }));
   }
 
-  // Quiz handlers - Only MCQ
+  // Quizzes helpers (basic MCQ support)
   function addMcqQuiz() {
-    const q: QuizItem = { id: String(Date.now()), type: "mcq", questions: [] };
-    updateField("quizzes", [...(form.quizzes ?? []), q]);
+    const qId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    setForm((s: any) => ({ ...s, quizzes: [...(s.quizzes || []), { id: qId, type: "mcq", questions: [] }] }));
   }
-
   function removeQuiz(id: string) {
-    updateField("quizzes", (form.quizzes ?? []).filter((q) => (q as any).id !== id));
+    setForm((s: any) => ({ ...s, quizzes: (s.quizzes || []).filter((q: any) => q.id !== id) }));
   }
-
   function addMcqQuestion(quizId: string) {
-    const quizzes = (form.quizzes ?? []).map((q) => {
-      if (q.type === "mcq" && q.id === quizId) {
-        const questions = q.questions || [];
-        questions.push({ id: String(Date.now()), q: "New question", opts: ["Option 1", "Option 2", "Option 3", "Option 4"], answer: 0 });
-        return { ...q, questions };
-      }
-      return q;
-    });
-    updateField("quizzes", quizzes);
+    const qnId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    setForm((s: any) => ({
+      ...s,
+      quizzes: (s.quizzes || []).map((q: any) => (q.id === quizId ? { ...q, questions: [...(q.questions || []), { id: qnId, q: "", opts: ["", "", "", ""], answer: 0 }] } : q)),
+    }));
   }
-
   function removeMcqQuestion(quizId: string, questionId: string) {
-    const quizzes = (form.quizzes ?? []).map((q) => {
-      if (q.type === "mcq" && q.id === quizId) {
-        return {
-          ...q,
-          questions: q.questions.filter(qq => qq.id !== questionId)
-        };
-      }
-      return q;
-    });
-    updateField("quizzes", quizzes);
+    setForm((s: any) => ({
+      ...s,
+      quizzes: (s.quizzes || []).map((q: any) => (q.id === quizId ? { ...q, questions: (q.questions || []).filter((qq: any) => qq.id !== questionId) } : q)),
+    }));
+  }
+  function updateMcqQuestion(quizId: string, questionId: string, fn: (old: any) => any) {
+    setForm((s: any) => ({
+      ...s,
+      quizzes: (s.quizzes || []).map((q: any) => (q.id === quizId ? { ...q, questions: (q.questions || []).map((qq: any) => (qq.id === questionId ? fn(qq) : qq)) } : q)),
+    }));
   }
 
-  function updateMcqQuestion(quizId: string, questionId: string, updater: (q: any) => any) {
-    const quizzes = (form.quizzes ?? []).map((q) => {
-      if (q.type === "mcq" && q.id === quizId) {
-        return {
-          ...q,
-          questions: q.questions.map((qq) => (qq.id === questionId ? updater(qq) : qq)),
-        };
-      }
-      return q;
-    });
-    updateField("quizzes", quizzes);
-  }
-
-  function ensureNumber(x: any) {
-    const n = Number(x);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function onSave(e: React.FormEvent) {
-    e.preventDefault();
-    
-    if (!form.title || form.title.trim() === "") {
-      alert("Course title is required");
-      return;
+  useEffect(() => {
+    if (id) {
+      (async () => {
+        const res = await apiFetchCourse(id);
+        if (res?.course) setForm(res.course);
+      })();
     }
+  }, [id]);
 
-    const now = Date.now();
-    const existing = loadCourses();
-    
+  function updateField(k: string, v: any) { setForm((s: any) => ({ ...s, [k]: v })); }
+
+  async function onSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title || form.title.trim() === "") { alert("Course title is required"); return; }
     try {
       if (isEditing && id) {
-        const updated = existing.map((c) => 
-          c.id === id 
-            ? { 
-                ...c, 
-                ...form,
-                title: form.title!.trim(),
-                price: ensureNumber(form.price)
-              } as Course
-            : c
-        );
-        saveCourses(updated);
+        await apiUpdateCourse(id, { ...form, title: form.title.trim(), price: Number(form.price || 0) });
       } else {
-        const newCourse: Course = {
-          id: String(now),
-          title: form.title.trim(),
-          thumbnail: form.thumbnail || "",
-          videos: form.videos ?? [],
-          quizzes: form.quizzes ?? [],
-          assignments: form.assignments ?? [],
-          description: form.description || "",
-          price: ensureNumber(form.price),
-          createdAt: now,
-          creator: user?.id || "unknown"
-        };
-        saveCourses([newCourse, ...existing]);
+        await apiCreateCourse({ ...form, title: form.title.trim(), price: Number(form.price || 0) }, user?.id);
       }
-      
       navigate("/app/managecourse");
-    } catch (error) {
-      console.error("Failed to save course:", error);
+    } catch (err) {
+      console.error("Failed to save course:", err);
+      alert("Failed to save course");
     }
   }
 
@@ -601,20 +460,9 @@ export function AddCourse() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-4 border-t">
-            <button 
-              type="submit" 
-              className="px-6 py-3 bg-[#515DEF] text-white rounded hover:bg-[#414BCF] transition-colors font-medium"
-            >
-              {isEditing ? "Update Course" : "Create Course"}
-            </button>
-            <button 
-              type="button" 
-              onClick={() => navigate("/app/managecourse")} 
-              className="px-6 py-3 border rounded hover:bg-gray-50 font-medium"
-            >
-              Cancel
-            </button>
+          <div className="mt-6 flex gap-3">
+            <button type="submit" className="px-6 py-3 bg-[#515DEF] text-white rounded">{isEditing ? "Update Course" : "Create Course"}</button>
+            <button type="button" onClick={() => navigate("/app/managecourse")} className="px-6 py-3 border rounded">Cancel</button>
           </div>
         </form>
       </div>

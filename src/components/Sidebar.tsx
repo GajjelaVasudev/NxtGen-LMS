@@ -48,7 +48,6 @@ export default function Sidebar() {
     { icon: <FileText />, label: "Assignments", to: "/app/assignments" },
     { icon: <PieChart />, label: "Reports", to: "/app/reports" },
     { icon: <Inbox />, label: "Inbox", to: "/app/inbox", badge: unreadCount },
-    { icon: <MessageCircle />, label: "Discussions", to: "/app/discussions" },
     { icon: <Inbox />, label: "Courses", to: "/app/courses" },
     { icon: <MessageSquarePlus />, label: "Course Catalog", to: "/app/course-catalog" },
     { icon: <Settings />, label: "Settings", to: "/app/settings" },
