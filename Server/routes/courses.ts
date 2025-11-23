@@ -124,32 +124,49 @@ export const listEnrollments: RequestHandler = async (req, res) => {
 export const enrollCourse: RequestHandler = async (req, res) => {
   try {
     const courseId = req.params.id;
+
+    // Log incoming request
+    console.log('[enroll] incoming request:', { courseId, body: req.body, query: req.query, headers: { 'x-user-id': req.headers['x-user-id'] } });
+
     // Accept user identifier from multiple places: body.userId, body.email, query.userId, query.email, header x-user-id
     const rawUser = String(req.body.userId || req.body.email || req.query.userId || req.query.email || req.headers['x-user-id'] || "");
-    if (!rawUser) return res.status(400).json({ error: "user identifier required (userId or email)" });
+    if (!rawUser) {
+      return res.status(400).json({ success: false, error: "ValidationFailed", details: "user identifier required (userId or email)" });
+    }
 
     let userId = rawUser;
+    let resolvedEmail: string | null = null;
+
     // If looks like an email, use getOrCreateUserInDb to ensure DB UUID exists
     if (userId.includes('@')) {
+      resolvedEmail = userId.toLowerCase();
       try {
         const { getOrCreateUserInDb } = await import("./auth.js");
-        const result = await getOrCreateUserInDb(userId);
+        const result = await getOrCreateUserInDb(resolvedEmail);
         if (result.error) {
-          console.error('[enroll] failed to ensure user', { user: userId, error: result.error });
-          return res.status(500).json({ error: 'Failed to create user', details: result.error });
+          console.error('[enroll] failed to ensure user', { user: resolvedEmail, error: result.error });
+          return res.status(500).json({ success: false, error: 'DatabaseInsertFailed', details: result.error });
         }
-        if (!result.id) return res.status(500).json({ error: 'Failed to create user', details: 'no id returned' });
+        if (!result.id) {
+          console.error('[enroll] getOrCreateUserInDb returned no id', { user: resolvedEmail });
+          return res.status(500).json({ success: false, error: 'DatabaseInsertFailed', details: 'no id returned' });
+        }
         userId = result.id;
       } catch (ex) {
         console.error('[enroll] exception ensuring user', ex);
-        return res.status(500).json({ error: 'Failed to create user', details: String(ex) });
+        return res.status(500).json({ success: false, error: 'DatabaseInsertFailed', details: String(ex) });
       }
     } else if (!userId.includes('-')) {
       // Not an email and not a UUID: try canonicalize (handles demo numeric ids)
-      const { canonicalizeUserId } = await import("../utils/userHelpers.js");
-      const canonical = await canonicalizeUserId(userId);
-      if (!canonical) return res.status(400).json({ error: "userId could not be canonicalized" });
-      userId = canonical;
+      try {
+        const { canonicalizeUserId } = await import("../utils/userHelpers.js");
+        const canonical = await canonicalizeUserId(userId);
+        if (!canonical) return res.status(400).json({ success: false, error: 'ValidationFailed', details: 'userId could not be canonicalized' });
+        userId = canonical;
+      } catch (ex) {
+        console.error('[enroll] canonicalize exception', ex);
+        return res.status(500).json({ success: false, error: 'ServerError', details: String(ex) });
+      }
     }
 
     // verify course exists
@@ -164,7 +181,9 @@ export const enrollCourse: RequestHandler = async (req, res) => {
     }
     if (existing && existing.length > 0) return res.json({ success: true, message: "Already enrolled" });
 
-    const insertRow = { course_id: courseId, user_id: userId, created_at: new Date().toISOString() };
+    const insertRow: any = { course_id: courseId, user_id: userId };
+    // include enrolled_at if table uses it (listEnrollments orders by enrolled_at)
+    insertRow.enrolled_at = new Date().toISOString();
     const { error: insertErr } = await supabase.from("enrollments").insert([insertRow]);
     if (insertErr) {
       // If duplicate due to race, treat as success

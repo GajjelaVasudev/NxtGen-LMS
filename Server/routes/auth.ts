@@ -6,10 +6,11 @@ type UserRecord = {
   id: string;
   email: string;
   password: string;
-  role: "admin" | "instructor" | "contentCreator" | "user";
+  // canonical DB role strings
+  role: "admin" | "instructor" | "content_creator" | "student";
   name: string;
   approved?: boolean; // whether account is approved for elevated roles
-  requestedRole?: "admin" | "instructor" | "contentCreator" | null;
+  requestedRole?: "admin" | "instructor" | "content_creator" | null;
 };
 
 // Only these users can login (demo)
@@ -36,7 +37,7 @@ export const REGISTERED_USERS: UserRecord[] = [
     id: "3",
     email: "contentcreator@gmail.com",
     password: "creator123",
-    role: "contentCreator",
+    role: "content_creator",
     name: "Content Creator User",
     approved: true,
     requestedRole: null,
@@ -45,7 +46,7 @@ export const REGISTERED_USERS: UserRecord[] = [
     id: "4",
     email: "student@gmail.com",
     password: "student123",
-    role: "user",
+    role: "student",
     name: "Student User",
     approved: true,
     requestedRole: null,
@@ -140,7 +141,7 @@ export const register: RequestHandler = async (_req, res) => {
     id: String(Date.now()),
     email,
     password,
-    role: "user",
+    role: "student",
     name: name || email.split("@")[0],
     approved: true,
     requestedRole: null,
@@ -332,9 +333,9 @@ export const socialLogin: RequestHandler = async (req, res) => {
 
   // Demo mapping: map provider -> a registered user
   let user: UserRecord | undefined;
-  if (provider === "google") user = REGISTERED_USERS.find((u) => u.role === "user");
+  if (provider === "google") user = REGISTERED_USERS.find((u) => u.role === "student");
   else if (provider === "facebook") user = REGISTERED_USERS.find((u) => u.role === "instructor");
-  else if (provider === "apple") user = REGISTERED_USERS.find((u) => u.role === "contentCreator");
+  else if (provider === "apple") user = REGISTERED_USERS.find((u) => u.role === "content_creator");
 
   if (!user) return res.status(404).json({ error: "No demo user available for provider" });
 
@@ -362,13 +363,16 @@ export const socialLogin: RequestHandler = async (req, res) => {
 export const requestRole: RequestHandler = (req, res) => {
   const { email, requestedRole } = req.body;
   if (!email || !requestedRole) return res.status(400).json({ error: 'email and requestedRole required' });
-  const allowed = ['admin', 'instructor', 'contentCreator'];
+  // accept either frontend form values ('contentCreator') or canonical ('content_creator')
+  const allowed = ['admin', 'instructor', 'contentCreator', 'content_creator'];
   if (!allowed.includes(requestedRole)) return res.status(400).json({ error: 'invalid requestedRole' });
 
   const user = REGISTERED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
   if (!user) return res.status(404).json({ error: 'user not found; please signup first' });
 
-  user.requestedRole = requestedRole as any;
+  // normalize requested role to DB canonical form when storing
+  const normalized = requestedRole === 'contentCreator' ? 'content_creator' : requestedRole;
+  user.requestedRole = normalized as any;
   user.approved = false; // pending approval
   return res.json({ success: true, message: 'Role request submitted' });
 };
@@ -436,4 +440,15 @@ export function findOrCreateSocialUser(email: string, name?: string) {
   REGISTERED_USERS.push(newUser);
   const { password: _, ...userWithoutPassword } = newUser;
   return userWithoutPassword;
+}
+
+// Helper to normalize incoming role strings to DB canonical values
+export function normalizeRoleForDb(role: string | undefined | null) {
+  if (!role) return 'student';
+  const r = String(role);
+  if (r === 'contentCreator' || r === 'content_creator') return 'content_creator';
+  if (r === 'user' || r === 'student') return 'student';
+  if (r === 'instructor') return 'instructor';
+  if (r === 'admin') return 'admin';
+  return 'student';
 }

@@ -99,7 +99,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const finalUser: User = {
         id: serverUser?.id ? String(serverUser.id) : String(u.id || serverUser?.id || ''),
         email: serverUser?.email || email || String(u.email || ''),
-        role: (serverUser?.role as Role) || (u.role as Role) || 'user',
+        // map server canonical roles back to client-side role strings
+        role: (function mapRole(srv: any) {
+          const r = String(srv || '').toLowerCase();
+          if (r === 'content_creator') return 'contentCreator' as Role;
+          if (r === 'student') return 'user' as Role;
+          if (r === 'instructor') return 'instructor' as Role;
+          if (r === 'admin') return 'admin' as Role;
+          return (u.role as Role) || 'user';
+        })(serverUser?.role) as Role,
         name: serverUser?.name || u.name,
       };
 
