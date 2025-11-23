@@ -115,19 +115,43 @@ export default function CourseView() {
 
   useEffect(() => {
     if (courseId && user) {
-      const courses = loadCourses();
-      const foundCourse = courses.find(c => c.id === courseId);
-      setCourse(foundCourse || null);
-      
-      if (foundCourse) {
-        const userProgress = loadProgress(user.id, courseId);
-        setProgress(userProgress);
-        
-        // Auto-select first video if none selected
-        if (foundCourse.videos && foundCourse.videos.length > 0 && !selectedVideo) {
-          setSelectedVideo(foundCourse.videos[0]);
+      let mounted = true;
+      (async () => {
+        // First try local cache
+        const courses = loadCourses();
+        const foundCourse = courses.find(c => c.id === courseId);
+        if (foundCourse) {
+          if (!mounted) return;
+          setCourse(foundCourse);
+          const userProgress = loadProgress(user.id, courseId);
+          setProgress(userProgress);
+          if (foundCourse.videos && foundCourse.videos.length > 0 && !selectedVideo) {
+            setSelectedVideo(foundCourse.videos[0]);
+          }
+          return;
         }
-      }
+
+        // Fallback: fetch from API
+        try {
+          const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+          const res = await fetch(`${API}/courses/${courseId}`);
+          if (res.ok) {
+            const body = await res.json().catch(() => null);
+            const serverCourse = body?.course || null;
+            if (serverCourse) {
+              if (!mounted) return;
+              setCourse(serverCourse);
+              const userProgress = loadProgress(user.id, courseId);
+              setProgress(userProgress);
+              if (serverCourse.videos && serverCourse.videos.length > 0 && !selectedVideo) {
+                setSelectedVideo(serverCourse.videos[0]);
+              }
+            }
+          }
+        } catch (ex) {
+          console.error('[CourseView] failed to fetch course from API', ex);
+        }
+      })();
     }
   }, [courseId, user]);
 

@@ -1,80 +1,92 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { PlayCircle, CheckCircle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { PlayCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
-export default function CourseDetails() {
-  const { courseId } = useParams();
+export default function Courses() {
   const { user } = useAuth();
-  const [course, setCourse] = useState<any>(null);
-  const [enrolled, setEnrolled] = useState(false);
   const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!courseId) return;
     let mounted = true;
     (async () => {
-      const c = await fetch(`${API}/courses/${courseId}`).then(r => r.json()).catch(() => ({ course: null }));
-      const e = await fetch(`${API}/enrollments${user?.id ? `?userId=${user.id}` : ""}`).then(r => r.json()).catch(() => ({ enrollments: [] }));
-      if (!mounted) return;
-      setCourse(c.course || null);
-      setEnrollments(e.enrollments || []);
+      if (!user?.id) {
+        if (mounted) {
+          setEnrollments([]);
+          setCourses([]);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const eRes = await fetch(`${API}/enrollments?userId=${user.id}`);
+        const eJson = await eRes.json().catch(() => ({ enrollments: [] }));
+        const raw = eJson.enrollments || [];
+        const norm = raw.map((row: any) => ({ ...row, courseId: row.course_id || row.courseId, userId: row.user_id || row.userId }));
+        if (!mounted) return;
+        setEnrollments(norm);
+
+        // Fetch course details for each enrollment
+        const courseIds = Array.from(new Set(norm.map((r: any) => r.courseId).filter(Boolean)));
+        const coursePromises = courseIds.map((id: string) => fetch(`${API}/courses/${id}`).then(r => r.json()).catch(() => ({ course: null })));
+        const courseResults = await Promise.all(coursePromises);
+        const fetched = courseResults.map((c: any) => c.course).filter(Boolean);
+        if (!mounted) return;
+        setCourses(fetched);
+      } catch (err) {
+        console.error('Failed to load enrolled courses', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     })();
+
     return () => { mounted = false; };
-  }, [courseId, user]);
+  }, [user]);
 
-  useEffect(() => setEnrolled(enrollments.some(e => e.courseId === courseId)), [enrollments, courseId]);
+  if (loading) return <div className="p-6">Loading...</div>;
 
-  const buyCourse = async () => {
-    if (enrolled) return;
-    if (!user?.id) return alert("Please sign in to enroll");
-    const res = await fetch(`${API}/courses/${courseId}/enroll`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id }),
-    });
-    if (!res.ok) return alert("Enroll failed");
-    const e = await fetch(`${API}/enrollments?userId=${user.id}`).then(r => r.json()).catch(() => ({ enrollments: [] }));
-    setEnrollments(e.enrollments || []);
-    setEnrolled(true);
-  };
-
-  if (!course) {
+  if (!user) {
     return (
-      <div className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
-        <div className="max-w-5xl mx-auto p-6 text-center">
-          <p className="text-gray-500">Course not found.</p>
-          <Link to="/app/course-catalog" className="text-blue-600 hover:underline mt-4 inline-block">Back to Catalog</Link>
-        </div>
+      <div className="p-6">
+        <p>Please sign in to see your courses.</p>
+        <Link to="/login" className="text-blue-600 hover:underline">Sign in</Link>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto bg-white">
-      <div className="max-w-6xl mx-auto p-6 lg:p-10">
-        {/* hero and details (unchanged UI) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* left info */}
-          {/* right CTA */}
-          <aside>
-            <div className="bg-white p-6 rounded-lg shadow-sm border text-center">
-              <div className="text-sm text-gray-500">Students enrolled</div>
-              <div className="text-2xl font-bold mt-2">{/* show via enrollments count */}</div>
-              <div className="text-sm text-gray-400 mt-1">Updated live</div>
-            </div>
+    <main className="flex-1 min-h-0 overflow-y-auto bg-white">
+      <div className="max-w-7xl mx-auto p-6">
+        <h1 className="text-2xl font-bold mb-4">My Courses</h1>
 
-            <div className="bg-gradient-to-br from-blue-600 to-purple-600 text-white p-6 rounded-lg shadow-lg mt-4">
-              <button onClick={buyCourse} disabled={enrolled} className={`mt-4 w-full px-4 py-2 rounded-md font-semibold ${enrolled ? "bg-white/20" : "bg-white text-blue-600"}`}>
-                {enrolled ? "Enrolled" : user ? "Enroll Now" : "Sign in to Enroll"}
-              </button>
-            </div>
-          </aside>
-        </div>
+        {courses.length === 0 ? (
+          <div className="text-gray-500">You are not enrolled in any courses yet.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {courses.map((c: any) => (
+              <div key={c.id} className="bg-white border rounded-lg p-4 shadow-sm flex flex-col">
+                <div className="h-40 bg-gray-100 rounded-md mb-4 overflow-hidden">
+                  {c.thumbnail ? <img src={c.thumbnail} alt={c.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400">No thumbnail</div>}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-2">{c.title}</h3>
+                  <p className="text-sm text-gray-600 mb-3 line-clamp-3">{c.description || "No description"}</p>
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-gray-500">Price: ₹{c.price ?? 0}</div>
+                  <Link to={`/app/courses/${c.id}`} className="text-sm px-3 py-1 border rounded hover:bg-gray-50">Open</Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </main>
   );
 }
 
