@@ -4,8 +4,15 @@ import { supabase } from "../supabaseClient.js";
 // GET /api/submissions?userId=<id>
 export const listUserSubmissions: RequestHandler = async (req, res) => {
   try {
-    const userId = String(req.query.userId || "");
+    let userId = String(req.query.userId || "");
     if (!userId) return res.status(400).json({ success: false, error: "userId required" });
+
+    if (!userId.includes('-')) {
+      const { canonicalizeUserId } = await import("../utils/userHelpers.js");
+      const canonical = await canonicalizeUserId(userId);
+      if (!canonical) return res.status(400).json({ success: false, error: "userId could not be canonicalized" });
+      userId = canonical;
+    }
 
     const { data, error } = await supabase.from("assignment_submissions").select("*").eq("user_id", userId).order("submitted_at", { ascending: false });
     if (error) {
@@ -39,8 +46,14 @@ export const listAssignmentSubmissions: RequestHandler = async (req, res) => {
 export const createSubmission: RequestHandler = async (req, res) => {
   try {
     const assignmentId = req.params.assignmentId;
-    const userId = String(req.headers["x-user-id"] || req.body.userId || "");
+    let userId = String(req.headers["x-user-id"] || req.body.userId || "");
     if (!userId) return res.status(401).json({ success: false, error: "Missing x-user-id header" });
+    if (!userId.includes('-')) {
+      const { canonicalizeUserId } = await import("../utils/userHelpers.js");
+      const canonical = await canonicalizeUserId(userId);
+      if (!canonical) return res.status(401).json({ success: false, error: "x-user-id could not be canonicalized" });
+      userId = canonical;
+    }
 
     const content = req.body.content || {};
 

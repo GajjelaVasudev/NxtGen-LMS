@@ -13,7 +13,7 @@ type UserRecord = {
 };
 
 // Only these users can login (demo)
-const REGISTERED_USERS: UserRecord[] = [
+export const REGISTERED_USERS: UserRecord[] = [
   {
     id: "1",
     email: "admin@gmail.com",

@@ -66,8 +66,14 @@ export const createAssignment: RequestHandler = async (req, res) => {
     if (!title) return res.status(400).json({ success: false, error: "title is required" });
 
     // Determine creator from header (demo auth). In production use JWT/session.
-    const creatorId = String(req.headers["x-user-id"] || req.headers["x-userid"] || "");
+    let creatorId = String(req.headers["x-user-id"] || req.headers["x-userid"] || "");
     if (!creatorId) return res.status(401).json({ success: false, error: "Missing x-user-id header (sender)" });
+    if (!creatorId.includes('-')) {
+      const { canonicalizeUserId } = await import("../utils/userHelpers.js");
+      const canonical = await canonicalizeUserId(creatorId);
+      if (!canonical) return res.status(401).json({ success: false, error: "Missing x-user-id header (sender)" });
+      creatorId = canonical;
+    }
 
     // Verify user role (only instructor or admin allowed to create)
     const { data: userData, error: userErr } = await supabase.from("users").select("role").eq("id", creatorId).single();

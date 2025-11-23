@@ -97,9 +97,17 @@ export const deleteCourse: RequestHandler = async (req, res) => {
 // GET /api/enrollments[?userId=...]
 export const listEnrollments: RequestHandler = async (req, res) => {
   try {
-    const userId = String(req.query.userId || "");
+    let userId = String(req.query.userId || "");
     let q = supabase.from("enrollments").select("*").order("enrolled_at", { ascending: false });
-    if (userId) q = q.eq("user_id", userId);
+    if (userId) {
+      if (!userId.includes('-')) {
+        const { canonicalizeUserId } = await import("../utils/userHelpers.js");
+        const canonical = await canonicalizeUserId(userId);
+        if (!canonical) return res.status(400).json({ error: "userId could not be canonicalized" });
+        userId = canonical;
+      }
+      q = q.eq("user_id", userId);
+    }
     const { data, error } = await q;
     if (error) {
       console.error("Supabase listEnrollments error:", error);

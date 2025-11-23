@@ -27,9 +27,12 @@ export const getInbox: RequestHandler = async (req, res) => {
       return res.json({ success: true, data: data || [] });
     }
 
-    // Reject numeric/demo IDs — require a UUID for userId
+    // Canonicalize numeric/demo ids or emails to UUIDs
     if (userId && !userId.includes("-")) {
-      return res.status(400).json({ success: false, error: 'userId must be a UUID' });
+      const { canonicalizeUserId } = await import("../utils/userHelpers.js");
+      const canonical = await canonicalizeUserId(userId);
+      if (!canonical) return res.status(400).json({ success: false, error: 'userId could not be canonicalized to UUID' });
+      userId = canonical;
     }
 
     // Build OR query: messages addressed to user, targeted to role, or global broadcasts
