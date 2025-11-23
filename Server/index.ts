@@ -4,7 +4,8 @@ import cors from "cors";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { handleDemo } from "./routes/demo.js";
-import { login, register, getRegisteredEmails, requestOtp, verifyOtp, socialLogin, findOrCreateSocialUser, requestRole, listRoleRequests, approveRole, denyRole, getUserById, REGISTERED_USERS } from "./routes/auth.js";
+import { login, register, getRegisteredEmails, requestOtp, verifyOtp, socialLogin, findOrCreateSocialUser, requestRole, listRoleRequests, approveRole, denyRole, getUserById } from "./routes/auth.js";
+import debugMappingsRouter from "./routes/_debug/demo-mappings.js";
 import {
   getCourses,
   getCourse,
@@ -98,25 +99,8 @@ export function createServer() {
   app.get("/api/assignments/:id", getAssignment);
   app.post("/api/assignments", createAssignment);
   
-  // Debug: list demo registered users and any mapped DB UUIDs
-  app.get('/api/_debug/demo-mappings', async (req, res) => {
-    const adminSecret = process.env.ADMIN_SECRET || '';
-    const provided = (req.headers['x-admin-secret'] || '') as string;
-    if (!adminSecret || provided !== adminSecret) return res.status(403).json({ error: 'admin secret required' });
-    try {
-      const results = await Promise.all(REGISTERED_USERS.map(async (u) => {
-        try {
-          const { data } = await supabase.from('users').select('id,email,role').ilike('email', u.email).maybeSingle();
-          return { demoId: u.id, email: u.email, role: u.role, dbId: data?.id || null };
-        } catch (ex) {
-          return { demoId: u.id, email: u.email, role: u.role, error: String(ex) };
-        }
-      }));
-      return res.json({ mappings: results });
-    } catch (err: any) {
-      return res.status(500).json({ error: 'unexpected' });
-    }
-  });
+  // debug routes (protected)
+  app.use('/api/_debug', debugMappingsRouter);
 
 
   // --- Google OAuth (popup flow) ---
