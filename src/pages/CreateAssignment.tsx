@@ -35,16 +35,28 @@ export default function CreateAssignment() {
 
   useEffect(() => {
     if (isEditing) {
-      const assignment = loadAssignments().find(a => a.id === id);
-      if (assignment) {
-        setForm({
-          title: assignment.title,
-          description: assignment.description,
-          courseId: assignment.courseId,
-          dueDate: assignment.dueDate,
-          imageUrl: assignment.imageUrl || ""
-        });
-      }
+      // fetch the assignment from server when editing
+      let mounted = true;
+      (async () => {
+        try {
+          const res = await fetch(`${API}/assignments/${id}`);
+          if (!res.ok) return;
+          const json = await res.json();
+          if (!mounted) return;
+          const a = json.data;
+          if (a) {
+            setForm({
+              title: a.title || "",
+              description: a.description || "",
+              courseId: a.course_id || a.courseId || "",
+              dueDate: a.due_at || a.dueAt || "",
+              imageUrl: a.image_url || a.imageUrl || ""
+            });
+          }
+        } catch (e) {
+          // ignore
+        }
+      })();
     }
   }, [id, isEditing]);
 
@@ -87,7 +99,8 @@ export default function CreateAssignment() {
         description: form.description,
         due_at: form.dueDate,
       };
-      const res = await fetch(`${API}/assignments`, {
+      const url = isEditing ? `${API}/assignments/${id}` : `${API}/assignments`;
+      const res = await fetch(url, {
         method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json", "x-user-id": user.id },
         body: JSON.stringify(body),

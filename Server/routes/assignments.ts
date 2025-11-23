@@ -96,4 +96,48 @@ export const createAssignment: RequestHandler = async (req, res) => {
   }
 };
 
+// PUT /api/assignments/:id
+export const updateAssignment: RequestHandler = async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ success: false, error: "assignment id required" });
+
+    const payload = req.body || {};
+    const updaterId = String(req.headers["x-user-id"] || "");
+    if (!updaterId) return res.status(401).json({ success: false, error: "Missing x-user-id header (updater)" });
+
+    // Verify updater role (must be instructor or admin)
+    const { data: userData, error: userErr } = await supabase.from("users").select("role").eq("id", updaterId).single();
+    if (userErr) {
+      console.error("Supabase user lookup error:", userErr);
+      return res.status(500).json({ success: false, error: "Failed to verify updater" });
+    }
+    const role = (userData as any)?.role;
+    if (!role || (role !== "instructor" && role !== "admin")) {
+      return res.status(403).json({ success: false, error: "Only instructors or admins can update assignments" });
+    }
+
+    const update: any = {};
+    if (typeof payload.title !== "undefined") update.title = payload.title;
+    if (typeof payload.description !== "undefined") update.description = payload.description;
+    if (typeof payload.points !== "undefined") update.points = payload.points;
+    if (typeof payload.due_at !== "undefined") update.due_at = payload.due_at;
+
+    if (Object.keys(update).length === 0) return res.status(400).json({ success: false, error: "No update fields provided" });
+
+    update.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase.from("assignments").update(update).eq("id", id).select().single();
+    if (error) {
+      console.error("Supabase update assignment error:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.json({ success: true, data });
+  } catch (err: any) {
+    console.error("Unexpected updateAssignment error:", err);
+    return res.status(500).json({ success: false, error: "Unexpected server error" });
+  }
+};
+
 export default {};

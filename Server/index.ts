@@ -21,7 +21,7 @@ import {
   deleteMessages,
   starMessage,
 } from "./routes/messages.js";
-import { getAssignments, createAssignment, getAssignment } from "./routes/assignments.js";
+import { getAssignments, createAssignment, getAssignment, updateAssignment } from "./routes/assignments.js";
 import {
   listUserSubmissions,
   listAssignmentSubmissions,
@@ -221,7 +221,9 @@ export function createServer() {
   app.post("/api/inbox/star", starMessage);
   // Assignments
   app.get("/api/assignments", getAssignments);
+  app.get("/api/assignments/:id", getAssignment);
   app.post("/api/assignments", createAssignment);
+  app.put("/api/assignments/:id", updateAssignment);
 
   // Submissions
   app.get("/api/submissions", listUserSubmissions);
