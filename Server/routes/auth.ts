@@ -427,12 +427,12 @@ export function findOrCreateSocialUser(email: string, name?: string) {
   let user = REGISTERED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
   if (user) return { ...user, password: undefined };
 
-  // By default, new social signups become students (role 'user') and are approved.
+  // By default, new social signups become students (role 'student') and are approved.
   const newUser: UserRecord = {
     id: String(Date.now()),
     email,
     password: '',
-    role: 'user',
+    role: 'student',
     name: name || email.split('@')[0],
     approved: true,
     requestedRole: null,
