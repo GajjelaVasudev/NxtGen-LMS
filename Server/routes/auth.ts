@@ -174,31 +174,21 @@ export const getRegisteredEmails: RequestHandler = (_req, res) => {
 // GET /api/users/:id
 export const getUserById: RequestHandler = async (req, res) => {
   const key = String(req.params.id || "");
-
-  // If the key looks like an email, try Supabase by email
+  // If the key looks like an email, ensure DB row exists (create if missing) and return it
   try {
     if (key.includes("@")) {
-      const { data, error } = await supabase.from("users").select("id, email, role").ilike("email", key).maybeSingle();
-      if (error) {
-        console.warn('[auth] Supabase lookup by email returned error', { key, error });
-      } else if (data) {
-        return res.json({ user: data });
-      } else {
-        // If no DB user found but this email is a known demo user, create the DB row so frontend can canonicalize to UUID
-        const demo = REGISTERED_USERS.find((u) => u.email.toLowerCase() === key.toLowerCase());
-        if (demo) {
-          try {
-            const insertRow = { email: demo.email, role: demo.role };
-            const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
-            if (createErr) console.warn('[auth/getUserById] failed to create DB user for demo email', { key, createErr });
-            if (created) {
-              console.log('[auth/getUserById] auto-created DB user for demo email', { key, id: created.id });
-              return res.json({ user: created });
-            }
-          } catch (exCreate) {
-            console.error('[auth/getUserById] exception creating DB user for demo email', exCreate);
+      try {
+        const id = await getOrCreateUserInDb(key);
+        if (id) {
+          const { data, error } = await supabase.from("users").select("id, email, role").eq("id", id).maybeSingle();
+          if (error) {
+            console.warn('[auth] Supabase lookup by id returned error', { key, error });
+          } else if (data) {
+            return res.json({ user: data });
           }
         }
+      } catch (exInner) {
+        console.error('[auth/getUserById] error ensuring user', exInner);
       }
     }
 
@@ -217,6 +207,43 @@ export const getUserById: RequestHandler = async (req, res) => {
   // No Supabase user found
   return res.status(404).json({ error: 'User not found' });
 };
+
+// Ensure a user row exists for the given email. Returns the DB id or null on failure.
+export async function getOrCreateUserInDb(email: string, role: string = 'user'): Promise<string | null> {
+  const lc = String(email || '').toLowerCase();
+  console.log('[auth/getOrCreate] ensure user exists', { email: lc });
+  try {
+    // Try find first
+    const { data: found, error: findErr } = await supabase.from('users').select('id').ilike('email', lc).maybeSingle();
+    if (findErr) {
+      console.warn('[auth/getOrCreate] Supabase lookup error', { email: lc, findErr });
+    }
+    if (found && found.id) return found.id;
+
+    // Not found -> attempt insert with lowercase email
+    const insertRow = { email: lc, role };
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id').maybeSingle();
+    if (createErr) {
+      // If unique constraint (race) occurred, query again
+      const isUniqueViolation = String(createErr?.code || '').includes('23505') || String(createErr?.message || '').toLowerCase().includes('duplicate');
+      if (isUniqueViolation) {
+        console.warn('[auth/getOrCreate] insert unique violation, querying again', { email: lc, createErr });
+        const { data: recheck } = await supabase.from('users').select('id').ilike('email', lc).maybeSingle();
+        if (recheck && recheck.id) return recheck.id;
+      }
+      console.warn('[auth/getOrCreate] failed to insert user', { email: lc, createErr });
+      return null;
+    }
+    if (created && created.id) {
+      console.log('[auth/getOrCreate] created DB user', { email: lc, id: created.id });
+      return created.id;
+    }
+    return null;
+  } catch (ex: any) {
+    console.error('[auth/getOrCreate] exception', ex);
+    return null;
+  }
+}
 
 // NEW: request OTP endpoint
 export const requestOtp: RequestHandler = async (req, res) => {
