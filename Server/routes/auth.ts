@@ -177,18 +177,26 @@ export const getUserById: RequestHandler = async (req, res) => {
   // If the key looks like an email, ensure DB row exists (create if missing) and return it
   try {
     if (key.includes("@")) {
+      const lc = key.toLowerCase();
+      console.log('[auth/byEmail] handling by email', { email: lc });
       try {
-        const id = await getOrCreateUserInDb(key);
+        const result = await getOrCreateUserInDb(lc);
+        if (result.error) {
+          // Return structured error with Supabase details
+          return res.status(500).json({ error: 'Failed to create user', details: result.error });
+        }
+        const id = result.id;
         if (id) {
           const { data, error } = await supabase.from("users").select("id, email, role").eq("id", id).maybeSingle();
           if (error) {
-            console.warn('[auth] Supabase lookup by id returned error', { key, error });
+            console.warn('[auth] Supabase lookup by id returned error', { key: lc, error });
           } else if (data) {
             return res.json({ user: data });
           }
         }
       } catch (exInner) {
         console.error('[auth/getUserById] error ensuring user', exInner);
+        return res.status(500).json({ error: 'Failed to create user', details: String(exInner) });
       }
     }
 
@@ -209,7 +217,7 @@ export const getUserById: RequestHandler = async (req, res) => {
 };
 
 // Ensure a user row exists for the given email. Returns the DB id or null on failure.
-export async function getOrCreateUserInDb(email: string, role: string = 'user'): Promise<string | null> {
+export async function getOrCreateUserInDb(email: string, role: string = 'user'): Promise<{ id: string | null; error?: any }> {
   const lc = String(email || '').toLowerCase();
   console.log('[auth/getOrCreate] ensure user exists', { email: lc });
   try {
@@ -218,7 +226,7 @@ export async function getOrCreateUserInDb(email: string, role: string = 'user'):
     if (findErr) {
       console.warn('[auth/getOrCreate] Supabase lookup error', { email: lc, findErr });
     }
-    if (found && found.id) return found.id;
+    if (found && found.id) return { id: found.id };
 
     // Not found -> attempt insert with lowercase email
     const insertRow = { email: lc, role };
@@ -229,19 +237,19 @@ export async function getOrCreateUserInDb(email: string, role: string = 'user'):
       if (isUniqueViolation) {
         console.warn('[auth/getOrCreate] insert unique violation, querying again', { email: lc, createErr });
         const { data: recheck } = await supabase.from('users').select('id').ilike('email', lc).maybeSingle();
-        if (recheck && recheck.id) return recheck.id;
+        if (recheck && recheck.id) return { id: recheck.id };
       }
       console.warn('[auth/getOrCreate] failed to insert user', { email: lc, createErr });
-      return null;
+      return { id: null, error: createErr };
     }
     if (created && created.id) {
       console.log('[auth/getOrCreate] created DB user', { email: lc, id: created.id });
-      return created.id;
+      return { id: created.id };
     }
-    return null;
+    return { id: null };
   } catch (ex: any) {
     console.error('[auth/getOrCreate] exception', ex);
-    return null;
+    return { id: null, error: ex };
   }
 }
 
