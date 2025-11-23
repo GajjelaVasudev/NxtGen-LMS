@@ -30,15 +30,24 @@ export default function CourseDetails() {
   const buyCourse = async () => {
     if (enrolled) return;
     if (!user?.id) return alert("Please sign in to enroll");
-    const res = await fetch(`${API}/courses/${courseId}/enroll`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id }),
-    });
-    if (!res.ok) return alert("Enroll failed");
-    const e = await fetch(`${API}/enrollments?userId=${user.id}`).then(r => r.json()).catch(() => ({ enrollments: [] }));
-    setEnrollments(e.enrollments || []);
-    setEnrolled(true);
+    try {
+      const res = await fetch(`${API}/courses/${courseId}/enroll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.success) {
+        console.error('Enroll failed', { status: res.status, body });
+        return alert('Enroll failed');
+      }
+      const e = await fetch(`${API}/enrollments?userId=${user.id}`).then(r => r.json()).catch(() => ({ enrollments: [] }));
+      setEnrollments(e.enrollments || []);
+      setEnrolled(true);
+    } catch (err) {
+      console.error('Enroll exception', err);
+      alert('Enroll failed');
+    }
   };
 
   if (!course) {

@@ -124,11 +124,28 @@ export const listEnrollments: RequestHandler = async (req, res) => {
 export const enrollCourse: RequestHandler = async (req, res) => {
   try {
     const courseId = req.params.id;
-    let userId = String(req.body.userId || "");
-    if (!userId) return res.status(400).json({ error: "userId required" });
+    // Accept user identifier from multiple places: body.userId, body.email, query.userId, query.email, header x-user-id
+    const rawUser = String(req.body.userId || req.body.email || req.query.userId || req.query.email || req.headers['x-user-id'] || "");
+    if (!rawUser) return res.status(400).json({ error: "user identifier required (userId or email)" });
 
-    // canonicalize numeric/demo ids or emails to UUIDs
-    if (!userId.includes('-')) {
+    let userId = rawUser;
+    // If looks like an email, use getOrCreateUserInDb to ensure DB UUID exists
+    if (userId.includes('@')) {
+      try {
+        const { getOrCreateUserInDb } = await import("./auth.js");
+        const result = await getOrCreateUserInDb(userId);
+        if (result.error) {
+          console.error('[enroll] failed to ensure user', { user: userId, error: result.error });
+          return res.status(500).json({ error: 'Failed to create user', details: result.error });
+        }
+        if (!result.id) return res.status(500).json({ error: 'Failed to create user', details: 'no id returned' });
+        userId = result.id;
+      } catch (ex) {
+        console.error('[enroll] exception ensuring user', ex);
+        return res.status(500).json({ error: 'Failed to create user', details: String(ex) });
+      }
+    } else if (!userId.includes('-')) {
+      // Not an email and not a UUID: try canonicalize (handles demo numeric ids)
       const { canonicalizeUserId } = await import("../utils/userHelpers.js");
       const canonical = await canonicalizeUserId(userId);
       if (!canonical) return res.status(400).json({ error: "userId could not be canonicalized" });
@@ -142,21 +159,28 @@ export const enrollCourse: RequestHandler = async (req, res) => {
     // check existing
     const { data: existing, error: exErr } = await supabase.from("enrollments").select("*").eq("course_id", courseId).eq("user_id", userId).limit(1);
     if (exErr) {
-      console.error("Supabase enroll check error:", exErr);
+      console.error('[enroll] Supabase enroll check error:', exErr);
       return res.status(500).json({ error: exErr.message });
     }
     if (existing && existing.length > 0) return res.json({ success: true, message: "Already enrolled" });
 
-    const insertRow = { course_id: courseId, user_id: userId, role: "student" };
+    const insertRow = { course_id: courseId, user_id: userId, created_at: new Date().toISOString() };
     const { error: insertErr } = await supabase.from("enrollments").insert([insertRow]);
     if (insertErr) {
-      console.error("Supabase enroll insert error:", insertErr);
+      // If duplicate due to race, treat as success
+      const isUnique = String(insertErr?.code || '').includes('23505') || String(insertErr?.message || '').toLowerCase().includes('duplicate');
+      if (isUnique) {
+        console.warn('[enroll] duplicate enrollment race, treating as success', { courseId, userId, insertErr });
+        return res.json({ success: true, message: 'Already enrolled' });
+      }
+      console.error('[enroll] Supabase enroll insert error:', insertErr);
       return res.status(500).json({ error: insertErr.message });
     }
 
+    console.log('[enroll] enrolled user', { courseId, userId });
     return res.json({ success: true });
   } catch (err: any) {
-    console.error("Unexpected enrollCourse error:", err);
+    console.error('[enroll] Unexpected enrollCourse error:', err);
     return res.status(500).json({ error: "Unexpected server error" });
   }
 };

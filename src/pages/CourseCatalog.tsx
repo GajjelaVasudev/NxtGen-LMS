@@ -32,14 +32,23 @@ export default function CourseCatalog() {
   const buyCourse = async (id: string) => {
     if (!user?.id) return alert("Please sign in to enroll");
     if (isPurchased(id)) return;
-    const res = await fetch(`${API}/courses/${id}/enroll`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id }),
-    });
-    if (!res.ok) return alert("Failed to enroll");
-    const eJson = await fetch(`${API}/enrollments?userId=${user.id}`).then((r) => r.json()).catch(() => ({ enrollments: [] }));
-    setEnrollments(eJson.enrollments || []);
+    try {
+      const res = await fetch(`${API}/courses/${id}/enroll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.success) {
+        console.error('Enroll failed', { status: res.status, body });
+        return alert("Failed to enroll");
+      }
+      const eJson = await fetch(`${API}/enrollments?userId=${user.id}`).then((r) => r.json()).catch(() => ({ enrollments: [] }));
+      setEnrollments(eJson.enrollments || []);
+    } catch (err) {
+      console.error('Enroll exception', err);
+      alert('Failed to enroll');
+    }
   };
 
   const filtered = courses.filter((c) => !query || c.title.toLowerCase().includes(query.toLowerCase())).sort((a,b) => b.createdAt - a.createdAt);
@@ -91,7 +100,7 @@ export default function CourseCatalog() {
                       <Link to={`/app/course-details/${c.id}`} className="text-sm px-3 py-1 border rounded hover:bg-gray-50">Details</Link>
                     )}
                     <button onClick={() => buyCourse(c.id)} disabled={isPurchased(c.id)} className={`px-4 py-2 rounded ${isPurchased(c.id) ? "bg-gray-200 text-gray-500" : "bg-[#515DEF] text-white"}`}>
-                      {isPurchased(c.id) ? "Purchased" : "Buy"}
+                      {isPurchased(c.id) ? "Enrolled" : "Buy"}
                     </button>
                   </div>
                 </div>
