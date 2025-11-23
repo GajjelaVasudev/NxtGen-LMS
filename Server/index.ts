@@ -28,6 +28,9 @@ import {
   listAssignmentSubmissions,
   createSubmission,
   updateSubmission,
+  listInstructorSubmissions,
+  submitAssignment,
+  gradeSubmission,
 } from "./routes/submissions.js";
 import { supabase } from "./supabaseClient.js";
 
@@ -233,6 +236,9 @@ export function createServer() {
   app.get("/api/submissions", listUserSubmissions);
   app.get("/api/assignments/:assignmentId/submissions", listAssignmentSubmissions);
   app.post("/api/assignments/:assignmentId/submissions", createSubmission);
+  app.post("/api/assignments/:id/submit", submitAssignment);
+  app.get("/api/instructor/submissions", listInstructorSubmissions);
+  app.patch("/api/submissions/:submissionId/grade", gradeSubmission);
   app.put("/api/submissions/:submissionId", updateSubmission);
   // Discussions and direct-messages removed: Inbox handles notifications, teacher and admin messages
 
