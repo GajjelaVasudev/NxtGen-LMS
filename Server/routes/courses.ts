@@ -126,12 +126,23 @@ export const enrollCourse: RequestHandler = async (req, res) => {
     const courseId = req.params.id;
 
     // Log incoming request
-    console.log('[enroll] incoming request:', { courseId, body: req.body, query: req.query, headers: { 'x-user-id': req.headers['x-user-id'] } });
+    console.log('[enroll] incoming request:', {
+      courseId,
+      bodyType: typeof req.body,
+      body: req.body,
+      query: req.query,
+      headers: { 'x-user-id': req.headers['x-user-id'], 'content-type': req.headers['content-type'] },
+    });
 
     // Accept user identifier from multiple places: body.userId, body.email, query.userId, query.email, header x-user-id
-    const rawUser = String(req.body.userId || req.body.email || req.query.userId || req.query.email || req.headers['x-user-id'] || "");
+    const bodyIsObject = req.body && typeof req.body === 'object';
+    const bodyUserId = bodyIsObject ? (req.body as any).userId : undefined;
+    const bodyEmail = bodyIsObject ? (req.body as any).email : undefined;
+    const rawUserCandidate = bodyUserId || bodyEmail || req.query.userId || req.query.email || req.headers['x-user-id'];
+    const rawUser = rawUserCandidate ? String(rawUserCandidate) : "";
     if (!rawUser) {
-      return res.status(400).json({ success: false, error: "ValidationFailed", details: "user identifier required (userId or email)" });
+      console.warn('[enroll] validation failed: missing identifier', { courseId, bodyUserId, bodyEmail, query: req.query, headers: req.headers });
+      return res.status(400).json({ success: false, error: "MissingIdentifier", details: "No email or userId provided" });
     }
 
     let userId = rawUser;
@@ -143,12 +154,13 @@ export const enrollCourse: RequestHandler = async (req, res) => {
       try {
         const { getOrCreateUserInDb } = await import("./auth.js");
         const result = await getOrCreateUserInDb(resolvedEmail);
+        console.log('[enroll] getOrCreateUserInDb result', { resolvedEmail, result });
         if (result.error) {
           console.error('[enroll] failed to ensure user', { user: resolvedEmail, error: result.error });
           return res.status(500).json({ success: false, error: 'DatabaseInsertFailed', details: result.error });
         }
         if (!result.id) {
-          console.error('[enroll] getOrCreateUserInDb returned no id', { user: resolvedEmail });
+          console.error('[enroll] getOrCreateUserInDb returned no id', { user: resolvedEmail, result });
           return res.status(500).json({ success: false, error: 'DatabaseInsertFailed', details: 'no id returned' });
         }
         userId = result.id;
@@ -170,36 +182,51 @@ export const enrollCourse: RequestHandler = async (req, res) => {
     }
 
     // verify course exists
-    const { data: course } = await supabase.from("courses").select("id").eq("id", courseId).single();
-    if (!course) return res.status(404).json({ error: "Course not found" });
+    const { data: course, error: courseErr } = await supabase.from("courses").select("id").eq("id", courseId).single();
+    if (courseErr) {
+      console.error('[enroll] Supabase course lookup error', courseErr);
+      return res.status(500).json({ success: false, error: 'DatabaseLookupFailed', details: courseErr });
+    }
+    if (!course) return res.status(404).json({ success: false, error: "CourseNotFound", details: `Course ${courseId} not found` });
 
     // check existing
     const { data: existing, error: exErr } = await supabase.from("enrollments").select("*").eq("course_id", courseId).eq("user_id", userId).limit(1);
     if (exErr) {
       console.error('[enroll] Supabase enroll check error:', exErr);
-      return res.status(500).json({ error: exErr.message });
+      return res.status(500).json({ success: false, error: 'DatabaseLookupFailed', details: exErr });
     }
-    if (existing && existing.length > 0) return res.json({ success: true, message: "Already enrolled" });
+    if (existing && existing.length > 0) return res.status(200).json({ success: true, alreadyEnrolled: true });
 
-    const insertRow: any = { course_id: courseId, user_id: userId };
-    // include enrolled_at if table uses it (listEnrollments orders by enrolled_at)
-    insertRow.enrolled_at = new Date().toISOString();
-    const { error: insertErr } = await supabase.from("enrollments").insert([insertRow]);
+    const insertRow: any = {
+      course_id: courseId,
+      user_id: userId,
+      enrolled_at: new Date().toISOString(),
+    };
+
+    console.log('[enroll] inserting enrollment', { insertRow });
+    const { data: insertData, error: insertErr } = await supabase.from("enrollments").insert([insertRow]).select().maybeSingle();
     if (insertErr) {
       // If duplicate due to race, treat as success
-      const isUnique = String(insertErr?.code || '').includes('23505') || String(insertErr?.message || '').toLowerCase().includes('duplicate');
+      const code = String(insertErr?.code || '');
+      const msg = String(insertErr?.message || '');
+      const isUnique = code.includes('23505') || msg.toLowerCase().includes('duplicate');
       if (isUnique) {
         console.warn('[enroll] duplicate enrollment race, treating as success', { courseId, userId, insertErr });
-        return res.json({ success: true, message: 'Already enrolled' });
+        return res.status(200).json({ success: true, alreadyEnrolled: true });
       }
       console.error('[enroll] Supabase enroll insert error:', insertErr);
-      return res.status(500).json({ error: insertErr.message });
+      return res.status(500).json({ success: false, error: 'DatabaseInsertFailed', details: { code: insertErr.code, message: insertErr.message } });
     }
 
-    console.log('[enroll] enrolled user', { courseId, userId });
-    return res.json({ success: true });
+    console.log('[enroll] enrolled user', { courseId, userId, insertData });
+    return res.status(200).json({ success: true, enrollment: insertData || null });
   } catch (err: any) {
     console.error('[enroll] Unexpected enrollCourse error:', err);
-    return res.status(500).json({ error: "Unexpected server error" });
+    return res.status(500).json({ success: false, error: "UnexpectedServerError", details: String(err) });
   }
 };
+
+// Quick test examples (run from a shell):
+// curl -X POST -H "Content-Type: application/json" -d '{"email":"student@gmail.com"}' http://localhost:5000/api/courses/d6c1463c-4f80-4271-b194-cae4c721c46f/enroll
+// Node (quick):
+// node -e "(async()=>{const res=await fetch('http://localhost:5000/api/courses/d6c1463c-4f80-4271-b194-cae4c721c46f/enroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'student@gmail.com'})});console.log(res.status,await res.text());})();"
