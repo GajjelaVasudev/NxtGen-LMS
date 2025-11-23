@@ -124,8 +124,16 @@ export const listEnrollments: RequestHandler = async (req, res) => {
 export const enrollCourse: RequestHandler = async (req, res) => {
   try {
     const courseId = req.params.id;
-    const { userId } = req.body;
+    let userId = String(req.body.userId || "");
     if (!userId) return res.status(400).json({ error: "userId required" });
+
+    // canonicalize numeric/demo ids or emails to UUIDs
+    if (!userId.includes('-')) {
+      const { canonicalizeUserId } = await import("../utils/userHelpers.js");
+      const canonical = await canonicalizeUserId(userId);
+      if (!canonical) return res.status(400).json({ error: "userId could not be canonicalized" });
+      userId = canonical;
+    }
 
     // verify course exists
     const { data: course } = await supabase.from("courses").select("id").eq("id", courseId).single();
