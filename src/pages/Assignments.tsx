@@ -79,7 +79,21 @@ export default function Assignments() {
         const courseIds = (eRes.enrollments || []).map((en: any) => en.course_id || en.courseId || en.courseId);
         const assignmentPromises = courseIds.map((cid: string) => fetch(`${API}/assignments?courseId=${cid}`).then(r => r.json()).catch(() => ({ data: [] })));
         const assignmentsResults = await Promise.all(assignmentPromises);
-        const all = assignmentsResults.flatMap((ar: any) => (ar.data || ar.assignments || []));
+        let all = assignmentsResults.flatMap((ar: any) => (ar.data || ar.assignments || []));
+
+        // If the user is an instructor/admin also fetch assignments they created so they can view/edit them
+        if (hasRole && hasRole(["instructor", "admin"])) {
+          try {
+            const mineRes = await fetch(`${API}/assignments?creatorId=${user.id}`).then(r => r.json()).catch(() => ({ data: [] }));
+            const mine = (mineRes.data || mineRes.assignments || []);
+            // merge and dedupe by id
+            const byId: Record<string, any> = {};
+            [...all, ...mine].forEach((a: any) => { if (a && a.id) byId[a.id] = a; });
+            all = Object.values(byId);
+          } catch (e) {
+            // ignore
+          }
+        }
         const mapped = (all || []).map((a: any) => ({
           id: a.id,
           title: a.title,

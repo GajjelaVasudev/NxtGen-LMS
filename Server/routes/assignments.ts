@@ -5,13 +5,20 @@ import { supabase } from "../supabaseClient.js";
 export const getAssignments: RequestHandler = async (req, res) => {
   try {
     const courseId = String(req.query.courseId || "");
-    if (!courseId) return res.status(400).json({ success: false, error: "courseId query parameter is required" });
+    const creatorId = String(req.query.creatorId || "");
 
-    const { data, error } = await supabase
-      .from("assignments")
-      .select("*")
-      .eq("course_id", courseId)
-      .order("created_at", { ascending: false });
+    let query = supabase.from("assignments").select("*").order("created_at", { ascending: false });
+
+    if (courseId) {
+      query = query.eq("course_id", courseId as string);
+    } else if (creatorId) {
+      query = query.eq("created_by", creatorId as string);
+    } else {
+      // If neither provided, return empty result to avoid exposing all assignments
+      return res.json({ success: true, data: [] });
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Supabase getAssignments error:", error);
