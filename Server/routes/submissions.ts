@@ -356,9 +356,11 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
     console.log('[grade] updated submission', submissionId);
 
     // Build response payload with canonical fields
+    const assignmentTitle = assignmentRow ? (assignmentRow as any).title : null;
     const resp = {
       id: data.id,
       assignment_id: data.assignment_id,
+      assignment_title: assignmentTitle,
       user_id: data.user_id,
       grade: data.grade ?? null,
       feedback: data.feedback ?? null,
