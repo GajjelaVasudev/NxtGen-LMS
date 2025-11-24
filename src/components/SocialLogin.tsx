@@ -1,68 +1,34 @@
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { auth } from "@/firebase";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
 export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const doSocial = async (provider: string) => {
-    const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
-    // Use an explicit OAuth start URL in production so the popup hits the Render backend
-    // Allow overriding with VITE_GOOGLE_AUTH_URL if needed.
-    const OAUTH_URL = import.meta.env.DEV
-      ? "/api/auth/google"
-      : ((import.meta.env.VITE_GOOGLE_AUTH_URL as string) || "https://nxtgen-lms.onrender.com/api/auth/google");
-    const url = OAUTH_URL;
+  const doSocial = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const fbUser = result.user;
+      const email = fbUser?.email;
+      const name = fbUser?.displayName;
 
-    const width = 600;
-    const height = 700;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2.5;
+      if (!email) {
+        alert("Google sign-in did not return an email address");
+        return;
+      }
 
-    const popup = window.open(
-      url,
-      "oauth_popup",
-      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`
-    );
-
-    if (!popup) {
-      alert("Unable to open popup. Please allow popups for this site.");
-      return;
+      // Use existing client-side login which will canonicalize via server if available
+      await login({ email, name });
+      // Redirect to dashboard after login
+      window.location.href = "/dashboard";
+    } catch (err: any) {
+      console.error("Firebase social login failed:", err);
+      alert("Google sign-in failed: " + (err?.message || String(err)));
     }
-
-    const handleMessage = async (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      const data = event.data || {};
-      if (data?.type !== "oauth") return;
-      window.removeEventListener("message", handleMessage);
-      try {
-        if (data.error) {
-          alert("Social login failed: " + data.error);
-          return;
-        }
-        const user = data.user;
-        if (!user) {
-          alert("Social login failed: no user returned");
-          return;
-        }
-        await login(user);
-        navigate("/app");
-      } finally {
-        try {
-          popup.close();
-        } catch (e) {}
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-
-    const poll = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(poll);
-        window.removeEventListener("message", handleMessage);
-      }
-    }, 500);
   };
 
   return (
@@ -74,7 +40,7 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
       </div>
 
       <div className="flex items-start w-full">
-        <button onClick={() => doSocial("google")} className="w-full flex items-center justify-center py-4 px-6 border border-[#515DEF] rounded hover:bg-gray-50 transition-colors">
+        <button onClick={() => doSocial()} className="w-full flex items-center justify-center py-4 px-6 border border-[#515DEF] rounded hover:bg-gray-50 transition-colors">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M24 12.0733C24 5.40554 18.6274 0 12 0C5.37258 0 0 5.40544 0 12.0733C0 18.0994 4.38823 23.0943 10.125 24V15.5633H7.07812V12.0733H10.125V9.41343C10.125 6.38748 11.9166 4.71615 14.6575 4.71615C15.9705 4.71615 17.3438 4.95203 17.3438 4.95203V7.92313H15.8306C14.3398 7.92313 13.875 8.85384 13.875 9.80857V12.0733H17.2031L16.6711 15.5633H13.875V24C19.6118 23.0943 24 18.0995 24 12.0733Z" fill="#1877F2"/>
           </svg>
