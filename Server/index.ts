@@ -110,7 +110,7 @@ export function createServer() {
   // --- Google OAuth (popup flow) ---
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-  const BASE_URL = process.env.BASE_URL || "http://localhost:5173"; // client origin for postMessage fallback
+  const BASE_URL = process.env.BASE_URL || (process.env.NODE_ENV === 'production' ? 'https://nxt-gen-lms.vercel.app' : 'http://localhost:5173'); // client origin for postMessage fallback
 
   const CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback";
 
@@ -150,9 +150,9 @@ export function createServer() {
         const name = profile?.displayName || emails[0]?.value?.split('@')[0] || 'User';
 
         if (!email) {
-          // send error back to opener
+          // send error back to opener; if postMessage fails, fall back to redirecting opener to dashboard
           return res.send(
-            `<html><body><script>window.opener.postMessage({ type: 'oauth', error: 'No email returned from provider' }, '${BASE_URL}'); window.close();</script></body></html>`
+            `<html><body><script>try{window.opener.postMessage({ type: 'oauth', error: 'No email returned from provider' }, '${BASE_URL}');}catch(e){try{window.opener.location='${BASE_URL}/dashboard';}catch(_){} } finally{ window.close();}</script></body></html>`
           );
         }
 
@@ -181,7 +181,7 @@ export function createServer() {
 
         const outUser = payloadUser || user;
 
-        // send user back to opener window via postMessage and close
+        // send user back to opener window via postMessage and close; fallback to redirecting opener to dashboard
         const payload = JSON.stringify(outUser).replace(/</g, '\u003c');
         return res.send(`
           <html>
@@ -191,7 +191,7 @@ export function createServer() {
                   const u = ${payload};
                   window.opener.postMessage({ type: 'oauth', user: u }, '${BASE_URL}');
                 } catch (e) {
-                  window.opener.postMessage({ type: 'oauth', error: 'Failed to parse user' }, '${BASE_URL}');
+                  try { window.opener.location = '${BASE_URL}/dashboard'; } catch (_) {}
                 }
                 window.close();
               </script>
@@ -202,12 +202,12 @@ export function createServer() {
     );
 
     app.get('/api/auth/google/failure', (_req, res) => {
-      return res.send(`<html><body><script>window.opener.postMessage({ type: 'oauth', error: 'OAuth failed' }, '${BASE_URL}'); window.close();</script></body></html>`);
+      return res.send(`<html><body><script>try{window.opener.postMessage({ type: 'oauth', error: 'OAuth failed' }, '${BASE_URL}');}catch(e){try{window.opener.location='${BASE_URL}/dashboard';}catch(_){} } finally{ window.close();}</script></body></html>`);
     });
   } else {
     // If OAuth not configured show a helpful route
     app.get('/api/auth/google', (_req, res) => {
-      return res.send(`<html><body><script>window.opener.postMessage({ type: 'oauth', error: 'Google OAuth not configured on server' }, '${BASE_URL}'); window.close();</script></body></html>`);
+      return res.send(`<html><body><script>try{window.opener.postMessage({ type: 'oauth', error: 'Google OAuth not configured on server' }, '${BASE_URL}');}catch(e){try{window.opener.location='${BASE_URL}/dashboard';}catch(_){} } finally{ window.close();}</script></body></html>`);
     });
   }
 

@@ -8,7 +8,12 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
 
   const doSocial = async (provider: string) => {
     const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
-    const url = `${API}/auth/google`;
+    // Use an explicit OAuth start URL in production so the popup hits the Render backend
+    // Allow overriding with VITE_GOOGLE_AUTH_URL if needed.
+    const OAUTH_URL = import.meta.env.DEV
+      ? "/api/auth/google"
+      : ((import.meta.env.VITE_GOOGLE_AUTH_URL as string) || "https://nxtgen-lms.onrender.com/api/auth/google");
+    const url = OAUTH_URL;
 
     const width = 600;
     const height = 700;
