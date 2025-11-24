@@ -63,7 +63,7 @@ export default function AssignmentSubmissions() {
           });
         }
         if (sRes && sRes.data) {
-          setSubmissions((sRes.data || []).map((s: any) => ({
+            setSubmissions((sRes.data || []).map((s: any) => ({
             id: s.id,
             assignmentId: s.assignment_id,
             userId: s.user_id,
@@ -72,7 +72,7 @@ export default function AssignmentSubmissions() {
             submittedAt: new Date(s.submitted_at).getTime(),
             grade: s.grade,
             feedback: s.feedback,
-            graded: s.status === 'graded'
+            graded: (s.status === 'graded' || s.grade != null)
           })));
         }
       } catch (err) {

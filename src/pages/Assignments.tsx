@@ -72,7 +72,7 @@ export default function Assignments() {
           submittedAt: new Date(s.submitted_at).getTime(),
           grade: s.grade,
           feedback: s.feedback,
-          graded: s.status === 'graded'
+          graded: (s.status === 'graded' || s.grade != null)
         })) : []);
 
         // Fetch assignments for enrolled courses
@@ -178,7 +178,7 @@ export default function Assignments() {
         userName: user.name || user.email,
         imageUrl: imageUrl,
         submittedAt: new Date(json.data.submitted_at).getTime(),
-        graded: json.data.status === 'graded'
+        graded: (json.data.status === 'graded' || json.data.grade != null)
       }, ...s]);
 
       setSelectedAssignment(null);

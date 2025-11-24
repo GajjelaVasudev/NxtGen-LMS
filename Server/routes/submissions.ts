@@ -305,7 +305,9 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
       .select()
       .maybeSingle();
 
-    console.log('[grade] supabase update result', { data, error });
+    // redact large binary/content fields from logs to avoid enormous output
+    const safeData = data ? ({ ...data, content: '[redacted]' }) : data;
+    console.log('[grade] supabase update result', { data: safeData, error });
 
     // If schema cache error complaining about missing column(s), strip them and retry once
     if (error && (error as any).code === 'PGRST204' && typeof (error as any).message === 'string') {
@@ -337,7 +339,8 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
           .maybeSingle();
         data = retry.data;
         error = retry.error;
-        console.log('[grade] retry supabase update result', { data, error });
+        const safeRetryData = data ? ({ ...data, content: '[redacted]' }) : data;
+        console.log('[grade] retry supabase update result', { data: safeRetryData, error });
       }
     }
 
