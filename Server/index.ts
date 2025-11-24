@@ -4,7 +4,7 @@ import cors from "cors";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { handleDemo } from "./routes/demo.js";
-import { login, register, getRegisteredEmails, requestOtp, verifyOtp, socialLogin, findOrCreateSocialUser, requestRole, listRoleRequests, approveRole, denyRole, getUserById, firebaseLogin, listAllUsers, updateUserRole, verifyEmail } from "./routes/auth.js";
+import { login, register, getRegisteredEmails, requestOtp, verifyOtp, socialLogin, findOrCreateSocialUser, requestRole, listRoleRequests, approveRole, denyRole, getUserById, firebaseLogin, listAllUsers, updateUserRole } from "./routes/auth.js";
 import debugMappingsRouter from "./routes/_debug/demo-mappings.js";
 import {
   getCourses,
@@ -213,8 +213,7 @@ export function createServer() {
 
   // Firebase token-based login (client posts ID token)
   app.post("/api/auth/firebase-login", firebaseLogin);
-  // Email verification endpoint for manual signups
-  app.post("/api/auth/verify-email", verifyEmail);
+  // Email verification endpoint removed — manual signups create users immediately
 
   // Admin user management
   app.get("/api/admin/users", listAllUsers);

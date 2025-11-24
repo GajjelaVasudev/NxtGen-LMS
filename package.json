@@ -19,7 +19,6 @@
     "firebase-admin": "^11.11.0",
     "express": "^5.1.0",
     "firebase": "^12.6.0",
-    "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "tsx": "^4.20.3",

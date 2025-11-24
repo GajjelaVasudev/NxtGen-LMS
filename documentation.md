@@ -140,18 +140,10 @@ VITE_API_URL=http://localhost:5000/api
 PORT=5000
 PING_MESSAGE=Server is running
 
-### Email / SMTP
+### Email
 
-To enable real email delivery for signup verification set the SMTP env vars in your `.env` (copy from `.env.example`). In production set `REQUIRE_SMTP=true` so the server will fail verification requests if SMTP is not configured.
-
-- `SMTP_HOST` - your SMTP host (e.g., smtp.sendgrid.net)
-- `SMTP_PORT` - SMTP port (587 or 465)
-- `SMTP_USER` - SMTP username
-- `SMTP_PASS` - SMTP password
-- `EMAIL_FROM` - the From header to use for outgoing emails
-- `CLIENT_URL` - the client base URL used to construct verification links
-
-If SMTP is not configured and `REQUIRE_SMTP` is false (development), the server will log the verification link to the server console for manual testing.
+- `EMAIL_FROM` - the From header to use for outgoing emails (used for OTP logging in demo flows)
+- `CLIENT_URL` - the client base URL used to construct deep links
 
 
 Build & Deployment

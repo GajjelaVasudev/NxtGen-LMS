@@ -1,5 +1,5 @@
 import { RequestHandler } from "express";
-import nodemailer from "nodemailer";
+// Nodemailer and SMTP removed per new requirements — no email sending
 import { supabase } from "../supabaseClient.js";
 import admin from "firebase-admin";
 
@@ -57,79 +57,11 @@ export const REGISTERED_USERS: UserRecord[] = [
 // Simple in-memory OTP store (demo). Use Redis or DB in production with TTL.
 const OTP_STORE = new Map<string, { code: string; expiresAt: number }>();
 
-// Nodemailer transporter (if SMTP env vars present). Otherwise fallback to console log.
-const transporter = ((): nodemailer.Transporter | null => {
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+// No transporter — all email-sending code removed. OTPs and verification links are logged only.
 
-  if (host && port && user && pass) {
-    return nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
-  }
-  return null;
-})();
+// Email verification removed — no verification store required.
 
-// Temporary in-memory verification store for email confirmations (demo).
-// Structure: token -> { email, firstName, lastName, password, expiresAt }
-const VERIFICATION_STORE = new Map<string, { email: string; firstName?: string; lastName?: string; password?: string; expiresAt: number }>();
-
-async function sendVerificationEmail(to: string, token: string) {
-  const from = process.env.EMAIL_FROM || "noreply@example.com";
-  const clientUrl = process.env.CLIENT_URL || (process.env.NODE_ENV === 'production' ? 'https://nxt-gen-lms.vercel.app' : 'http://localhost:5173');
-  const link = `${clientUrl}/verify-email?token=${encodeURIComponent(token)}`;
-  const subject = "Verify your email for NxtGen LMS";
-  const text = `Thanks for signing up.\n\nPlease verify your email by clicking the link below:\n\n${link}\n\nIf the link doesn't work, you can copy/paste it in your browser. This link expires in 24 hours.`;
-
-  // If transporter configured, attempt to send with a few retries for transient failures.
-  // If all attempts fail, honor SMTP_FAIL_OPEN=true to fall back to logging the link
-  // (useful for staging or when you prefer UX continuity over strict delivery).
-  if (transporter) {
-    const maxAttempts = Number(process.env.SMTP_MAX_RETRIES || '2');
-    const failOpen = String(process.env.SMTP_FAIL_OPEN || '').toLowerCase() === 'true';
-    let lastErr: any = null;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        await transporter.sendMail({ from, to, subject, text });
-        if (attempt > 1) console.log(`[VERIFICATION] sendMail succeeded on attempt ${attempt} for ${to}`);
-        return;
-      } catch (err) {
-        lastErr = err;
-        console.warn(`[VERIFICATION] sendMail attempt ${attempt} failed for ${to}`, { err: String(err) });
-        // small backoff
-        await new Promise((r) => setTimeout(r, attempt * 500));
-      }
-    }
-
-    const msg = `[VERIFICATION] Failed to send verification email to ${to} after ${maxAttempts} attempts: ${String(lastErr)}`;
-    if (failOpen) {
-      console.error(msg + ' — falling back to logged verification link due to SMTP_FAIL_OPEN=true');
-      console.log(`[VERIFICATION][fallback] verification link for ${to}: ${link}`);
-      return;
-    }
-
-    console.error(msg);
-    // Propagate last error to caller so it can decide how to respond
-    return Promise.reject(lastErr);
-  }
-
-  // No transporter configured
-  const requireSmtp = String(process.env.REQUIRE_SMTP || '').toLowerCase() === 'true' || process.env.NODE_ENV === 'production';
-  const devMsg = `[VERIFICATION][dev] SMTP not configured; verification link for ${to}: ${link}`;
-  if (requireSmtp) {
-    console.error(devMsg);
-    return Promise.reject(new Error('SMTP not configured; set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS'));
-  }
-
-  // In non-production, log the link so developers can copy/paste it for testing
-  console.log(devMsg);
-  return Promise.resolve();
-}
+// Email verification removed — no sendVerificationEmail implementation.
 
 // Initialize Firebase Admin SDK if service account JSON provided via env
 const _svc = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -150,13 +82,9 @@ function sendOtpEmail(to: string, code: string) {
   const subject = "Your NxtGen login OTP";
   const text = `Your one-time login code is: ${code}\nThis code expires in 5 minutes.`;
 
-  if (transporter) {
-    return transporter.sendMail({ from, to, subject, text });
-  } else {
-    // Fallback for local/dev: log OTP so developer can copy it
-    console.log(`[OTP][dev] sendOtpEmail -> to=${to} code=${code}`);
-    return Promise.resolve();
-  }
+  // Email sending removed: always log OTP to server logs (demo behavior)
+  console.log(`[OTP][dev] sendOtpEmail -> to=${to} code=${code}`);
+  return Promise.resolve();
 }
 
 export const login: RequestHandler = async (req, res) => {
@@ -202,9 +130,13 @@ export const login: RequestHandler = async (req, res) => {
 };
 
 export const register: RequestHandler = async (_req, res) => {
-  // Manual signup: require email verification before creating canonical DB user.
+  // Manual signup: immediately create canonical DB user after validating email.
   const { email, password, firstName, lastName } = _req.body || {};
   if (!email || !password) return res.status(400).json({ error: "email and password required" });
+
+  // Simple email format validation
+  const emailRegex = /^\S+@\S+\.\S+$/;
+  if (!emailRegex.test(String(email || '').trim())) return res.status(400).json({ error: 'Invalid email format' });
 
   // If a canonical DB user already exists, disallow signup (email already used).
   try {
@@ -215,17 +147,37 @@ export const register: RequestHandler = async (_req, res) => {
     console.warn('[auth/register] error checking existing user', ex);
   }
 
-  // Create a verification token and email it to the user. Do not create an active session yet.
-  const token = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
-  const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24h
-  VERIFICATION_STORE.set(token, { email: email.toLowerCase(), firstName, lastName, password, expiresAt });
   try {
-    await sendVerificationEmail(email, token);
-    return res.json({ success: true, verificationSent: true });
+    // Create DB user and return it. Use helper to set first/last name when available.
+    const result = await getOrCreateUserInDb(email.toLowerCase(), 'student', firstName, lastName);
+    if (result.error || !result.id) {
+      console.error('[auth/register] failed to create user in DB', { email, err: result.error });
+      return res.status(500).json({ error: 'Failed to create user' });
+    }
+
+    const { data, error } = await supabase.from('users').select('id, email, role, first_name, last_name').eq('id', result.id).maybeSingle();
+    if (error || !data) {
+      console.error('[auth/register] failed to fetch created user', { id: result.id, error });
+      return res.status(500).json({ error: 'Failed to fetch created user' });
+    }
+
+    // Also register demo in-memory user for local/demo flows
+    const displayName = `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim() || data.email.split('@')[0];
+    const newUser = {
+      id: String(Date.now()),
+      email: data.email,
+      password: password || '',
+      role: 'student',
+      name: displayName,
+      approved: true,
+      requestedRole: null,
+    } as UserRecord;
+    REGISTERED_USERS.push(newUser);
+
+    return res.json({ success: true, user: data, created: !!result.created });
   } catch (ex) {
-    console.error('[auth/register] failed to send verification email', ex);
-    VERIFICATION_STORE.delete(token);
-    return res.status(500).json({ error: 'Failed to send verification email' });
+    console.error('[auth/register] unexpected error', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
   }
 };
 
@@ -393,49 +345,7 @@ export const verifyOtp: RequestHandler = async (req, res) => {
   return res.json({ success: true, user: userWithoutPassword, message: "OTP verified" });
 };
 
-// POST /api/auth/verify-email
-export const verifyEmail: RequestHandler = async (req, res) => {
-  const { token } = req.body || {};
-  if (!token) return res.status(400).json({ error: 'token required' });
-  const entry = VERIFICATION_STORE.get(String(token));
-  if (!entry) return res.status(400).json({ error: 'Invalid or expired token' });
-  if (Date.now() > entry.expiresAt) {
-    VERIFICATION_STORE.delete(String(token));
-    return res.status(400).json({ error: 'Token expired' });
-  }
-
-  // Create demo user record and canonical DB row
-  const email = String(entry.email || '').toLowerCase();
-  const displayName = `${(entry.firstName || '').trim()} ${(entry.lastName || '').trim()}`.trim() || email.split('@')[0];
-  const newUser: UserRecord = {
-    id: String(Date.now()),
-    email,
-    password: entry.password || '',
-    role: 'student',
-    name: displayName,
-    approved: true,
-    requestedRole: null,
-  };
-  REGISTERED_USERS.push(newUser);
-
-  try {
-    const result = await getOrCreateUserInDb(email, 'student', entry.firstName, entry.lastName);
-    if (result.error || !result.id) {
-      console.warn('[auth/verifyEmail] failed to create/get DB user', { email, err: result.error });
-      return res.status(500).json({ error: 'Failed to create user' });
-    }
-    const { data, error } = await supabase.from('users').select('id, email, role, first_name, last_name').eq('id', result.id).maybeSingle();
-    if (error || !data) {
-      console.warn('[auth/verifyEmail] failed to fetch created user', { id: result.id, error });
-      return res.status(500).json({ error: 'Failed to fetch user' });
-    }
-    VERIFICATION_STORE.delete(String(token));
-    return res.json({ success: true, user: data, created: true });
-  } catch (ex) {
-    console.error('[auth/verifyEmail] unexpected', ex);
-    return res.status(500).json({ error: 'Unexpected error' });
-  }
-};
+// Email verification endpoint removed — manual signups are created immediately without email verification.
 
 // NEW: simple demo social login
 export const socialLogin: RequestHandler = async (req, res) => {

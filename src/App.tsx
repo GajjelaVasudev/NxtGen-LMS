@@ -8,8 +8,6 @@ import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import VerifyCode from "./pages/VerifyCode";
 import SetPassword from "./pages/SetPassword";
-import VerifyEmail from "./pages/VerifyEmail";
-import VerifyEmailSent from "./pages/VerifyEmailSent";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -30,8 +28,6 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/verify-code" element={<VerifyCode />} />
               <Route path="/set-password" element={<SetPassword />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
-              <Route path="/verify-email-sent" element={<VerifyEmailSent />} />
               <Route
                 path="/app/*"
                 element={

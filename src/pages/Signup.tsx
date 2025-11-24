@@ -76,12 +76,7 @@ export default function Signup() {
 				throw new Error(body?.error || body?.message || `HTTP ${res.status}`);
 			}
 						const data = await res.json();
-						// If the server indicates a verification email was sent, show instructions and do not log in yet
-						if (data?.verificationSent) {
-							navigate('/verify-email-sent');
-							return;
-						}
-						// If server returned a created canonical user (unlikely in manual flow), auto-login
+						// Server now creates users immediately — auto-login when user object returned
 						try { if (data?.created) localStorage.setItem('nxtgen_justSignedUp', '1'); } catch {}
 						await login(data.user || data);
 						navigate('/app');
