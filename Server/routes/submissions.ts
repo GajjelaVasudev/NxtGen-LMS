@@ -224,14 +224,27 @@ export const getSubmissionFile: RequestHandler = async (req, res) => {
 // PATCH /api/submissions/:submissionId/grade
 export const gradeSubmission: RequestHandler = async (req, res) => {
   try {
-    console.log('[grade] incoming');
     const submissionId = req.params.submissionId;
     let graderId = String(req.headers['x-user-id'] || "");
-    if (!graderId) return res.status(401).json({ success: false, error: 'Missing x-user-id header' });
+    console.log('[grade] incoming', { submissionId, graderId, body: req.body });
+
+    // Validate presence of identifiers
+    if (!submissionId) {
+      console.error('[grade] missing submissionId');
+      return res.status(400).json({ success: false, message: 'submissionId required' });
+    }
+    if (!graderId) {
+      console.error('[grade] missing x-user-id header');
+      return res.status(400).json({ success: false, message: 'Missing x-user-id header' });
+    }
+
     if (!graderId.includes('-')) {
       const { canonicalizeUserId } = await import('../utils/userHelpers.js');
       const canonical = await canonicalizeUserId(graderId);
-      if (!canonical) return res.status(401).json({ success: false, error: 'graderId could not be canonicalized' });
+      if (!canonical) {
+        console.error('[grade] graderId could not be canonicalized', { graderId });
+        return res.status(400).json({ success: false, message: 'Invalid grader id' });
+      }
       graderId = canonical;
     }
     // Verify grader exists and role
@@ -245,9 +258,17 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
 
     const payload = req.body || {};
     const update: any = {};
-    if (typeof payload.grade !== 'undefined') update.grade = payload.grade;
+    // Validate grade if provided
+    if (typeof payload.grade !== 'undefined') {
+      const gradeNumber = Number(payload.grade);
+      if (Number.isNaN(gradeNumber)) {
+        console.error('[grade] invalid grade value', { grade: payload.grade });
+        return res.status(400).json({ success: false, message: 'Invalid grade' });
+      }
+      update.grade = gradeNumber;
+    }
     if (typeof payload.feedback !== 'undefined') update.feedback = payload.feedback;
-    if (Object.keys(update).length === 0) return res.status(400).json({ success: false, error: 'No update fields provided' });
+    if (Object.keys(update).length === 0) return res.status(400).json({ success: false, message: 'No update fields provided' });
 
     // Fetch submission and related assignment to verify permission and existence
     const { data: existingSubmission, error: subErr } = await supabase.from('assignment_submissions').select('*').eq('id', submissionId).maybeSingle();
@@ -277,17 +298,43 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
     update.graded_at = new Date().toISOString();
     update.status = 'graded';
 
-    const { data, error } = await supabase.from('assignment_submissions').update(update).eq('id', submissionId).select().maybeSingle();
+    update.graded_by = graderId;
+    update.graded_at = new Date().toISOString();
+    update.status = 'graded';
+
+    // Perform update and log result
+    const { data, error } = await supabase
+      .from('assignment_submissions')
+      .update(update)
+      .eq('id', submissionId)
+      .select()
+      .maybeSingle();
+
+    console.log('[grade] supabase update result', { data, error });
+
     if (error) {
-      console.error('[grade] Supabase update error', error);
-      return res.status(500).json({ success: false, error: error.message });
+      console.error('[grade] supabase error', error);
+      return res.status(500).json({ success: false, message: 'Failed to save grade', error: error.message ?? String(error) });
+    }
+    if (!data) {
+      console.error('[grade] no rows updated for submissionId', submissionId);
+      return res.status(404).json({ success: false, message: 'Submission not found' });
     }
 
     console.log('[grade] updated submission', submissionId);
 
-    // return richer payload: include user_id and assignment title
-    const assignmentTitle = assignmentRow ? (assignmentRow as any).title : null;
-    return res.json({ success: true, data: { ...(data || {}), user_id: existingSubmission.user_id, assignment_title: assignmentTitle } });
+    // Build response payload with canonical fields
+    const resp = {
+      id: data.id,
+      assignment_id: data.assignment_id,
+      user_id: data.user_id,
+      grade: data.grade ?? null,
+      feedback: data.feedback ?? null,
+      graded_by: data.graded_by ?? graderId,
+      graded_at: data.graded_at ?? new Date().toISOString(),
+    };
+
+    return res.json({ success: true, data: resp });
   } catch (err: any) {
     console.error('[grade] unexpected error', err);
     return res.status(500).json({ success: false, error: 'Unexpected server error' });
