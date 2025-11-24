@@ -303,7 +303,7 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
     update.status = 'graded';
 
     // Perform update and log result
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('assignment_submissions')
       .update(update)
       .eq('id', submissionId)
@@ -311,6 +311,40 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
       .maybeSingle();
 
     console.log('[grade] supabase update result', { data, error });
+
+    // If schema cache error complaining about missing column(s), strip them and retry once
+    if (error && (error as any).code === 'PGRST204' && typeof (error as any).message === 'string') {
+      const msg: string = (error as any).message;
+      // extract quoted identifiers like 'feedback' from the message
+      const missing: string[] = [];
+      const re = /'([^']+)'/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(msg)) !== null) {
+        const col = m[1];
+        // only consider columns present in our update payload
+        if (col in update) missing.push(col);
+      }
+      if (missing.length > 0) {
+        console.warn('[grade] supabase reported missing columns, removing and retrying update', { missing });
+        for (const c of missing) delete update[c];
+
+        if (Object.keys(update).length === 0) {
+          console.error('[grade] no updatable columns remain after removing missing columns', { missing });
+          return res.status(500).json({ success: false, message: 'Database schema missing required columns for grading. Please add the grade/feedback/graded_by/graded_at columns to the assignment_submissions table.' });
+        }
+
+        // retry update once
+        const retry = await supabase
+          .from('assignment_submissions')
+          .update(update)
+          .eq('id', submissionId)
+          .select()
+          .maybeSingle();
+        data = retry.data;
+        error = retry.error;
+        console.log('[grade] retry supabase update result', { data, error });
+      }
+    }
 
     if (error) {
       console.error('[grade] supabase error', error);
