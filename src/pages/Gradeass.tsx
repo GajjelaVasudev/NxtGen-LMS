@@ -6,6 +6,7 @@ export default function Gradeass() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Record<string, { grade: string; feedback: string }>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
 
   const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
@@ -98,14 +99,22 @@ export default function Gradeass() {
                 </div>
 
                 <div className="mt-3 md:mt-0 flex flex-col md:items-end gap-2">
-                  <div className="flex items-center gap-2">
-                    <input type="number" min={0} max={100} placeholder="Grade" value={editing[s.submissionId]?.grade || ''} onChange={(e) => setEditing(prev => ({ ...prev, [s.submissionId]: { ...(prev[s.submissionId] || {}), grade: e.target.value } }))} className="w-24 border rounded p-1" />
-                    <input type="text" placeholder="Feedback" value={editing[s.submissionId]?.feedback || ''} onChange={(e) => setEditing(prev => ({ ...prev, [s.submissionId]: { ...(prev[s.submissionId] || {}), feedback: e.target.value } }))} className="border rounded p-1" />
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => handleEdit(s)} className="px-3 py-1 border rounded">Edit</button>
-                    <button onClick={() => saveGrade(s.submissionId)} className="px-3 py-1 bg-blue-600 text-white rounded">Save</button>
-                  </div>
+                  {editing[s.submissionId] ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <input type="number" min={0} max={100} placeholder="Grade" value={editing[s.submissionId]?.grade || ''} onChange={(e) => setEditing(prev => ({ ...prev, [s.submissionId]: { ...(prev[s.submissionId] || {}), grade: e.target.value } }))} className="w-24 border rounded p-1" />
+                        <input type="text" placeholder="Feedback" value={editing[s.submissionId]?.feedback || ''} onChange={(e) => setEditing(prev => ({ ...prev, [s.submissionId]: { ...(prev[s.submissionId] || {}), feedback: e.target.value } }))} className="border rounded p-1" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setEditing(prev => { const copy = { ...prev }; delete copy[s.submissionId]; return copy; }); }} disabled={!!saving[s.submissionId]} className="px-3 py-1 border rounded">Cancel</button>
+                        <button onClick={() => saveGrade(s.submissionId)} disabled={!!saving[s.submissionId]} className={`px-3 py-1 ${saving[s.submissionId] ? 'bg-gray-400' : 'bg-blue-600'} text-white rounded`}>{saving[s.submissionId] ? 'Saving...' : 'Save'}</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEdit(s)} className="px-3 py-1 border rounded">Edit</button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
