@@ -38,7 +38,7 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
               if (body.created) localStorage.setItem('nxtgen_justSignedUp', '1');
             } catch {}
             await login(body.user);
-            window.location.href = "/dashboard";
+            window.location.href = "/app";
             return;
           }
         }
@@ -48,7 +48,7 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
 
       // Fallback to client-side login/canonicalization
       await login({ email, name });
-      window.location.href = "/dashboard";
+      window.location.href = "/app";
     } catch (err: any) {
       console.error("Firebase social login failed:", err);
       alert("Google sign-in failed: " + (err?.message || String(err)));

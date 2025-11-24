@@ -75,12 +75,16 @@ export default function Signup() {
 				const body = await res.json().catch(() => ({}));
 				throw new Error(body?.error || body?.message || `HTTP ${res.status}`);
 			}
-			const data = await res.json();
-			// If server created the canonical DB row, mark local flag so Overview can show welcome
-			try { if (data?.created) localStorage.setItem('nxtgen_justSignedUp', '1'); } catch {}
-			// server should return created user; use canonical record
-			await login(data.user || data);
-			navigate("/dashboard");
+						const data = await res.json();
+						// If the server indicates a verification email was sent, show instructions and do not log in yet
+						if (data?.verificationSent) {
+							navigate('/verify-email-sent');
+							return;
+						}
+						// If server returned a created canonical user (unlikely in manual flow), auto-login
+						try { if (data?.created) localStorage.setItem('nxtgen_justSignedUp', '1'); } catch {}
+						await login(data.user || data);
+						navigate('/app');
 		} catch (err: any) {
 			console.error(err);
 			setError(err?.message || "Failed to create account. Try again.");

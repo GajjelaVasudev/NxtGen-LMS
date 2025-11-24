@@ -75,6 +75,21 @@ const transporter = ((): nodemailer.Transporter | null => {
   return null;
 })();
 
+// Temporary in-memory verification store for email confirmations (demo).
+// Structure: token -> { email, firstName, lastName, password, expiresAt }
+const VERIFICATION_STORE = new Map<string, { email: string; firstName?: string; lastName?: string; password?: string; expiresAt: number }>();
+
+function sendVerificationEmail(to: string, token: string) {
+  const from = process.env.EMAIL_FROM || "noreply@example.com";
+  const clientUrl = process.env.CLIENT_URL || (process.env.NODE_ENV === 'production' ? 'https://nxt-gen-lms.vercel.app' : 'http://localhost:5173');
+  const link = `${clientUrl}/verify-email?token=${encodeURIComponent(token)}`;
+  const subject = "Verify your email for NxtGen LMS";
+  const text = `Thanks for signing up.\n\nPlease verify your email by clicking the link below:\n\n${link}\n\nIf the link doesn't work, you can copy/paste it in your browser. This link expires in 24 hours.`;
+  if (transporter) return transporter.sendMail({ from, to, subject, text });
+  console.log(`[VERIFICATION][dev] to=${to} link=${link}`);
+  return Promise.resolve();
+}
+
 // Initialize Firebase Admin SDK if service account JSON provided via env
 const _svc = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 if (_svc) {
@@ -146,41 +161,31 @@ export const login: RequestHandler = async (req, res) => {
 };
 
 export const register: RequestHandler = async (_req, res) => {
-  // Allow manual signup for students only. Collect firstName/lastName from client.
+  // Manual signup: require email verification before creating canonical DB user.
   const { email, password, firstName, lastName } = _req.body || {};
   if (!email || !password) return res.status(400).json({ error: "email and password required" });
-  const existing = REGISTERED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-  if (existing) return res.status(409).json({ error: "Email already registered" });
 
-  const displayName = `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim() || email.split("@")[0];
-  const newUser: UserRecord = {
-    id: String(Date.now()),
-    email,
-    password,
-    role: "student",
-    name: displayName,
-    approved: true,
-    requestedRole: null,
-  };
-  REGISTERED_USERS.push(newUser);
-
-  // Also create a DB user so frontend receives canonical UUID and name parts
+  // If a canonical DB user already exists, disallow signup (email already used).
   try {
-    const insertRow: any = { email: newUser.email, role: newUser.role };
-    if (firstName) insertRow.first_name = firstName;
-    if (lastName) insertRow.last_name = lastName;
-
-    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role, first_name, last_name').maybeSingle();
-    if (createErr) {
-      console.warn('[auth/register] failed to create DB user', { email: newUser.email, createErr });
-    }
-    if (created) return res.json({ success: true, user: created, created: true });
+    const { data: found, error: findErr } = await supabase.from('users').select('id').ilike('email', email).maybeSingle();
+    if (findErr) console.warn('[auth/register] Supabase lookup error', { email, findErr });
+    if (found && found.id) return res.status(409).json({ error: 'Email already registered' });
   } catch (ex) {
-    console.error('[auth/register] exception creating DB user', ex);
+    console.warn('[auth/register] error checking existing user', ex);
   }
 
-  const { password: _, ...userWithoutPassword } = newUser;
-  return res.json({ success: true, user: userWithoutPassword, created: true });
+  // Create a verification token and email it to the user. Do not create an active session yet.
+  const token = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24h
+  VERIFICATION_STORE.set(token, { email: email.toLowerCase(), firstName, lastName, password, expiresAt });
+  try {
+    await sendVerificationEmail(email, token);
+    return res.json({ success: true, verificationSent: true });
+  } catch (ex) {
+    console.error('[auth/register] failed to send verification email', ex);
+    VERIFICATION_STORE.delete(token);
+    return res.status(500).json({ error: 'Failed to send verification email' });
+  }
 };
 
 // Get all registered emails (for display purposes only)
@@ -345,6 +350,50 @@ export const verifyOtp: RequestHandler = async (req, res) => {
   }
 
   return res.json({ success: true, user: userWithoutPassword, message: "OTP verified" });
+};
+
+// POST /api/auth/verify-email
+export const verifyEmail: RequestHandler = async (req, res) => {
+  const { token } = req.body || {};
+  if (!token) return res.status(400).json({ error: 'token required' });
+  const entry = VERIFICATION_STORE.get(String(token));
+  if (!entry) return res.status(400).json({ error: 'Invalid or expired token' });
+  if (Date.now() > entry.expiresAt) {
+    VERIFICATION_STORE.delete(String(token));
+    return res.status(400).json({ error: 'Token expired' });
+  }
+
+  // Create demo user record and canonical DB row
+  const email = String(entry.email || '').toLowerCase();
+  const displayName = `${(entry.firstName || '').trim()} ${(entry.lastName || '').trim()}`.trim() || email.split('@')[0];
+  const newUser: UserRecord = {
+    id: String(Date.now()),
+    email,
+    password: entry.password || '',
+    role: 'student',
+    name: displayName,
+    approved: true,
+    requestedRole: null,
+  };
+  REGISTERED_USERS.push(newUser);
+
+  try {
+    const result = await getOrCreateUserInDb(email, 'student', entry.firstName, entry.lastName);
+    if (result.error || !result.id) {
+      console.warn('[auth/verifyEmail] failed to create/get DB user', { email, err: result.error });
+      return res.status(500).json({ error: 'Failed to create user' });
+    }
+    const { data, error } = await supabase.from('users').select('id, email, role, first_name, last_name').eq('id', result.id).maybeSingle();
+    if (error || !data) {
+      console.warn('[auth/verifyEmail] failed to fetch created user', { id: result.id, error });
+      return res.status(500).json({ error: 'Failed to fetch user' });
+    }
+    VERIFICATION_STORE.delete(String(token));
+    return res.json({ success: true, user: data, created: true });
+  } catch (ex) {
+    console.error('[auth/verifyEmail] unexpected', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
 };
 
 // NEW: simple demo social login

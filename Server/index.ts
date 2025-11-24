@@ -4,7 +4,7 @@ import cors from "cors";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { handleDemo } from "./routes/demo.js";
-import { login, register, getRegisteredEmails, requestOtp, verifyOtp, socialLogin, findOrCreateSocialUser, requestRole, listRoleRequests, approveRole, denyRole, getUserById, firebaseLogin, listAllUsers, updateUserRole } from "./routes/auth.js";
+import { login, register, getRegisteredEmails, requestOtp, verifyOtp, socialLogin, findOrCreateSocialUser, requestRole, listRoleRequests, approveRole, denyRole, getUserById, firebaseLogin, listAllUsers, updateUserRole, verifyEmail } from "./routes/auth.js";
 import debugMappingsRouter from "./routes/_debug/demo-mappings.js";
 import {
   getCourses,
@@ -152,7 +152,7 @@ export function createServer() {
         if (!email) {
           // send error back to opener; if postMessage fails, fall back to redirecting opener to dashboard
           return res.send(
-            `<html><body><script>try{window.opener.postMessage({ type: 'oauth', error: 'No email returned from provider' }, '${BASE_URL}');}catch(e){try{window.opener.location='${BASE_URL}/dashboard';}catch(_){} } finally{ window.close();}</script></body></html>`
+            `<html><body><script>try{window.opener.postMessage({ type: 'oauth', error: 'No email returned from provider' }, '${BASE_URL}');}catch(e){try{window.opener.location='${BASE_URL}/app';}catch(_){} } finally{ window.close();}</script></body></html>`
           );
         }
 
@@ -191,7 +191,7 @@ export function createServer() {
                   const u = ${payload};
                   window.opener.postMessage({ type: 'oauth', user: u }, '${BASE_URL}');
                 } catch (e) {
-                  try { window.opener.location = '${BASE_URL}/dashboard'; } catch (_) {}
+                  try { window.opener.location = '${BASE_URL}/app'; } catch (_) {}
                 }
                 window.close();
               </script>
@@ -202,17 +202,19 @@ export function createServer() {
     );
 
     app.get('/api/auth/google/failure', (_req, res) => {
-      return res.send(`<html><body><script>try{window.opener.postMessage({ type: 'oauth', error: 'OAuth failed' }, '${BASE_URL}');}catch(e){try{window.opener.location='${BASE_URL}/dashboard';}catch(_){} } finally{ window.close();}</script></body></html>`);
+      return res.send(`<html><body><script>try{window.opener.postMessage({ type: 'oauth', error: 'OAuth failed' }, '${BASE_URL}');}catch(e){try{window.opener.location='${BASE_URL}/app';}catch(_){} } finally{ window.close();}</script></body></html>`);
     });
   } else {
     // If OAuth not configured show a helpful route
     app.get('/api/auth/google', (_req, res) => {
-      return res.send(`<html><body><script>try{window.opener.postMessage({ type: 'oauth', error: 'Google OAuth not configured on server' }, '${BASE_URL}');}catch(e){try{window.opener.location='${BASE_URL}/dashboard';}catch(_){} } finally{ window.close();}</script></body></html>`);
+      return res.send(`<html><body><script>try{window.opener.postMessage({ type: 'oauth', error: 'Google OAuth not configured on server' }, '${BASE_URL}');}catch(e){try{window.opener.location='${BASE_URL}/app';}catch(_){} } finally{ window.close();}</script></body></html>`);
     });
   }
 
   // Firebase token-based login (client posts ID token)
   app.post("/api/auth/firebase-login", firebaseLogin);
+  // Email verification endpoint for manual signups
+  app.post("/api/auth/verify-email", verifyEmail);
 
   // Admin user management
   app.get("/api/admin/users", listAllUsers);
