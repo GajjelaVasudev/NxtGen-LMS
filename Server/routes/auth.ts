@@ -85,8 +85,21 @@ function sendVerificationEmail(to: string, token: string) {
   const link = `${clientUrl}/verify-email?token=${encodeURIComponent(token)}`;
   const subject = "Verify your email for NxtGen LMS";
   const text = `Thanks for signing up.\n\nPlease verify your email by clicking the link below:\n\n${link}\n\nIf the link doesn't work, you can copy/paste it in your browser. This link expires in 24 hours.`;
-  if (transporter) return transporter.sendMail({ from, to, subject, text });
-  console.log(`[VERIFICATION][dev] to=${to} link=${link}`);
+  // If transporter configured, use it. If not configured and we're in production
+  // or REQUIRE_SMTP=true, fail loudly so emails don't silently vanish.
+  if (transporter) {
+    return transporter.sendMail({ from, to, subject, text });
+  }
+
+  const requireSmtp = String(process.env.REQUIRE_SMTP || '').toLowerCase() === 'true' || process.env.NODE_ENV === 'production';
+  const msg = `[VERIFICATION][dev] SMTP not configured; verification link for ${to}: ${link}`;
+  if (requireSmtp) {
+    console.error(msg);
+    return Promise.reject(new Error('SMTP not configured; set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS')); 
+  }
+
+  // In non-production, log the link so developers can copy/paste it for testing
+  console.log(msg);
   return Promise.resolve();
 }
 
