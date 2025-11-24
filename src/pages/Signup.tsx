@@ -43,9 +43,7 @@ export default function Signup() {
 	const [agreeToTerms, setAgreeToTerms] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
-	const [role, setRole] = useState<
-		"user" | "instructor" | "contentCreator" | "admin"
-	>("user");
+	// role selection removed; manual signups are students by default
 	const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
 	async function handleSubmit(e: React.FormEvent) {
@@ -71,16 +69,18 @@ export default function Signup() {
 			const res = await fetch(`${API}/auth/register`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ email, password, name: `${firstName} ${lastName}`, role }),
+				body: JSON.stringify({ email, password, firstName, lastName }),
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => ({}));
 				throw new Error(body?.error || body?.message || `HTTP ${res.status}`);
 			}
 			const data = await res.json();
+			// If server created the canonical DB row, mark local flag so Overview can show welcome
+			try { if (data?.created) localStorage.setItem('nxtgen_justSignedUp', '1'); } catch {}
 			// server should return created user; use canonical record
 			await login(data.user || data);
-			navigate("/app");
+			navigate("/dashboard");
 		} catch (err: any) {
 			console.error(err);
 			setError(err?.message || "Failed to create account. Try again.");
@@ -231,25 +231,7 @@ export default function Signup() {
 									onChange={(e) => setConfirmPassword(e.target.value)}
 								/>
 
-								{/* Role selection */}
-								<div>
-									<label className="block text-sm font-medium text-[#313131] mb-2">
-										Account Type
-									</label>
-									<select
-										value={role}
-										onChange={(e) => setRole(e.target.value as any)}
-										className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#515DEF] focus:border-transparent"
-									>
-										<option value="user">Student</option>
-										<option value="instructor">Instructor</option>
-										<option value="contentCreator">Content Creator</option>
-										<option value="admin">Administrator</option>
-									</select>
-									<p className="text-xs text-gray-500 mt-1">
-										Choose your account type. You can change this later.
-									</p>
-								</div>
+																{/* Role selection removed — new signups are students by default */}
 
 								<div className="flex items-center gap-2">
 									<Checkbox

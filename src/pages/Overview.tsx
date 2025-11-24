@@ -32,9 +32,21 @@ export default function Overview() {
   const [enrollments, setEnrollments] = useState<{ courseId: string; userId?: string }[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [justSignedUp, setJustSignedUp] = useState(false);
 
   // Load server-backed courses & user enrollments
   useEffect(() => {
+    try {
+      const flag = localStorage.getItem('nxtgen_justSignedUp');
+      if (flag) {
+        setJustSignedUp(true);
+        // clear the transient flag after a short period
+        setTimeout(() => {
+          try { localStorage.removeItem('nxtgen_justSignedUp'); } catch {}
+          setJustSignedUp(false);
+        }, 4000);
+      }
+    } catch {}
     let mounted = true;
     (async () => {
       try {
@@ -135,7 +147,7 @@ export default function Overview() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, {displayName}</h1>
+            <h1 className="text-3xl font-bold">{justSignedUp ? `Welcome, ${displayName}` : `Welcome back, ${displayName}`}</h1>
             <p className="text-sm text-gray-600 mt-1">Here's a snapshot of your learning dashboard</p>
           </div>
 

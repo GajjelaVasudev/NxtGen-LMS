@@ -125,14 +125,14 @@ export const login: RequestHandler = async (req, res) => {
 
   // Try to ensure this demo user exists in Supabase and return the canonical DB row (id as UUID)
   try {
-    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role').ilike('email', user.email).single();
+    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role, first_name, last_name').ilike('email', user.email).single();
     if (found && !findErr) {
       return res.json({ success: true, user: found, message: 'Login successful (DB user)' });
     }
 
     // Create the user in DB
     const insertRow = { email: user.email, role: user.role };
-    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').single();
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role, first_name, last_name').single();
     if (created && !createErr) {
       console.log('[auth] Created DB user during login', { email: user.email, id: created.id });
       return res.json({ success: true, user: created, message: 'Login successful (created DB user)' });
@@ -146,37 +146,41 @@ export const login: RequestHandler = async (req, res) => {
 };
 
 export const register: RequestHandler = async (_req, res) => {
-  // Allow manual signup for students only
-  const { email, password, name } = _req.body || {};
+  // Allow manual signup for students only. Collect firstName/lastName from client.
+  const { email, password, firstName, lastName } = _req.body || {};
   if (!email || !password) return res.status(400).json({ error: "email and password required" });
   const existing = REGISTERED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
   if (existing) return res.status(409).json({ error: "Email already registered" });
 
+  const displayName = `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim() || email.split("@")[0];
   const newUser: UserRecord = {
     id: String(Date.now()),
     email,
     password,
     role: "student",
-    name: name || email.split("@")[0],
+    name: displayName,
     approved: true,
     requestedRole: null,
   };
   REGISTERED_USERS.push(newUser);
 
-  // Also create a DB user so frontend receives canonical UUID
+  // Also create a DB user so frontend receives canonical UUID and name parts
   try {
-    const insertRow = { email: newUser.email, role: newUser.role };
-    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
+    const insertRow: any = { email: newUser.email, role: newUser.role };
+    if (firstName) insertRow.first_name = firstName;
+    if (lastName) insertRow.last_name = lastName;
+
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role, first_name, last_name').maybeSingle();
     if (createErr) {
       console.warn('[auth/register] failed to create DB user', { email: newUser.email, createErr });
     }
-    if (created) return res.json({ success: true, user: created });
+    if (created) return res.json({ success: true, user: created, created: true });
   } catch (ex) {
     console.error('[auth/register] exception creating DB user', ex);
   }
 
   const { password: _, ...userWithoutPassword } = newUser;
-  return res.json({ success: true, user: userWithoutPassword });
+  return res.json({ success: true, user: userWithoutPassword, created: true });
 };
 
 // Get all registered emails (for display purposes only)
@@ -203,7 +207,7 @@ export const getUserById: RequestHandler = async (req, res) => {
         }
         const id = result.id;
         if (id) {
-          const { data, error } = await supabase.from("users").select("id, email, role").eq("id", id).maybeSingle();
+          const { data, error } = await supabase.from("users").select("id, email, role, first_name, last_name").eq("id", id).maybeSingle();
           if (error) {
             console.warn('[auth] Supabase lookup by id returned error', { key: lc, error });
           } else if (data) {
@@ -218,7 +222,7 @@ export const getUserById: RequestHandler = async (req, res) => {
 
     // Otherwise, try by id (UUID) in Supabase
     if (key && key.includes("-")) {
-      const { data, error } = await supabase.from("users").select("id, email, role").eq("id", key).maybeSingle();
+      const { data, error } = await supabase.from("users").select("id, email, role, first_name, last_name").eq("id", key).maybeSingle();
       if (error) {
         console.warn('[auth] Supabase lookup by id returned error', { key, error });
       } else if (data) {
@@ -233,7 +237,7 @@ export const getUserById: RequestHandler = async (req, res) => {
 };
 
 // Ensure a user row exists for the given email. Returns the DB id or null on failure.
-export async function getOrCreateUserInDb(email: string, _role: string = 'user'): Promise<{ id: string | null; error?: any }> {
+export async function getOrCreateUserInDb(email: string, _role: string = 'user', firstName?: string, lastName?: string): Promise<{ id: string | null; created?: boolean; error?: any }> {
   const lc = String(email || '').toLowerCase();
   console.log('[auth/getOrCreate] ensure user exists', { email: lc });
   // determine role based on demo emails
@@ -245,16 +249,18 @@ export async function getOrCreateUserInDb(email: string, _role: string = 'user')
   else assignedRole = 'student';
   console.log('[auth/getOrCreate] assigning role', assignedRole, 'to', lc);
   try {
-    // Try find first
-    const { data: found, error: findErr } = await supabase.from('users').select('id').ilike('email', lc).maybeSingle();
+    // Try find first (also prefer first_name/last_name if present)
+    const { data: found, error: findErr } = await supabase.from('users').select('id, first_name, last_name').ilike('email', lc).maybeSingle();
     if (findErr) {
       console.warn('[auth/getOrCreate] Supabase lookup error', { email: lc, findErr });
     }
     if (found && found.id) return { id: found.id };
 
     // Not found -> attempt insert with lowercase email
-    const insertRow = { email: lc, role: assignedRole };
-    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id').maybeSingle();
+    const insertRow: any = { email: lc, role: assignedRole };
+    if (firstName) insertRow.first_name = firstName;
+    if (lastName) insertRow.last_name = lastName;
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, first_name, last_name').maybeSingle();
     if (createErr) {
       // If unique constraint (race) occurred, query again
       const isUniqueViolation = String(createErr?.code || '').includes('23505') || String(createErr?.message || '').toLowerCase().includes('duplicate');
@@ -268,7 +274,7 @@ export async function getOrCreateUserInDb(email: string, _role: string = 'user')
     }
     if (created && created.id) {
       console.log('[auth/getOrCreate] created DB user', { email: lc, id: created.id });
-      return { id: created.id };
+      return { id: created.id, created: true };
     }
     return { id: null };
   } catch (ex: any) {
@@ -324,16 +330,16 @@ export const verifyOtp: RequestHandler = async (req, res) => {
 
   // Ensure DB user exists and return DB row when possible
   try {
-    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role').ilike('email', email).maybeSingle();
+    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role, first_name, last_name').ilike('email', email).maybeSingle();
     if (findErr) {
       console.warn('[auth/verifyOtp] Supabase lookup error', { email, findErr });
     }
-    if (found) return res.json({ success: true, user: found, message: 'OTP verified' });
+    if (found) return res.json({ success: true, user: found, message: 'OTP verified', created: false });
 
-    const insertRow = { email: user.email, role: user.role };
-    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
+    const insertRow: any = { email: user.email, role: user.role };
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role, first_name, last_name').maybeSingle();
     if (createErr) console.warn('[auth/verifyOtp] failed to create DB user', { email, createErr });
-    if (created) return res.json({ success: true, user: created, message: 'OTP verified' });
+    if (created) return res.json({ success: true, user: created, message: 'OTP verified', created: true });
   } catch (ex) {
     console.error('[auth/verifyOtp] exception ensuring DB user', ex);
   }
@@ -359,14 +365,14 @@ export const socialLogin: RequestHandler = async (req, res) => {
 
   // Ensure DB user exists so social login returns DB UUID
   try {
-    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role').ilike('email', user.email).maybeSingle();
+    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role, first_name, last_name').ilike('email', user.email).maybeSingle();
     if (findErr) console.warn('[auth/socialLogin] Supabase lookup error', { email: user.email, findErr });
-    if (found) return res.json({ success: true, user: found, provider });
+    if (found) return res.json({ success: true, user: found, provider, created: false });
 
-    const insertRow = { email: user.email, role: user.role };
-    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role').maybeSingle();
+    const insertRow: any = { email: user.email, role: user.role };
+    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role, first_name, last_name').maybeSingle();
     if (createErr) console.warn('[auth/socialLogin] failed to create DB user', { email: user.email, createErr });
-    if (created) return res.json({ success: true, user: created, provider });
+    if (created) return res.json({ success: true, user: created, provider, created: true });
   } catch (ex) {
     console.error('[auth/socialLogin] exception ensuring DB user', ex);
   }
@@ -384,22 +390,24 @@ export const firebaseLogin: RequestHandler = async (req, res) => {
     const decoded = await admin.auth().verifyIdToken(idToken);
     const email = String(decoded.email || '').toLowerCase();
     const name = String(decoded.name || email.split('@')[0]);
+    const given = String((decoded as any).given_name || '').trim() || name.split(' ')[0];
+    const family = String((decoded as any).family_name || '').trim() || (name.split(' ').slice(1).join(' ') || '');
     if (!email) return res.status(400).json({ error: 'No email present in token' });
 
     // Ensure DB user exists with default student role
-    const result = await getOrCreateUserInDb(email, 'student');
+    const result = await getOrCreateUserInDb(email, 'student', given || undefined, family || undefined);
     if (result.error || !result.id) {
       console.warn('[auth/firebaseLogin] failed to ensure DB user', { email, err: result.error });
       return res.status(500).json({ error: 'Failed to ensure user in DB' });
     }
 
-    const { data, error } = await supabase.from('users').select('id, email, role').eq('id', result.id).maybeSingle();
+    const { data, error } = await supabase.from('users').select('id, email, role, first_name, last_name').eq('id', result.id).maybeSingle();
     if (error || !data) {
       console.warn('[auth/firebaseLogin] failed to fetch created user', { id: result.id, error });
       return res.status(500).json({ error: 'Failed to fetch user' });
     }
 
-    return res.json({ success: true, user: data });
+    return res.json({ success: true, user: data, created: !!result.created });
   } catch (ex: any) {
     console.error('[auth/firebaseLogin] token verification failed', ex);
     return res.status(401).json({ error: 'Invalid or expired ID token' });
@@ -425,7 +433,7 @@ export const listAllUsers: RequestHandler = async (req, res) => {
   const chk = await requireAdmin(req);
   if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
   try {
-    const { data, error } = await supabase.from('users').select('id, email, role').order('email');
+    const { data, error } = await supabase.from('users').select('id, email, role, first_name, last_name').order('email');
     if (error) return res.status(500).json({ error: error.message || 'Failed to list users' });
     return res.json({ success: true, users: data || [] });
   } catch (ex) {
@@ -443,7 +451,7 @@ export const updateUserRole: RequestHandler = async (req, res) => {
   if (!id) return res.status(400).json({ error: 'user id required' });
 
   try {
-    const { data, error } = await supabase.from('users').update({ role }).eq('id', id).select('id, email, role').maybeSingle();
+    const { data, error } = await supabase.from('users').update({ role }).eq('id', id).select('id, email, role, first_name, last_name').maybeSingle();
     if (error) return res.status(500).json({ error: error.message || 'Failed to update role' });
     if (!data) return res.status(404).json({ error: 'User not found' });
     return res.json({ success: true, user: data });

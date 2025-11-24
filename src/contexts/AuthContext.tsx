@@ -108,7 +108,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (r === 'admin') return 'admin' as Role;
           return (u.role as Role) || 'user';
         })(serverUser?.role) as Role,
-        name: serverUser?.name || u.name,
+        name: (function deriveName(srv: any, providedName?: string) {
+          if (!srv) return providedName;
+          const f = srv?.first_name || null;
+          const l = srv?.last_name || null;
+          if (f || l) return `${(f || '').trim()} ${(l || '').trim()}`.trim();
+          return srv?.name || providedName;
+        })(serverUser, u.name),
       };
 
       if (!finalUser.id) {

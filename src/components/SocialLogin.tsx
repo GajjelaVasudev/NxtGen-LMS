@@ -33,6 +33,10 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
         if (resp.ok) {
           const body = await resp.json().catch(() => ({}));
           if (body?.user) {
+            // If server reports the user was just created, set a transient flag so Overview shows a welcome message
+            try {
+              if (body.created) localStorage.setItem('nxtgen_justSignedUp', '1');
+            } catch {}
             await login(body.user);
             window.location.href = "/dashboard";
             return;
