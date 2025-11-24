@@ -47,7 +47,7 @@ export default function Gradeass() {
       const res = await fetch(`${API}/submissions/${submissionId}/grade`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
-        body: JSON.stringify({ grade, feedback: payload.feedback })
+        body: JSON.stringify({ submissionId, grade, feedback: payload.feedback })
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to grade');

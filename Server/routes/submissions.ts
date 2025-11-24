@@ -170,6 +170,57 @@ export const listInstructorSubmissions: RequestHandler = async (req, res) => {
   }
 };
 
+// GET /api/submissions/:submissionId/file
+export const getSubmissionFile: RequestHandler = async (req, res) => {
+  try {
+    const submissionId = req.params.submissionId;
+    console.log('[submission/file] incoming for', submissionId);
+    const { data: submission, error } = await supabase.from('assignment_submissions').select('*').eq('id', submissionId).maybeSingle();
+    if (error) {
+      console.error('[submission/file] DB error', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    if (!submission) return res.status(404).json({ success: false, error: 'Submission not found' });
+
+    const content = (submission as any).content || {};
+    const url = content.imageUrl || content.fileUrl || content.file_url || content.url || null;
+    if (!url) return res.status(404).json({ success: false, error: 'No file attached to submission' });
+
+    // If the url is a data URL (base64), return it as a download
+    if (typeof url === 'string' && url.startsWith('data:')) {
+      // data:[<mediatype>][;base64],<data>
+      const matches = url.match(/^data:(.+?);base64,(.+)$/);
+      if (!matches) return res.status(400).json({ success: false, error: 'Invalid data URL' });
+      const mime = matches[1] || 'application/octet-stream';
+      const b64 = matches[2] || '';
+      const buf = Buffer.from(b64, 'base64');
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Length', String(buf.length));
+      // attachment with filename derived from submission id
+      res.setHeader('Content-Disposition', `attachment; filename="submission-${submissionId}"`);
+      return res.send(buf);
+    }
+
+    // If the url is an absolute http(s) URL, redirect
+    if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+      return res.redirect(url);
+    }
+
+    // Otherwise, treat as relative path under public/ or uploads/ - attempt to serve
+    const path = await import('path');
+    const fs = await import('fs');
+    const root = path.join(process.cwd(), 'public');
+    const filePath = path.join(root, url as string);
+    // ensure filePath is within root
+    if (!filePath.startsWith(root)) return res.status(400).json({ success: false, error: 'Invalid file path' });
+    if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'File not found on server' });
+    return res.sendFile(filePath);
+  } catch (err: any) {
+    console.error('[submission/file] unexpected error', err);
+    return res.status(500).json({ success: false, error: 'Unexpected server error' });
+  }
+};
+
 // PATCH /api/submissions/:submissionId/grade
 export const gradeSubmission: RequestHandler = async (req, res) => {
   try {
@@ -183,17 +234,14 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
       if (!canonical) return res.status(401).json({ success: false, error: 'graderId could not be canonicalized' });
       graderId = canonical;
     }
-
-    // Verify role
-    const { data: userData, error: userErr } = await supabase.from('users').select('role').eq('id', graderId).single();
+    // Verify grader exists and role
+    const { data: userData, error: userErr } = await supabase.from('users').select('role').eq('id', graderId).maybeSingle();
     if (userErr) {
       console.error('[grade] user lookup error', userErr);
       return res.status(500).json({ success: false, error: 'Failed to verify grader' });
     }
     const role = (userData as any)?.role;
-    if (!role || (role !== 'instructor' && role !== 'admin')) {
-      return res.status(403).json({ success: false, error: 'Only instructors or admins can grade submissions' });
-    }
+    if (!role) return res.status(403).json({ success: false, error: 'Forbidden: grader not found' });
 
     const payload = req.body || {};
     const update: any = {};
@@ -201,18 +249,45 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
     if (typeof payload.feedback !== 'undefined') update.feedback = payload.feedback;
     if (Object.keys(update).length === 0) return res.status(400).json({ success: false, error: 'No update fields provided' });
 
+    // Fetch submission and related assignment to verify permission and existence
+    const { data: existingSubmission, error: subErr } = await supabase.from('assignment_submissions').select('*').eq('id', submissionId).maybeSingle();
+    if (subErr) {
+      console.error('[grade] submission lookup error', subErr);
+      return res.status(500).json({ success: false, error: 'Failed to lookup submission' });
+    }
+    if (!existingSubmission) return res.status(404).json({ success: false, error: 'Submission not found' });
+
+    const assignmentId = (existingSubmission as any).assignment_id;
+    const { data: assignmentRow, error: assignErr } = await supabase.from('assignments').select('*').eq('id', assignmentId).maybeSingle();
+    if (assignErr) {
+      console.error('[grade] assignment lookup error', assignErr);
+      return res.status(500).json({ success: false, error: 'Failed to lookup assignment' });
+    }
+
+    // Instructor must be assignment creator OR admin
+    if (role !== 'admin') {
+      if (!assignmentRow) return res.status(400).json({ success: false, error: 'Assignment not found for submission' });
+      const createdBy = (assignmentRow as any).created_by;
+      if (createdBy !== graderId) {
+        return res.status(403).json({ success: false, error: 'Forbidden: you do not own this assignment' });
+      }
+    }
+
     update.graded_by = graderId;
     update.graded_at = new Date().toISOString();
     update.status = 'graded';
 
-    const { data, error } = await supabase.from('assignment_submissions').update(update).eq('id', submissionId).select().single();
+    const { data, error } = await supabase.from('assignment_submissions').update(update).eq('id', submissionId).select().maybeSingle();
     if (error) {
       console.error('[grade] Supabase update error', error);
       return res.status(500).json({ success: false, error: error.message });
     }
 
     console.log('[grade] updated submission', submissionId);
-    return res.json({ success: true, data });
+
+    // return richer payload: include user_id and assignment title
+    const assignmentTitle = assignmentRow ? (assignmentRow as any).title : null;
+    return res.json({ success: true, data: { ...(data || {}), user_id: existingSubmission.user_id, assignment_title: assignmentTitle } });
   } catch (err: any) {
     console.error('[grade] unexpected error', err);
     return res.status(500).json({ success: false, error: 'Unexpected server error' });
