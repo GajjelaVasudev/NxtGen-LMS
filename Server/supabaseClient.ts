@@ -1,18 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
+import './loadEnv.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Load .env from current working directory first (common case)
-dotenv.config();
-
-// If the Supabase vars are not present, attempt to load the .env located next to this file (Server/.env)
+// loadEnv runs automatically on import; ensure the SUPABASE-specific Server/.env
+// is also considered (loadEnv already reads Server/.env located next to this file).
+// No further dotenv.config() calls are necessary and we avoid overwriting existing env vars.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-if (!process.env.SUPABASE_URL || !(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)) {
-  const envPath = path.join(__dirname, '.env');
-  dotenv.config({ path: envPath });
-}
 
 const url = process.env.SUPABASE_URL;
 const anon = process.env.SUPABASE_ANON_KEY;

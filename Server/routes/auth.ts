@@ -79,27 +79,55 @@ const transporter = ((): nodemailer.Transporter | null => {
 // Structure: token -> { email, firstName, lastName, password, expiresAt }
 const VERIFICATION_STORE = new Map<string, { email: string; firstName?: string; lastName?: string; password?: string; expiresAt: number }>();
 
-function sendVerificationEmail(to: string, token: string) {
+async function sendVerificationEmail(to: string, token: string) {
   const from = process.env.EMAIL_FROM || "noreply@example.com";
   const clientUrl = process.env.CLIENT_URL || (process.env.NODE_ENV === 'production' ? 'https://nxt-gen-lms.vercel.app' : 'http://localhost:5173');
   const link = `${clientUrl}/verify-email?token=${encodeURIComponent(token)}`;
   const subject = "Verify your email for NxtGen LMS";
   const text = `Thanks for signing up.\n\nPlease verify your email by clicking the link below:\n\n${link}\n\nIf the link doesn't work, you can copy/paste it in your browser. This link expires in 24 hours.`;
-  // If transporter configured, use it. If not configured and we're in production
-  // or REQUIRE_SMTP=true, fail loudly so emails don't silently vanish.
+
+  // If transporter configured, attempt to send with a few retries for transient failures.
+  // If all attempts fail, honor SMTP_FAIL_OPEN=true to fall back to logging the link
+  // (useful for staging or when you prefer UX continuity over strict delivery).
   if (transporter) {
-    return transporter.sendMail({ from, to, subject, text });
+    const maxAttempts = Number(process.env.SMTP_MAX_RETRIES || '2');
+    const failOpen = String(process.env.SMTP_FAIL_OPEN || '').toLowerCase() === 'true';
+    let lastErr: any = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await transporter.sendMail({ from, to, subject, text });
+        if (attempt > 1) console.log(`[VERIFICATION] sendMail succeeded on attempt ${attempt} for ${to}`);
+        return;
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[VERIFICATION] sendMail attempt ${attempt} failed for ${to}`, { err: String(err) });
+        // small backoff
+        await new Promise((r) => setTimeout(r, attempt * 500));
+      }
+    }
+
+    const msg = `[VERIFICATION] Failed to send verification email to ${to} after ${maxAttempts} attempts: ${String(lastErr)}`;
+    if (failOpen) {
+      console.error(msg + ' — falling back to logged verification link due to SMTP_FAIL_OPEN=true');
+      console.log(`[VERIFICATION][fallback] verification link for ${to}: ${link}`);
+      return;
+    }
+
+    console.error(msg);
+    // Propagate last error to caller so it can decide how to respond
+    return Promise.reject(lastErr);
   }
 
+  // No transporter configured
   const requireSmtp = String(process.env.REQUIRE_SMTP || '').toLowerCase() === 'true' || process.env.NODE_ENV === 'production';
-  const msg = `[VERIFICATION][dev] SMTP not configured; verification link for ${to}: ${link}`;
+  const devMsg = `[VERIFICATION][dev] SMTP not configured; verification link for ${to}: ${link}`;
   if (requireSmtp) {
-    console.error(msg);
-    return Promise.reject(new Error('SMTP not configured; set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS')); 
+    console.error(devMsg);
+    return Promise.reject(new Error('SMTP not configured; set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS'));
   }
 
   // In non-production, log the link so developers can copy/paste it for testing
-  console.log(msg);
+  console.log(devMsg);
   return Promise.resolve();
 }
 
