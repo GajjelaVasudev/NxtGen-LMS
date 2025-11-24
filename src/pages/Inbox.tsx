@@ -110,10 +110,10 @@ export default function Inbox() {
   });
 
   return (
-    <main className="flex-1 min-h-0 flex bg-gray-50">
+    <main className="h-screen flex bg-gray-50">
       <div className="flex-1 min-h-0 flex">
         {/* Message List */}
-        <div className="w-80 bg-white border-r flex flex-col">
+        <div className="w-80 bg-white border-r flex flex-col min-h-0">
           <div className="p-4 border-b">
             <div className="flex items-center justify-between mb-3">
               <h1 className="text-lg font-bold">Inbox</h1>
@@ -171,13 +171,12 @@ export default function Inbox() {
                 </div>
               </div>
 
-              <div className="flex-1 p-4 bg-white overflow-y-auto min-h-0">
+              <div className="flex-1 p-4 bg-white overflow-auto min-h-0">
                 <div className="prose max-w-none">
                   <p className="text-gray-700 whitespace-pre-wrap">{selectedMessage.content}</p>
                 </div>
               </div>
-
-              <div className="p-4 border-t bg-white">
+              <div className="p-4 border-t bg-white flex-shrink-0">
                 <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
                   <div className="flex gap-2">
                     <input value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Reply subject" className="flex-1 border px-3 py-2 rounded" />
