@@ -27,9 +27,11 @@ async function apiUpdateCourse(id: string, course: any) {
 async function apiFetchAllCourses() {
   return fetch(`${API}/courses`).then(r => r.json()).catch(() => ({ courses: [] }));
 }
-async function apiDeleteCourse(id: string) {
+async function apiDeleteCourse(id: string, userId?: string) {
   try {
-    const res = await fetch(`${API}/courses/${id}`, { method: "DELETE" });
+    const headers: Record<string, string> = {};
+    if (userId) headers['x-user-id'] = userId;
+    const res = await fetch(`${API}/courses/${id}`, { method: "DELETE", headers: Object.keys(headers).length ? headers : undefined });
     // try to parse JSON; if parsing fails, return a safe shape
     const json = await res.json().catch(() => ({}));
     // normalize to { success: boolean, error?: string }
@@ -62,7 +64,7 @@ export default function ManageCourse() {
 
   async function onDelete(id: string) {
     if (!confirm("Delete this course?")) return;
-    const res = await apiDeleteCourse(id);
+    const res = await apiDeleteCourse(id, user?.id);
     // apiDeleteCourse returns the parsed JSON from the server, e.g. { success: true }
     if (res && res.success === true) {
       setCourses((c) => c.filter((x: any) => x.id !== id));
