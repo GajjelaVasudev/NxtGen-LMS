@@ -21,9 +21,29 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
         return;
       }
 
-      // Use existing client-side login which will canonicalize via server if available
+      // Get ID token from Firebase client and post to server to obtain canonical user
+      try {
+        const idToken = await fbUser.getIdToken();
+        const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+        const resp = await fetch(`${API}/auth/firebase-login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
+        if (resp.ok) {
+          const body = await resp.json().catch(() => ({}));
+          if (body?.user) {
+            await login(body.user);
+            window.location.href = "/dashboard";
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('firebase-login failed, falling back to client login', err);
+      }
+
+      // Fallback to client-side login/canonicalization
       await login({ email, name });
-      // Redirect to dashboard after login
       window.location.href = "/dashboard";
     } catch (err: any) {
       console.error("Firebase social login failed:", err);

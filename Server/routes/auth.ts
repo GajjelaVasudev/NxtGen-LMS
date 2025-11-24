@@ -1,6 +1,7 @@
 import { RequestHandler } from "express";
 import nodemailer from "nodemailer";
 import { supabase } from "../supabaseClient.js";
+import admin from "firebase-admin";
 
 type UserRecord = {
   id: string;
@@ -73,6 +74,20 @@ const transporter = ((): nodemailer.Transporter | null => {
   }
   return null;
 })();
+
+// Initialize Firebase Admin SDK if service account JSON provided via env
+const _svc = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+if (_svc) {
+  try {
+    const svc = JSON.parse(_svc);
+    admin.initializeApp({ credential: admin.credential.cert(svc as admin.ServiceAccount) });
+    console.log('[firebase-admin] initialized');
+  } catch (ex) {
+    console.warn('[firebase-admin] failed to parse FIREBASE_SERVICE_ACCOUNT_JSON', ex);
+  }
+} else {
+  console.warn('[firebase-admin] not configured (FIREBASE_SERVICE_ACCOUNT_JSON missing)');
+}
 
 function sendOtpEmail(to: string, code: string) {
   const from = process.env.EMAIL_FROM || "noreply@example.com";
@@ -357,6 +372,85 @@ export const socialLogin: RequestHandler = async (req, res) => {
   }
 
   return res.json({ success: true, user: userWithoutPassword, provider });
+};
+
+// Verify Firebase ID token and return canonical DB user (creates student by default)
+export const firebaseLogin: RequestHandler = async (req, res) => {
+  const { idToken } = req.body || {};
+  if (!idToken) return res.status(400).json({ error: 'idToken required' });
+  if (!admin.apps?.length) return res.status(500).json({ error: 'Server not configured for Firebase token verification' });
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const email = String(decoded.email || '').toLowerCase();
+    const name = String(decoded.name || email.split('@')[0]);
+    if (!email) return res.status(400).json({ error: 'No email present in token' });
+
+    // Ensure DB user exists with default student role
+    const result = await getOrCreateUserInDb(email, 'student');
+    if (result.error || !result.id) {
+      console.warn('[auth/firebaseLogin] failed to ensure DB user', { email, err: result.error });
+      return res.status(500).json({ error: 'Failed to ensure user in DB' });
+    }
+
+    const { data, error } = await supabase.from('users').select('id, email, role').eq('id', result.id).maybeSingle();
+    if (error || !data) {
+      console.warn('[auth/firebaseLogin] failed to fetch created user', { id: result.id, error });
+      return res.status(500).json({ error: 'Failed to fetch user' });
+    }
+
+    return res.json({ success: true, user: data });
+  } catch (ex: any) {
+    console.error('[auth/firebaseLogin] token verification failed', ex);
+    return res.status(401).json({ error: 'Invalid or expired ID token' });
+  }
+};
+
+// Helper to ensure requester is an admin based on x-user-id header
+async function requireAdmin(req: any) {
+  const reqId = String(req.headers['x-user-id'] || '');
+  if (!reqId) return { ok: false, status: 401, msg: 'x-user-id header required' };
+  try {
+    const { data: user, error } = await supabase.from('users').select('id, role').eq('id', reqId).maybeSingle();
+    if (error || !user) return { ok: false, status: 401, msg: 'Requester not found' };
+    if (String(user.role) !== 'admin') return { ok: false, status: 403, msg: 'admin role required' };
+    return { ok: true, user };
+  } catch (ex) {
+    return { ok: false, status: 500, msg: 'failed to verify admin' };
+  }
+}
+
+// Admin: list all users
+export const listAllUsers: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
+  try {
+    const { data, error } = await supabase.from('users').select('id, email, role').order('email');
+    if (error) return res.status(500).json({ error: error.message || 'Failed to list users' });
+    return res.json({ success: true, users: data || [] });
+  } catch (ex) {
+    console.error('[admin/listAllUsers] err', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
+};
+
+// Admin: update a user's role
+export const updateUserRole: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
+  const id = String(req.params.id || '');
+  const role = normalizeRoleForDb(String(req.body?.role || 'student'));
+  if (!id) return res.status(400).json({ error: 'user id required' });
+
+  try {
+    const { data, error } = await supabase.from('users').update({ role }).eq('id', id).select('id, email, role').maybeSingle();
+    if (error) return res.status(500).json({ error: error.message || 'Failed to update role' });
+    if (!data) return res.status(404).json({ error: 'User not found' });
+    return res.json({ success: true, user: data });
+  } catch (ex) {
+    console.error('[admin/updateUserRole] err', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
 };
 
 // User requests elevated role (teacher/contentCreator/admin) — creates or updates requestedRole

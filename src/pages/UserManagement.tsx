@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Users,
   Search,
@@ -148,6 +149,7 @@ const userGroups: UserGroup[] = [
 ];
 
 export default function UserManagement() {
+  const { user } = useAuth();
   const [currentTab, setCurrentTab] = useState<"users" | "roles" | "access" | "groups" | "activity" | "profile" | "notifications">("users");
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>(() => {
     const stored = localStorage.getItem(ADMIN_STORAGE);
@@ -204,6 +206,37 @@ export default function UserManagement() {
     localStorage.setItem(ADMIN_STORAGE, JSON.stringify({ users: systemUsers, roles: permissionRoles, groups }));
   }, [systemUsers, permissionRoles, groups]);
 
+  // Fetch real users from server if current user is admin (fallback to local data otherwise)
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!user?.id) return;
+        const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+        const res = await fetch(`${API}/admin/users`, { headers: { 'x-user-id': user.id } });
+        if (!res.ok) {
+          console.warn('Failed to fetch admin users', res.status);
+          return;
+        }
+        const body = await res.json().catch(() => ({}));
+        if (body?.users && Array.isArray(body.users)) {
+          // map server rows into SystemUser shape conservatively
+          const mapped = body.users.map((u: any) => ({
+            id: u.id || String(Date.now()),
+            name: u.email?.split('@')[0] || u.email || 'User',
+            email: u.email || '',
+            role: u.role === 'content_creator' ? 'contentCreator' : (u.role === 'student' ? 'user' : u.role),
+            status: 'active',
+            lastLogin: 'Unknown',
+            joinedDate: 'Unknown'
+          }));
+          setSystemUsers(mapped);
+        }
+      } catch (e) {
+        console.warn('admin users fetch failed', e);
+      }
+    })();
+  }, [user]);
+
   // Apply filters
   const displayedUsers = systemUsers.filter(user => {
     const textMatch = user.name.toLowerCase().includes(filterText.toLowerCase()) ||
@@ -233,6 +266,30 @@ export default function UserManagement() {
     setSystemUsers(systemUsers.map(u => u.id === userId ? { ...u, ...changes } : u));
     setDisplayEditUser(false);
     setActiveUser(null);
+  };
+
+  // Update a user's role on the server (admin only) and update local state
+  const updateUserRoleOnServer = async (userId: string, newRole: string) => {
+    try {
+      if (!user?.id) return alert('You must be signed in as an admin');
+      const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+      const res = await fetch(`${API}/admin/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+        body: JSON.stringify({ role: newRole }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return alert('Failed to update role: ' + (body?.error || res.statusText));
+      }
+      const body = await res.json().catch(() => ({}));
+      if (body?.user) {
+        setSystemUsers(systemUsers.map(u => u.id === userId ? { ...u, role: body.user.role === 'content_creator' ? 'contentCreator' : (body.user.role === 'student' ? 'user' : body.user.role) } : u));
+      }
+    } catch (ex) {
+      console.error('updateUserRoleOnServer failed', ex);
+      alert('Failed to update role');
+    }
   };
 
   const removeUser = (userId: string) => {
