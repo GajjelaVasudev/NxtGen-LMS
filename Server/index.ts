@@ -244,6 +244,34 @@ export function createServer() {
   app.put("/api/submissions/:submissionId", updateSubmission);
   // Discussions and direct-messages removed: Inbox handles notifications, teacher and admin messages
 
+  // Global error handler to log unexpected errors and return JSON
+  // Placed after all routes so any thrown error is caught here.
+  // In non-production include the stack trace for debugging.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    try {
+      console.error('[Unhandled Error]', {
+        message: err?.message,
+        stack: err?.stack,
+        method: req.method,
+        url: req.originalUrl,
+        body: req.body,
+      });
+    } catch (logErr) {
+      console.error('[Unhandled Error] logging failed', logErr);
+    }
+
+    const status = err?.status || 500;
+    const payload: any = { success: false, message: err?.message || 'Internal server error' };
+    if (process.env.NODE_ENV !== 'production') payload.error = err?.stack;
+    try {
+      res.status(status).json(payload);
+    } catch (resErr) {
+      // If JSON response fails, fallback to plain text
+      try { res.status(status).send(payload.message || 'Internal server error'); } catch (_) { /* noop */ }
+    }
+  });
+
   return app;
 }
 
