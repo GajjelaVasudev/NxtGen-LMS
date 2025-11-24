@@ -82,6 +82,39 @@ export const updateCourse: RequestHandler = async (req, res) => {
 export const deleteCourse: RequestHandler = async (req, res) => {
   try {
     const id = req.params.id;
+
+    // Require authenticated user (via x-user-id header)
+    let requester = String(req.headers["x-user-id"] || "");
+    if (!requester) return res.status(401).json({ error: 'Missing x-user-id header' });
+    if (!requester.includes('-')) {
+      const { canonicalizeUserId } = await import("../utils/userHelpers.js");
+      const canonical = await canonicalizeUserId(requester);
+      if (!canonical) return res.status(401).json({ error: 'Invalid requester id' });
+      requester = canonical;
+    }
+
+    // Fetch course to get owner
+    const { data: courseRow, error: courseErr } = await supabase.from('courses').select('id, owner_id').eq('id', id).maybeSingle();
+    if (courseErr) {
+      console.error('[deleteCourse] course lookup error', courseErr);
+      return res.status(500).json({ error: courseErr.message });
+    }
+    if (!courseRow) return res.status(404).json({ error: 'Course not found' });
+
+    // Fetch requester role
+    const { data: userRow, error: userErr } = await supabase.from('users').select('id, role').eq('id', requester).maybeSingle();
+    if (userErr) {
+      console.error('[deleteCourse] user lookup error', userErr);
+      return res.status(500).json({ error: userErr.message });
+    }
+    const role = (userRow as any)?.role || null;
+
+    // Only owner or admin allowed
+    if (role !== 'admin' && String((courseRow as any).owner_id) !== requester) {
+      console.warn('[deleteCourse] forbidden delete attempt', { requester, courseOwner: (courseRow as any).owner_id });
+      return res.status(403).json({ error: 'Forbidden: only course owner or admin may delete this course' });
+    }
+
     const { error } = await supabase.from("courses").delete().eq("id", id);
     if (error) {
       console.error("Supabase deleteCourse error:", error);

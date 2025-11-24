@@ -28,13 +28,25 @@ async function apiFetchAllCourses() {
   return fetch(`${API}/courses`).then(r => r.json()).catch(() => ({ courses: [] }));
 }
 async function apiDeleteCourse(id: string) {
-  return fetch(`${API}/courses/${id}`, { method: "DELETE" }).then(r => r.json()).catch(() => ({ ok: false }));
+  try {
+    const res = await fetch(`${API}/courses/${id}`, { method: "DELETE" });
+    // try to parse JSON; if parsing fails, return a safe shape
+    const json = await res.json().catch(() => ({}));
+    // normalize to { success: boolean, error?: string }
+    if (json && typeof json === 'object') {
+      return { success: Boolean((json as any).success === true), error: (json as any).error || undefined };
+    }
+    return { success: res.ok };
+  } catch (err: any) {
+    return { success: false, error: String(err) };
+  }
 }
 
 export default function ManageCourse() {
   const { user } = useAuth();
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,53 +63,67 @@ export default function ManageCourse() {
   async function onDelete(id: string) {
     if (!confirm("Delete this course?")) return;
     const res = await apiDeleteCourse(id);
-    if (res.ok) {
+    // apiDeleteCourse returns the parsed JSON from the server, e.g. { success: true }
+    if (res && res.success === true) {
       setCourses((c) => c.filter((x: any) => x.id !== id));
+      setToast({ type: 'success', message: 'Course deleted' });
+      setTimeout(() => setToast(null), 3000);
     } else {
-      alert("Failed to delete course");
+      console.error('Delete failed response', res);
+      setToast({ type: 'error', message: 'Failed to delete course' });
+      setTimeout(() => setToast(null), 4000);
     }
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto bg-white">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Manage Courses</h1>
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/app/managecourse/add')} className="px-4 py-2 bg-blue-600 text-white rounded">Create Course</button>
+    <>
+      <div className="flex-1 min-h-0 overflow-y-auto bg-white">
+        <div className="max-w-6xl mx-auto p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-bold">Manage Courses</h1>
+            <div className="flex items-center gap-2">
+              <button onClick={() => navigate('/app/managecourse/add')} className="px-4 py-2 bg-blue-600 text-white rounded">Create Course</button>
+            </div>
           </div>
-        </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-gray-500">Loading...</div>
-        ) : courses.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600 mb-4">No courses yet.</p>
-            <button onClick={() => navigate('/app/managecourse/add')} className="px-4 py-2 bg-blue-600 text-white rounded">Add your first course</button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {courses.map((c) => (
-              <div key={c.id} className="p-4 border rounded bg-gray-50 flex items-start gap-4">
-                {c.thumbnail && <img src={c.thumbnail} alt={c.title} className="w-28 h-20 object-cover rounded" />}
-                <div className="flex-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-semibold">{c.title}</div>
-                      <div className="text-xs text-gray-500">{c.description}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Link to={`/app/managecourse/edit/${c.id}`} className="text-blue-600">Edit</Link>
-                      <button onClick={() => onDelete(c.id)} className="text-red-600">Delete</button>
+          {loading ? (
+            <div className="text-center py-12 text-gray-500">Loading...</div>
+          ) : courses.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600 mb-4">No courses yet.</p>
+              <button onClick={() => navigate('/app/managecourse/add')} className="px-4 py-2 bg-blue-600 text-white rounded">Add your first course</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {courses.map((c) => (
+                <div key={c.id} className="p-4 border rounded bg-gray-50 flex items-start gap-4">
+                  {c.thumbnail && <img src={c.thumbnail} alt={c.title} className="w-28 h-20 object-cover rounded" />}
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="font-semibold">{c.title}</div>
+                        <div className="text-xs text-gray-500">{c.description}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link to={`/app/managecourse/edit/${c.id}`} className="text-blue-600">Edit</Link>
+                        <button onClick={() => onDelete(c.id)} className="text-red-600">Delete</button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className={`px-4 py-2 rounded shadow-lg ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+            {toast.message}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
