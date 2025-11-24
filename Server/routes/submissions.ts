@@ -296,11 +296,6 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
 
     update.graded_by = graderId;
     update.graded_at = new Date().toISOString();
-    update.status = 'graded';
-
-    update.graded_by = graderId;
-    update.graded_at = new Date().toISOString();
-    update.status = 'graded';
 
     // Perform update and log result
     let { data, error } = await supabase
@@ -400,7 +395,6 @@ export const updateSubmission: RequestHandler = async (req, res) => {
     if (Object.keys(update).length === 0) return res.status(400).json({ success: false, error: "No update fields provided" });
     update.graded_by = updaterId;
     update.graded_at = new Date().toISOString();
-    update.status = "graded";
 
     const { data, error } = await supabase.from("assignment_submissions").update(update).eq("id", submissionId).select().single();
     if (error) {
