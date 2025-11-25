@@ -17,6 +17,7 @@ import Inbox from "@/pages/Inbox";
 import Settings from "@/pages/Settings";
 import Reports from "@/pages/Reports";
 import ManageRoles from "@/pages/ManageRoles";
+import RoleGuard from "@/components/RoleGuard";
 import Gradeass from "@/pages/Gradeass";
 import UserManagement from "@/pages/UserManagement";
 
@@ -64,9 +65,9 @@ export default function DashboardLayout() {
 
               {/* Reports / Admin */}
               <Route path="reports" element={<Reports />} />
-              <Route path="managerole" element={<ManageRoles />} />
+              <Route path="managerole" element={<RoleGuard roles="admin"><ManageRoles /></RoleGuard>} />
               <Route path="gradeass" element={<Gradeass />} />
-              <Route path="user-management" element={<UserManagement />} />
+              <Route path="user-management" element={<RoleGuard roles="admin"><UserManagement /></RoleGuard>} />
             </Routes>
           </div>
         </div>

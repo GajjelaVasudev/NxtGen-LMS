@@ -416,14 +416,40 @@ export const firebaseLogin: RequestHandler = async (req, res) => {
 
 // Helper to ensure requester is an admin based on x-user-id header
 async function requireAdmin(req: any) {
-  const reqId = String(req.headers['x-user-id'] || '');
-  if (!reqId) return { ok: false, status: 401, msg: 'x-user-id header required' };
+  // Prefer Authorization Bearer token when available (validate via Supabase)
   try {
+    const authHeader = String(req.headers['authorization'] || '');
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      const token = authHeader.slice(7).trim();
+      if (token) {
+        try {
+          // Try to get user from Supabase using the token
+          // supabase.auth.getUser returned object shape may vary across SDK versions
+          const userResp: any = await (supabase as any).auth.getUser?.(token) || (await (supabase as any).auth.api?.getUser?.(token));
+          const foundUser = userResp?.data?.user || userResp?.user || null;
+          if (foundUser && foundUser.id) {
+            // Confirm role from DB row
+            const { data: dbUser, error: dbErr } = await supabase.from('users').select('id, role').eq('id', foundUser.id).maybeSingle();
+            if (dbErr || !dbUser) return { ok: false, status: 401, msg: 'Requester not found' };
+            if (String(dbUser.role) !== 'admin') return { ok: false, status: 403, msg: 'admin role required' };
+            return { ok: true, user: dbUser };
+          }
+        } catch (tokenErr) {
+          console.warn('[requireAdmin] token validation failed', tokenErr?.message || tokenErr);
+          // fall through to x-user-id fallback
+        }
+      }
+    }
+
+    // Fallback: legacy x-user-id header (keeps compatibility with existing clients)
+    const reqId = String(req.headers['x-user-id'] || '');
+    if (!reqId) return { ok: false, status: 401, msg: 'x-user-id header required' };
     const { data: user, error } = await supabase.from('users').select('id, role').eq('id', reqId).maybeSingle();
     if (error || !user) return { ok: false, status: 401, msg: 'Requester not found' };
     if (String(user.role) !== 'admin') return { ok: false, status: 403, msg: 'admin role required' };
     return { ok: true, user };
   } catch (ex) {
+    console.error('[requireAdmin] unexpected error', ex);
     return { ok: false, status: 500, msg: 'failed to verify admin' };
   }
 }
@@ -454,6 +480,17 @@ export const updateUserRole: RequestHandler = async (req, res) => {
     const { data, error } = await supabase.from('users').update({ role }).eq('id', id).select('id, email, role, first_name, last_name').maybeSingle();
     if (error) return res.status(500).json({ error: error.message || 'Failed to update role' });
     if (!data) return res.status(404).json({ error: 'User not found' });
+
+    // Attempt to write a simple audit entry. If the audit table doesn't exist, don't fail the request.
+    try {
+      const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+      const metadata = { changedBy: adminId, newRole: role, targetUser: id, timestamp: new Date().toISOString() };
+      await supabase.from('admin_audit').insert([{ action: 'update_user_role', admin_id: adminId, target_user_id: id, metadata }]);
+    } catch (auditErr) {
+      // Non-fatal: audit failed (table may not exist), log and continue
+      console.warn('[admin/updateUserRole] audit insert failed', auditErr?.message || auditErr);
+    }
+
     return res.json({ success: true, user: data });
   } catch (ex) {
     console.error('[admin/updateUserRole] err', ex);
@@ -480,20 +517,18 @@ export const requestRole: RequestHandler = (req, res) => {
 };
 
 // Admin: list pending role requests (protected by ADMIN_SECRET header)
-export const listRoleRequests: RequestHandler = (_req, res) => {
-  const secret = process.env.ADMIN_SECRET || '';
-  const provided = (_req.headers['x-admin-secret'] || '') as string;
-  if (!secret || provided !== secret) return res.status(403).json({ error: 'admin secret required' });
+export const listRoleRequests: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
 
   const requests = REGISTERED_USERS.filter((u) => u.requestedRole).map((u) => ({ email: u.email, requestedRole: u.requestedRole, name: u.name }));
   return res.json({ requests });
 };
 
 // Admin: approve a role request
-export const approveRole: RequestHandler = (req, res) => {
-  const secret = process.env.ADMIN_SECRET || '';
-  const provided = (req.headers['x-admin-secret'] || '') as string;
-  if (!secret || provided !== secret) return res.status(403).json({ error: 'admin secret required' });
+export const approveRole: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
 
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email required' });
@@ -505,14 +540,23 @@ export const approveRole: RequestHandler = (req, res) => {
   user.requestedRole = null;
   user.approved = true;
   const { password: _, ...userWithoutPassword } = user;
+
+  // Audit
+  try {
+    const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+    const metadata = { action: 'approve_role', target: email, by: adminId, timestamp: new Date().toISOString() };
+    await supabase.from('admin_audit').insert([{ action: 'approve_role', admin_id: adminId, target_user_id: userWithoutPassword.id, metadata }]);
+  } catch (auditErr) {
+    console.warn('[admin/approveRole] audit insert failed', auditErr?.message || auditErr);
+  }
+
   return res.json({ success: true, user: userWithoutPassword });
 };
 
 // Admin: deny a role request
-export const denyRole: RequestHandler = (req, res) => {
-  const secret = process.env.ADMIN_SECRET || '';
-  const provided = (req.headers['x-admin-secret'] || '') as string;
-  if (!secret || provided !== secret) return res.status(403).json({ error: 'admin secret required' });
+export const denyRole: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
 
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email required' });
@@ -520,6 +564,16 @@ export const denyRole: RequestHandler = (req, res) => {
   if (!user) return res.status(404).json({ error: 'user not found' });
   user.requestedRole = null;
   user.approved = true; // keep as student
+
+  // Audit
+  try {
+    const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+    const metadata = { action: 'deny_role', target: email, by: adminId, timestamp: new Date().toISOString() };
+    await supabase.from('admin_audit').insert([{ action: 'deny_role', admin_id: adminId, target_user_id: user.id, metadata }]);
+  } catch (auditErr) {
+    console.warn('[admin/denyRole] audit insert failed', auditErr?.message || auditErr);
+  }
+
   return res.json({ success: true });
 };
 

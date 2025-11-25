@@ -1,24 +1,246 @@
-// src/pages/ManageRoles.tsx
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import ConfirmModal from '@/components/ConfirmModal';
+import { createClient } from '@supabase/supabase-js';
+
+function makeSupabase() {
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
+type RoleRequest = {
+  email: string;
+  requestedRole: string;
+  name?: string;
+};
+
 export default function ManageRoles() {
+  const { user } = useAuth();
+  const ENV_SECRET = (import.meta.env.VITE_ADMIN_SECRET as string) || '';
+  const [adminSecret, setAdminSecret] = useState<string>(ENV_SECRET);
+  const [requests, setRequests] = useState<RoleRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState<string | null>(null);
+  const [confirmActionType, setConfirmActionType] = useState<'approve' | 'deny' | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Try to fetch using current supabase session token first, else use env secret
+    (async () => {
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) {
+        try {
+          const resp: any = await supabase.auth.getSession?.();
+          token = resp?.data?.session?.access_token || null;
+        } catch (_) {
+          try {
+            // fallback to older SDK method
+            const r: any = await (supabase as any).auth.getUser?.();
+            token = r?.data?.user?.id || null;
+          } catch (_) { token = null; }
+        }
+      }
+
+      if (token) {
+        fetchRequests(undefined, token);
+        return;
+      }
+
+      if (ENV_SECRET) fetchRequests(ENV_SECRET);
+    })();
+  }, []);
+
+  async function fetchRequests(secret?: string, bearerToken?: string | null) {
+    setLoading(true);
+    setError(null);
+    try {
+      const headers: Record<string, string> = {};
+      if (bearerToken) headers['Authorization'] = `Bearer ${bearerToken}`;
+      else if (secret) headers['x-admin-secret'] = secret;
+
+      const res = await fetch('/api/auth/role-requests', { headers });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body?.error || `Failed to load requests (${res.status})`);
+        setRequests([]);
+      } else {
+        const body = await res.json();
+        setRequests(body?.requests || []);
+      }
+    } catch (ex: any) {
+      setError(String(ex?.message || ex));
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function performAction(email: string, action: 'approve' | 'deny') {
+    setActionLoading((s) => ({ ...s, [email]: true }));
+    try {
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) {
+        try {
+          const resp: any = await supabase.auth.getSession?.();
+          token = resp?.data?.session?.access_token || null;
+        } catch (_) { token = null; }
+      }
+
+      const endpoint = action === 'approve' ? '/api/auth/approve-role' : '/api/auth/deny-role';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else if (adminSecret) headers['x-admin-secret'] = adminSecret;
+      else return alert('Admin secret or authenticated admin session required to approve/deny requests');
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert('Action failed: ' + (body?.error || res.statusText));
+        return;
+      }
+      // remove from list and show success message
+      setRequests((r) => r.filter((q) => q.email.toLowerCase() !== email.toLowerCase()));
+      setSuccessMessage(`Successfully ${action}d role request for ${email}`);
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (ex: any) {
+      console.error('role action failed', ex);
+      alert('Action failed: ' + String(ex?.message || ex));
+    } finally {
+      setActionLoading((s) => ({ ...s, [email]: false }));
+    }
+  }
+
+  function openConfirm(email: string, action: 'approve' | 'deny') {
+    setConfirmEmail(email);
+    setConfirmActionType(action);
+    setConfirmOpen(true);
+  }
+
+  async function handleConfirm() {
+    if (!confirmEmail || !confirmActionType) return;
+    setConfirmOpen(false);
+    await performAction(confirmEmail, confirmActionType);
+    setConfirmEmail(null);
+    setConfirmActionType(null);
+  }
+
   return (
     <main className="flex-1 p-6 min-h-0 overflow-y-auto bg-white">
-      <div>
-        <h1 className="text-2xl font-bold text-nxtgen-text-primary mb-6">
-          Manage Roles
-        </h1>
-
-        {/* Example: Report cards or charts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white border border-nxtgen-border rounded-lg p-6 shadow-sm">
-            <h3 className="text-lg font-semibold">Report 1</h3>
-            <p>Some data or chart here</p>
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Manage Roles</h1>
+            <p className="text-sm text-gray-600 mt-1">Review and approve role elevation requests from users.</p>
           </div>
-          <div className="bg-white border border-nxtgen-border rounded-lg p-6 shadow-sm">
-            <h3 className="text-lg font-semibold">Report 2</h3>
-            <p>Some data or chart here</p>
+          <div className="text-right">
+            <div className="text-sm text-gray-600">Signed in as</div>
+            <div className="font-medium">{user?.email || 'Unknown'}</div>
           </div>
         </div>
+
+        <div className="mb-4 p-4 rounded border bg-gray-50">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <p className="text-sm text-gray-700">Admin approval requires a server-side admin secret.</p>
+              <p className="text-sm text-gray-500">Provide the admin secret below or set `VITE_ADMIN_SECRET` in your environment for automatic loading (not recommended for production clients).</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                value={adminSecret}
+                onChange={(e) => setAdminSecret(e.target.value)}
+                placeholder="Admin secret"
+                className="px-3 py-2 border rounded-md"
+              />
+              <button
+                onClick={() => fetchRequests(adminSecret)}
+                className="px-3 py-2 bg-blue-600 text-white rounded-md"
+                disabled={loading || !adminSecret}
+              >
+                {loading ? 'Loading…' : 'Load Requests'}
+              </button>
+            </div>
+          </div>
+          {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
+        </div>
+
+        <div className="bg-white border rounded-lg p-4">
+          <h2 className="text-lg font-semibold mb-4">Pending Role Requests</h2>
+          {loading && <div className="text-sm text-gray-500">Loading requests…</div>}
+          {successMessage && <div className="mb-3 text-sm text-green-700">{successMessage}</div>}
+          {!loading && requests.length === 0 && (
+            <div className="text-sm text-gray-600">No pending requests.</div>
+          )}
+
+          {!loading && requests.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full table-auto">
+                <thead>
+                  <tr className="text-left text-sm text-gray-600 border-b">
+                    <th className="px-3 py-2">Name</th>
+                    <th className="px-3 py-2">Email</th>
+                    <th className="px-3 py-2">Requested Role</th>
+                    <th className="px-3 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((r) => (
+                    <tr key={r.email} className="border-b hover:bg-gray-50">
+                      <td className="px-3 py-3 text-sm">{r.name || r.email.split('@')[0]}</td>
+                      <td className="px-3 py-3 text-sm">{r.email}</td>
+                      <td className="px-3 py-3 text-sm">{r.requestedRole}</td>
+                      <td className="px-3 py-3 text-sm">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openConfirm(r.email, 'approve')}
+                            disabled={!!actionLoading[r.email]}
+                            className="px-3 py-1 bg-green-600 text-white rounded-md"
+                          >
+                            {actionLoading[r.email] ? '…' : 'Approve'}
+                          </button>
+                          <button
+                            onClick={() => openConfirm(r.email, 'deny')}
+                            disabled={!!actionLoading[r.email]}
+                            className="px-3 py-1 bg-red-600 text-white rounded-md"
+                          >
+                            {actionLoading[r.email] ? '…' : 'Deny'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
+      {confirmOpen && (
+        <ConfirmModal
+          title={confirmActionType === 'approve' ? 'Approve Role Request' : 'Deny Role Request'}
+          message={
+            <div>
+              Are you sure you want to <strong>{confirmActionType}</strong> the role request for <strong>{confirmEmail}</strong>?
+            </div>
+          }
+          confirmText={confirmActionType === 'approve' ? 'Approve' : 'Deny'}
+          cancelText="Cancel"
+          onConfirm={handleConfirm}
+          onCancel={() => setConfirmOpen(false)}
+          loading={false}
+        />
+      )}
     </main>
   );
 }

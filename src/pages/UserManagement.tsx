@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { createClient } from '@supabase/supabase-js';
 import {
   Users,
   Search,
@@ -150,6 +151,14 @@ const userGroups: UserGroup[] = [
 
 export default function UserManagement() {
   const { user } = useAuth();
+  // Supabase + admin secret fallback
+  function makeSupabase() {
+    const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+    if (!url || !key) return null;
+    return createClient(url, key);
+  }
+  const ENV_SECRET = (import.meta.env.VITE_ADMIN_SECRET as string) || '';
   const [currentTab, setCurrentTab] = useState<"users" | "roles" | "access" | "groups" | "activity" | "profile" | "notifications">("users");
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>(() => {
     const stored = localStorage.getItem(ADMIN_STORAGE);
@@ -173,6 +182,9 @@ export default function UserManagement() {
   const [displayAddGroup, setDisplayAddGroup] = useState(false);
   const [activeUser, setActiveUser] = useState<SystemUser | null>(null);
   const [activeRole, setActiveRole] = useState<PermissionRole | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [toasts, setToasts] = useState<{ id: string; message: string; type?: 'success' | 'error' }[]>([]);
   
   // Authentication settings
   const [authMethods, setAuthMethods] = useState({
@@ -210,9 +222,23 @@ export default function UserManagement() {
   useEffect(() => {
     (async () => {
       try {
-        if (!user?.id) return;
         const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
-        const res = await fetch(`${API}/admin/users`, { headers: { 'x-user-id': user.id } });
+        // prefer Authorization Bearer token from supabase session
+        const supabase = makeSupabase();
+        let token: string | null = null;
+        if (supabase) {
+          try {
+            const resp: any = await supabase.auth.getSession?.();
+            token = resp?.data?.session?.access_token || null;
+          } catch (_) { token = null; }
+        }
+
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET; // DEV fallback only
+
+        setLoading(true);
+        const res = await fetch(`${API}/admin/users`, { headers });
         if (!res.ok) {
           console.warn('Failed to fetch admin users', res.status);
           return;
@@ -233,6 +259,8 @@ export default function UserManagement() {
         }
       } catch (e) {
         console.warn('admin users fetch failed', e);
+      } finally {
+        setLoading(false);
       }
     })();
   }, [user]);
@@ -270,31 +298,54 @@ export default function UserManagement() {
 
   // Update a user's role on the server (admin only) and update local state
   const updateUserRoleOnServer = async (userId: string, newRole: string) => {
+    setActionLoading((s) => ({ ...s, [userId]: true }));
     try {
-      if (!user?.id) return alert('You must be signed in as an admin');
       const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) {
+        try {
+          const resp: any = await supabase.auth.getSession?.();
+          token = resp?.data?.session?.access_token || null;
+        } catch (_) { token = null; }
+      }
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
+      else {
+        pushToast('error', 'Admin session or admin secret required');
+        return;
+      }
+
       const res = await fetch(`${API}/admin/users/${userId}/role`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+        headers,
         body: JSON.stringify({ role: newRole }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        return alert('Failed to update role: ' + (body?.error || res.statusText));
+        const msg = body?.error || res.statusText || 'Failed to update role';
+        pushToast('error', msg);
+        return;
       }
       const body = await res.json().catch(() => ({}));
       if (body?.user) {
         setSystemUsers(systemUsers.map(u => u.id === userId ? { ...u, role: body.user.role === 'content_creator' ? 'contentCreator' : (body.user.role === 'student' ? 'user' : body.user.role) } : u));
+        pushToast('success', 'Role updated');
       }
-    } catch (ex) {
+    } catch (ex: any) {
       console.error('updateUserRoleOnServer failed', ex);
-      alert('Failed to update role');
+      pushToast('error', String(ex?.message || ex));
+    } finally {
+      setActionLoading((s) => ({ ...s, [userId]: false }));
     }
   };
 
   const removeUser = (userId: string) => {
     if (window.confirm("Confirm user deletion?")) {
       setSystemUsers(systemUsers.filter(u => u.id !== userId));
+      pushToast('success', 'User removed');
     }
   };
 
@@ -304,7 +355,16 @@ export default function UserManagement() {
         ? { ...u, status: u.status === "active" ? "inactive" : "active" } 
         : u
     ));
+    pushToast('success', 'Status updated');
   };
+
+  function pushToast(type: 'success' | 'error', message: string) {
+    const id = String(Date.now()) + Math.random().toString(36).slice(2, 8);
+    setToasts((t) => [...t, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((t) => t.filter(x => x.id !== id));
+    }, 4000);
+  }
 
   // Role operations
   const createRole = (roleData: Partial<PermissionRole>) => {
@@ -392,6 +452,14 @@ export default function UserManagement() {
   return (
     <main className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
+        {/* Toasts */}
+        <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+          {toasts.map(t => (
+            <div key={t.id} className={`px-4 py-2 rounded shadow ${t.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+              {t.message}
+            </div>
+          ))}
+        </div>
         {/* Page Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -573,6 +641,7 @@ export default function UserManagement() {
                                 setDisplayEditUser(true);
                               }}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                              disabled={!!actionLoading[user.id] || loading}
                               title="Modify"
                             >
                               <Edit2 size={16} />
@@ -580,6 +649,7 @@ export default function UserManagement() {
                             <button
                               onClick={() => switchStatus(user.id)}
                               className="p-2 text-green-600 hover:bg-green-50 rounded"
+                              disabled={!!actionLoading[user.id] || loading}
                               title={user.status === "active" ? "Disable" : "Enable"}
                             >
                               {user.status === "active" ? <XCircle size={16} /> : <CheckCircle size={16} />}
@@ -587,6 +657,7 @@ export default function UserManagement() {
                             <button
                               onClick={() => removeUser(user.id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded"
+                              disabled={!!actionLoading[user.id] || loading}
                               title="Remove"
                             >
                               <Trash2 size={16} />
