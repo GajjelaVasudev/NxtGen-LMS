@@ -151,45 +151,45 @@ export default function ForgotPassword() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <h1 className="text-2xl font-bold text-gray-800">Forgot Password</h1>
         <p className="mt-2 text-sm text-gray-600">Enter your email and we'll send reset instructions.</p>
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ChevronLeft } from 'lucide-react';
+import { Logo } from '@/components/Logo';
+import { FormInput } from '@/components/FormInput';
+import { SocialLogin } from '@/components/SocialLogin';
+import { createClient } from '@supabase/supabase-js';
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200"
-              placeholder="your@email.com"
-            />
-          </div>
-
-          <div>
-            <button type="submit" disabled={loading} className="w-full py-3 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700">
-              {loading ? 'Sending…' : 'Send reset link'}
-            </button>
-          </div>
-        </form>
-
-        {status && <div className="mt-4 text-sm text-gray-700">{status}</div>}
-
-        <div className="mt-6 text-sm text-gray-600">
-          <Link to="/login" className="text-rose-600 hover:underline">Back to login</Link>
-        </div>
-      </div>
-    </div>
-  );
+function makeSupabase() {
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!url || !key) return null;
+  return createClient(url, key);
 }
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
-import { Logo } from "@/components/Logo";
-import { FormInput } from "@/components/FormInput";
-import { SocialLogin } from "@/components/SocialLogin";
 
-function ForgotPassword(): JSX.Element {
-  const [email, setEmail] = useState("john.doe@gmail.com");
+export default function ForgotPassword(): JSX.Element {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    setStatus(null);
+    setLoading(true);
+    try {
+      const supabase = makeSupabase();
+      if (!supabase) throw new Error('Missing Supabase configuration');
+
+      const redirectTo = (import.meta.env.VITE_RESET_REDIRECT_URL as string) || (window.location.origin + '/reset-password');
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) console.debug('resetPasswordForEmail error', error.message);
+      setStatus('If an account exists for that email, we sent a password reset link. Check your inbox.');
+    } catch (err: any) {
+      console.error('Forgot password error', err);
+      setStatus('If an account exists for that email, we sent a password reset link.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white flex">
@@ -212,25 +212,33 @@ function ForgotPassword(): JSX.Element {
                   Forgot your password?
                 </h1>
                 <p className="text-[#313131] font-poppins text-base opacity-75">
-                  Don't worry, happens to all of us. Enter your email below to recover your password
+                  Don't worry — happens to all of us. Enter your email below to recover your password.
                 </p>
               </div>
             </div>
 
             <div className="flex flex-col gap-8">
-              <FormInput
-                label="Email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <FormInput
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
 
-              <button className="w-full h-12 bg-[#515DEF] rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:bg-[#515DEF]/90 transition-colors">
-                Submit
-              </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-12 bg-[#515DEF] rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:bg-[#515DEF]/90 transition-colors disabled:opacity-60"
+                >
+                  {loading ? 'Sending…' : 'Send reset link'}
+                </button>
+              </form>
+
+              {status && <div className="text-sm text-gray-700">{status}</div>}
+
+              <SocialLogin />
             </div>
-
-            <SocialLogin />
           </div>
         </div>
       </div>
@@ -252,5 +260,3 @@ function ForgotPassword(): JSX.Element {
     </div>
   );
 }
-
-export default ForgotPassword;
