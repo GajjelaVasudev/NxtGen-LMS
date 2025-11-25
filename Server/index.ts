@@ -34,6 +34,9 @@ import {
   deleteGroup,
   listActivity,
   reportsSummary,
+  createUser,
+  updateUser,
+  deleteUser,
 } from "./routes/admin.js";
 import { getAssignments, createAssignment, getAssignment, updateAssignment } from "./routes/assignments.js";
 import {
@@ -243,6 +246,10 @@ export function createServer() {
   app.delete('/api/admin/groups/:id', deleteGroup);
   app.get('/api/admin/activity', listActivity);
   app.get('/api/admin/reports/summary', reportsSummary);
+  // Admin user CRUD
+  app.post('/api/admin/users', createUser);
+  app.put('/api/admin/users/:id', updateUser);
+  app.delete('/api/admin/users/:id', deleteUser);
 
   // register courses API
   app.get("/api/courses", getCourses);

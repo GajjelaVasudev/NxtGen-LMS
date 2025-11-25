@@ -181,3 +181,83 @@ export const reportsSummary: RequestHandler = async (_req, res) => {
     return res.status(500).json({ error: 'Unexpected error' });
   }
 };
+
+// Admin: create a user (POST /api/admin/users)
+export const createUser: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
+  const email = String(req.body?.email || '').toLowerCase();
+  const role = String(req.body?.role || 'student');
+  const firstName = req.body?.first_name || req.body?.firstName || null;
+  const lastName = req.body?.last_name || req.body?.lastName || null;
+  if (!email) return res.status(400).json({ error: 'email required' });
+  try {
+    const insertRow: any = { email, role };
+    if (firstName) insertRow.first_name = firstName;
+    if (lastName) insertRow.last_name = lastName;
+    const { data, error } = await supabase.from('users').insert([insertRow]).select('id, email, role, first_name, last_name').maybeSingle();
+    if (error) return res.status(500).json({ error: error.message || 'Failed to create user' });
+
+    // audit
+    try {
+      const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+      await supabase.from('admin_audit').insert([{ action: 'create_user', admin_id: adminId, target_user_id: data?.id || null, metadata: { email } }]);
+    } catch (auditErr) { console.warn('[admin/createUser] audit failed', auditErr); }
+
+    return res.json({ success: true, user: data });
+  } catch (ex) {
+    console.error('[admin/createUser] err', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
+};
+
+// Admin: update user (PUT /api/admin/users/:id)
+export const updateUser: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
+  const id = String(req.params.id || '');
+  if (!id) return res.status(400).json({ error: 'user id required' });
+  const payload: any = {};
+  if (req.body?.email) payload.email = String(req.body.email).toLowerCase();
+  if (req.body?.role) payload.role = String(req.body.role);
+  if (req.body?.first_name) payload.first_name = req.body.first_name;
+  if (req.body?.last_name) payload.last_name = req.body.last_name;
+  try {
+    const { data, error } = await supabase.from('users').update(payload).eq('id', id).select('id, email, role, first_name, last_name').maybeSingle();
+    if (error) return res.status(500).json({ error: error.message || 'Failed to update user' });
+    if (!data) return res.status(404).json({ error: 'User not found' });
+
+    // audit
+    try {
+      const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+      await supabase.from('admin_audit').insert([{ action: 'update_user', admin_id: adminId, target_user_id: id, metadata: payload }]);
+    } catch (auditErr) { console.warn('[admin/updateUser] audit failed', auditErr); }
+
+    return res.json({ success: true, user: data });
+  } catch (ex) {
+    console.error('[admin/updateUser] err', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
+};
+
+// Admin: delete user (DELETE /api/admin/users/:id)
+export const deleteUser: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
+  const id = String(req.params.id || '');
+  if (!id) return res.status(400).json({ error: 'user id required' });
+  try {
+    const { error } = await supabase.from('users').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message || 'Failed to delete user' });
+
+    try {
+      const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+      await supabase.from('admin_audit').insert([{ action: 'delete_user', admin_id: adminId, target_user_id: id, metadata: {} }]);
+    } catch (auditErr) { console.warn('[admin/deleteUser] audit failed', auditErr); }
+
+    return res.json({ success: true });
+  } catch (ex) {
+    console.error('[admin/deleteUser] err', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
+};

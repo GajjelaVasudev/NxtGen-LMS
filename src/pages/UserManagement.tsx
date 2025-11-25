@@ -276,24 +276,89 @@ export default function UserManagement() {
 
   // User operations
   const createUser = (userData: Partial<SystemUser>) => {
-    const newUser: SystemUser = {
-      id: String(Date.now()),
-      name: userData.name || "",
-      email: userData.email || "",
-      role: userData.role || "user",
-      status: "active",
-      lastLogin: "Never",
-      joinedDate: new Date().toISOString().split('T')[0],
-      department: userData.department
-    };
-    setSystemUsers([...systemUsers, newUser]);
-    setDisplayAddUser(false);
+    (async () => {
+      setLoading(true);
+      const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) {
+        try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; }
+      }
+      const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
+
+      try {
+        const payload: any = { email: userData.email, role: userData.role || 'student' };
+        if (userData.name) {
+          const parts = String(userData.name).split(' ');
+          payload.first_name = parts.slice(0,1).join(' ');
+          payload.last_name = parts.slice(1).join(' ');
+        }
+        const res = await fetch(`${API}/admin/users`, { method: 'POST', headers, body: JSON.stringify(payload) });
+        if (!res.ok) {
+          const body = await res.json().catch(()=>({}));
+          pushToast('error', body?.error || 'Failed to create user');
+          return;
+        }
+        const body = await res.json().catch(()=>({}));
+        const created = body?.user;
+        if (created) {
+          const mapped: SystemUser = { id: created.id || String(Date.now()), name: created.email.split('@')[0], email: created.email, role: created.role === 'content_creator' ? 'contentCreator' : (created.role === 'student' ? 'user' : created.role), status: 'active', lastLogin: 'Unknown', joinedDate: 'Unknown' };
+          setSystemUsers((s) => [mapped, ...s]);
+          pushToast('success', 'User created');
+        }
+      } catch (ex:any) {
+        console.error('createUser failed', ex);
+        pushToast('error', String(ex?.message || ex));
+      } finally {
+        setDisplayAddUser(false);
+        setLoading(false);
+      }
+    })();
   };
 
   const modifyUser = (userId: string, changes: Partial<SystemUser>) => {
-    setSystemUsers(systemUsers.map(u => u.id === userId ? { ...u, ...changes } : u));
-    setDisplayEditUser(false);
-    setActiveUser(null);
+    (async () => {
+      setActionLoading((s) => ({ ...s, [userId]: true }));
+      const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
+      const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
+
+      try {
+        const payload: any = {};
+        if (changes.email) payload.email = changes.email;
+        if (changes.role) payload.role = changes.role === 'contentCreator' ? 'content_creator' : changes.role;
+        if (changes.name) {
+          const parts = String(changes.name).split(' ');
+          payload.first_name = parts.slice(0,1).join(' ');
+          payload.last_name = parts.slice(1).join(' ');
+        }
+        const res = await fetch(`${API}/admin/users/${userId}`, { method: 'PUT', headers, body: JSON.stringify(payload) });
+        if (!res.ok) {
+          const body = await res.json().catch(()=>({}));
+          pushToast('error', body?.error || 'Failed to update user');
+          return;
+        }
+        const body = await res.json().catch(()=>({}));
+        const updated = body?.user;
+        if (updated) {
+          setSystemUsers(systemUsers.map(u => u.id === userId ? { ...u, name: (updated.first_name || updated.email?.split('@')[0]) as string, email: updated.email, role: updated.role === 'content_creator' ? 'contentCreator' : (updated.role === 'student' ? 'user' : updated.role) } : u));
+          pushToast('success', 'User updated');
+        }
+      } catch (ex:any) {
+        console.error('modifyUser failed', ex);
+        pushToast('error', String(ex?.message || ex));
+      } finally {
+        setActionLoading((s) => ({ ...s, [userId]: false }));
+        setDisplayEditUser(false);
+        setActiveUser(null);
+      }
+    })();
   };
 
   // Update a user's role on the server (admin only) and update local state
@@ -343,19 +408,72 @@ export default function UserManagement() {
   };
 
   const removeUser = (userId: string) => {
-    if (window.confirm("Confirm user deletion?")) {
-      setSystemUsers(systemUsers.filter(u => u.id !== userId));
-      pushToast('success', 'User removed');
-    }
+    (async () => {
+      if (!window.confirm("Confirm user deletion?")) return;
+      setActionLoading((s) => ({ ...s, [userId]: true }));
+      const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
+      const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
+
+      try {
+        const res = await fetch(`${API}/admin/users/${userId}`, { method: 'DELETE', headers });
+        if (!res.ok) {
+          const body = await res.json().catch(()=>({}));
+          pushToast('error', body?.error || 'Failed to delete user');
+          return;
+        }
+        setSystemUsers(systemUsers.filter(u => u.id !== userId));
+        pushToast('success', 'User removed');
+      } catch (ex:any) {
+        console.error('removeUser failed', ex);
+        pushToast('error', String(ex?.message || ex));
+      } finally {
+        setActionLoading((s) => ({ ...s, [userId]: false }));
+      }
+    })();
   };
 
   const switchStatus = (userId: string) => {
-    setSystemUsers(systemUsers.map(u => 
-      u.id === userId 
-        ? { ...u, status: u.status === "active" ? "inactive" : "active" } 
-        : u
-    ));
-    pushToast('success', 'Status updated');
+    (async () => {
+      setActionLoading((s) => ({ ...s, [userId]: true }));
+      const target = systemUsers.find(u => u.id === userId);
+      if (!target) return;
+      const newStatus = target.status === 'active' ? 'inactive' : 'active';
+      const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
+      const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
+
+      try {
+        // Try to update status via admin API (store in metadata.status if users table supports metadata)
+        const res = await fetch(`${API}/admin/users/${userId}`, { method: 'PUT', headers, body: JSON.stringify({ metadata: { status: newStatus } }) });
+        if (!res.ok) {
+          // fallback to local update
+          setSystemUsers(systemUsers.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+          pushToast('success', 'Status updated (local fallback)');
+          return;
+        }
+        const body = await res.json().catch(()=>({}));
+        if (body?.user) {
+          setSystemUsers(systemUsers.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+          pushToast('success', 'Status updated');
+        }
+      } catch (ex:any) {
+        console.error('switchStatus failed', ex);
+        // local fallback
+        setSystemUsers(systemUsers.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+        pushToast('success', 'Status updated (local fallback)');
+      } finally {
+        setActionLoading((s) => ({ ...s, [userId]: false }));
+      }
+    })();
   };
 
   function pushToast(type: 'success' | 'error', message: string) {

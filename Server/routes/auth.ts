@@ -441,18 +441,9 @@ export async function requireAdmin(req: any) {
       }
     }
 
-    // Temporary DEV fallback: accept x-admin-secret header when it matches server ADMIN_SECRET
-    try {
-      const provided = String(req.headers['x-admin-secret'] || '');
-      const envSecret = String(process.env.ADMIN_SECRET || '');
-      if (provided && envSecret && provided === envSecret) {
-        console.warn('[requireAdmin] admin access granted via x-admin-secret (DEV only)');
-        // Return a synthetic admin user object so callers can log admin_id in audits.
-        return { ok: true, user: { id: 'admin-secret', role: 'admin' } } as any;
-      }
-    } catch (ex) {
-      // ignore and continue to x-user-id fallback
-    }
+    // DEV fallback `x-admin-secret` removed: require Authorization Bearer token
+    // or the legacy `x-user-id` header. Removing the secret fallback hardens
+    // admin checks; to re-enable, use a secure service-to-service mechanism.
 
     // Fallback: legacy x-user-id header (keeps compatibility with existing clients)
     const reqId = String(req.headers['x-user-id'] || '');
