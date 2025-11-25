@@ -25,7 +25,6 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <ThemeProvider>
-            <KeyboardShortcuts />
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/signup" element={<Signup />} />
