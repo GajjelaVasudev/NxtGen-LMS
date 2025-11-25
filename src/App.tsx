@@ -7,6 +7,7 @@ import Landing from "./pages/Landing";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import VerifyCode from "./pages/VerifyCode";
 import SetPassword from "./pages/SetPassword";
 import Surprise from "./pages/Surprise";
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="/surprise" element={<Surprise />} />
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/verify-code" element={<VerifyCode />} />
               <Route path="/set-password" element={<SetPassword />} />
               <Route

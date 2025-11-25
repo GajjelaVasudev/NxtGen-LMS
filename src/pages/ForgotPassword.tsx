@@ -1,3 +1,77 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { createClient } from '@supabase/supabase-js';
+
+function makeSupabase() {
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
+export default function ForgotPassword() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus(null);
+    setLoading(true);
+    try {
+      const supabase = makeSupabase();
+      if (!supabase) throw new Error('Missing Supabase configuration');
+
+      const redirectTo = (import.meta.env.VITE_RESET_REDIRECT_URL as string) || (window.location.origin + '/reset-password');
+
+      // Send password reset email. Supabase will send a recovery link containing an access_token.
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      // Do not reveal whether the email exists. Always show neutral message.
+      if (error) console.debug('resetPasswordForEmail error', error.message);
+      setStatus('If an account exists for that email, we sent a password reset link. Check your inbox.');
+    } catch (err: any) {
+      console.error('Forgot password error', err);
+      setStatus('If an account exists for that email, we sent a password reset link.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+        <h1 className="text-2xl font-bold text-gray-800">Forgot Password</h1>
+        <p className="mt-2 text-sm text-gray-600">Enter your email and we'll send reset instructions.</p>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div>
+            <label className="block text-sm text-gray-700 mb-2">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200"
+              placeholder="your@email.com"
+            />
+          </div>
+
+          <div>
+            <button type="submit" disabled={loading} className="w-full py-3 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700">
+              {loading ? 'Sending…' : 'Send reset link'}
+            </button>
+          </div>
+        </form>
+
+        {status && <div className="mt-4 text-sm text-gray-700">{status}</div>}
+
+        <div className="mt-6 text-sm text-gray-600">
+          <Link to="/login" className="text-rose-600 hover:underline">Back to login</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";

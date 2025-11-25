@@ -50,7 +50,7 @@ export default function Surprise() {
   // enable keyboard input for digits and backspace
   useKeypadKeyboard(press, backspace);
 
-  const message = `You are my bangaram Kannu , Love You so much ra 💖\nNijanga I Love You So Much Kannamaaaa !!!`;
+  const message = `You are my bangaram Kannu , Love You so much ra 💖\nI Love You So Much Kannamaaaa !!!`;
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-b from-pink-50 via-white to-rose-50 p-6 relative overflow-hidden">
