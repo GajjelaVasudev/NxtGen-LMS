@@ -20,10 +20,8 @@ export default function Surprise() {
   const [error, setError] = useState('');
   const location = useLocation();
 
-  useEffect(() => {
-    const anyState = (location as any).state;
-    if (anyState && anyState.autoUnlock) setUnlocked(true);
-  }, [location]);
+  // Note: do not auto-unlock based on route state. The surprise screen
+  // should open the keypad and require the secret code (2431).
 
   useEffect(() => {
     if (code.length === SECRET.length) {
