@@ -415,7 +415,7 @@ export const firebaseLogin: RequestHandler = async (req, res) => {
 };
 
 // Helper to ensure requester is an admin based on x-user-id header
-async function requireAdmin(req: any) {
+export async function requireAdmin(req: any) {
   // Prefer Authorization Bearer token when available (validate via Supabase)
   try {
     const authHeader = String(req.headers['authorization'] || '');
@@ -436,9 +436,22 @@ async function requireAdmin(req: any) {
           }
         } catch (tokenErr) {
           console.warn('[requireAdmin] token validation failed', tokenErr?.message || tokenErr);
-          // fall through to x-user-id fallback
+          // fall through to x-admin-secret or x-user-id fallback
         }
       }
+    }
+
+    // Temporary DEV fallback: accept x-admin-secret header when it matches server ADMIN_SECRET
+    try {
+      const provided = String(req.headers['x-admin-secret'] || '');
+      const envSecret = String(process.env.ADMIN_SECRET || '');
+      if (provided && envSecret && provided === envSecret) {
+        console.warn('[requireAdmin] admin access granted via x-admin-secret (DEV only)');
+        // Return a synthetic admin user object so callers can log admin_id in audits.
+        return { ok: true, user: { id: 'admin-secret', role: 'admin' } } as any;
+      }
+    } catch (ex) {
+      // ignore and continue to x-user-id fallback
     }
 
     // Fallback: legacy x-user-id header (keeps compatibility with existing clients)

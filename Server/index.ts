@@ -22,6 +22,19 @@ import {
   deleteMessages,
   starMessage,
 } from "./routes/messages.js";
+import {
+  listRoles,
+  listPermissions,
+  createRole,
+  addPermissionToRole,
+  removePermissionFromRole,
+  listGroups,
+  createGroup,
+  updateGroup,
+  deleteGroup,
+  listActivity,
+  reportsSummary,
+} from "./routes/admin.js";
 import { getAssignments, createAssignment, getAssignment, updateAssignment } from "./routes/assignments.js";
 import {
   listUserSubmissions,
@@ -218,6 +231,18 @@ export function createServer() {
   // Admin user management
   app.get("/api/admin/users", listAllUsers);
   app.patch("/api/admin/users/:id/role", updateUserRole);
+  // Roles / Permissions / Groups / Activity / Reports
+  app.get('/api/admin/roles', listRoles);
+  app.get('/api/admin/permissions', listPermissions);
+  app.post('/api/admin/roles', createRole);
+  app.post('/api/admin/roles/:roleId/permissions', addPermissionToRole);
+  app.delete('/api/admin/roles/:roleId/permissions/:permId', removePermissionFromRole);
+  app.get('/api/admin/groups', listGroups);
+  app.post('/api/admin/groups', createGroup);
+  app.put('/api/admin/groups/:id', updateGroup);
+  app.delete('/api/admin/groups/:id', deleteGroup);
+  app.get('/api/admin/activity', listActivity);
+  app.get('/api/admin/reports/summary', reportsSummary);
 
   // register courses API
   app.get("/api/courses", getCourses);
