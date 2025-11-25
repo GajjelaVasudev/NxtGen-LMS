@@ -2,6 +2,95 @@ import { RequestHandler } from 'express';
 import { supabase } from '../supabaseClient.js';
 import { requireAdmin } from './auth.js';
 
+// GET /api/admin/users (enhanced): supports search, role, status, group, pagination
+export const listUsers: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
+  try {
+    const search = String(req.query.search || '').trim();
+    const role = String(req.query.role || '').trim();
+    const status = String(req.query.status || '').trim();
+    const groupId = String(req.query.group || '').trim();
+    const page = Math.max(1, parseInt(String(req.query.page || '1')) || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt(String(req.query.pageSize || '25')) || 25));
+
+    // If a group filter is provided, try to fetch member user_ids first
+    let userIdsFromGroup: string[] | null = null;
+    if (groupId) {
+      try {
+        const gm = await supabase.from('group_members').select('user_id').eq('group_id', groupId);
+        if (!gm.error && Array.isArray(gm.data)) userIdsFromGroup = gm.data.map((r: any) => r.user_id).filter(Boolean);
+      } catch (e) {
+        console.warn('[admin/listUsers] group_members lookup failed', e);
+      }
+    }
+
+    let q: any = supabase.from('users').select('id, email, role, first_name, last_name, status, last_active', { count: 'exact' });
+    if (search) {
+      // match email or names
+      q = q.or(`ilike(email, '%${search}%'),ilike(first_name, '%${search}%'),ilike(last_name, '%${search}%')`);
+    }
+    if (role) q = q.eq('role', role);
+    if (status) q = q.eq('status', status);
+    if (userIdsFromGroup) {
+      if (userIdsFromGroup.length === 0) {
+        return res.json({ users: [], total: 0 });
+      }
+      q = q.in('id', userIdsFromGroup);
+    }
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize - 1;
+    q = q.order('email', { ascending: true }).range(start, end);
+
+    const { data, error, count } = await q;
+    if (error) return res.status(500).json({ error: error.message || 'Failed to list users' });
+    return res.json({ users: data || [], total: typeof count === 'number' ? count : (data || []).length, page, pageSize });
+  } catch (ex) {
+    console.error('[admin/listUsers] err', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
+};
+
+// GET /api/admin/users/export -> CSV export of filtered users
+export const exportUsersCsv: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
+  try {
+    const search = String(req.query.search || '').trim();
+    const role = String(req.query.role || '').trim();
+    const status = String(req.query.status || '').trim();
+
+    let q: any = supabase.from('users').select('id, email, role, first_name, last_name, status, last_active');
+    if (search) q = q.or(`ilike(email, '%${search}%'),ilike(first_name, '%${search}%'),ilike(last_name, '%${search}%')`);
+    if (role) q = q.eq('role', role);
+    if (status) q = q.eq('status', status);
+
+    const { data, error } = await q.order('email', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message || 'Failed to export users' });
+
+    // Build CSV
+    const rows = (data || []).map((u: any) => ({
+      id: u.id,
+      email: u.email,
+      role: u.role,
+      first_name: u.first_name || '',
+      last_name: u.last_name || '',
+      status: u.status || '',
+      last_active: u.last_active || '',
+    }));
+    const header = Object.keys(rows[0] || { id: '', email: '', role: '', first_name: '', last_name: '', status: '', last_active: '' });
+    const csv = [header.join(',')].concat(rows.map((r) => header.map((h) => JSON.stringify(r[h] ?? '')).join(','))).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="users-export-${Date.now()}.csv"`);
+    return res.send(csv);
+  } catch (ex) {
+    console.error('[admin/exportUsersCsv] err', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
+};
+
 // GET /api/admin/roles
 export const listRoles: RequestHandler = async (_req, res) => {
   const chk = await requireAdmin(_req);
@@ -200,7 +289,7 @@ export const createUser: RequestHandler = async (req, res) => {
 
     // audit
     try {
-      const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+      const adminId = String((chk.user && (chk.user as any).id) || '');
       await supabase.from('admin_audit').insert([{ action: 'create_user', admin_id: adminId, target_user_id: data?.id || null, metadata: { email } }]);
     } catch (auditErr) { console.warn('[admin/createUser] audit failed', auditErr); }
 
@@ -229,7 +318,7 @@ export const updateUser: RequestHandler = async (req, res) => {
 
     // audit
     try {
-      const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+      const adminId = String((chk.user && (chk.user as any).id) || '');
       await supabase.from('admin_audit').insert([{ action: 'update_user', admin_id: adminId, target_user_id: id, metadata: payload }]);
     } catch (auditErr) { console.warn('[admin/updateUser] audit failed', auditErr); }
 
@@ -251,7 +340,7 @@ export const deleteUser: RequestHandler = async (req, res) => {
     if (error) return res.status(500).json({ error: error.message || 'Failed to delete user' });
 
     try {
-      const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+      const adminId = String((chk.user && (chk.user as any).id) || '');
       await supabase.from('admin_audit').insert([{ action: 'delete_user', admin_id: adminId, target_user_id: id, metadata: {} }]);
     } catch (auditErr) { console.warn('[admin/deleteUser] audit failed', auditErr); }
 

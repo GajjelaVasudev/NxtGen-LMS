@@ -18,8 +18,7 @@ type RoleRequest = {
 
 export default function ManageRoles() {
   const { user } = useAuth();
-  const ENV_SECRET = (import.meta.env.VITE_ADMIN_SECRET as string) || '';
-  const [adminSecret, setAdminSecret] = useState<string>(ENV_SECRET);
+  const [unauthorized, setUnauthorized] = useState(false);
   const [requests, setRequests] = useState<RoleRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
@@ -46,13 +45,11 @@ export default function ManageRoles() {
           } catch (_) { token = null; }
         }
       }
-
       if (token) {
         fetchRequests(undefined, token);
         return;
       }
-
-      if (ENV_SECRET) fetchRequests(ENV_SECRET);
+      setUnauthorized(true);
     })();
   }, []);
 
@@ -62,7 +59,7 @@ export default function ManageRoles() {
     try {
       const headers: Record<string, string> = {};
       if (bearerToken) headers['Authorization'] = `Bearer ${bearerToken}`;
-      else if (secret) headers['x-admin-secret'] = secret;
+      else { setUnauthorized(true); setRequests([]); setLoading(false); return; }
 
       const res = await fetch('/api/auth/role-requests', { headers });
       if (!res.ok) {
@@ -96,8 +93,7 @@ export default function ManageRoles() {
       const endpoint = action === 'approve' ? '/api/auth/approve-role' : '/api/auth/deny-role';
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      else if (adminSecret) headers['x-admin-secret'] = adminSecret;
-      else return alert('Admin secret or authenticated admin session required to approve/deny requests');
+      else { setUnauthorized(true); return alert('Admin session required to approve/deny requests'); }
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -134,6 +130,21 @@ export default function ManageRoles() {
     setConfirmEmail(null);
     setConfirmActionType(null);
   }
+  if (unauthorized) {
+    return (
+      <main className="flex-1 p-6 min-h-0 overflow-y-auto bg-white">
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="bg-white p-8 rounded-lg shadow text-center">
+            <h2 className="text-2xl font-bold text-red-600">Unauthorized</h2>
+            <p className="mt-4 text-gray-700">You must sign in as an administrator to manage role requests. Please sign in with an admin account.</p>
+            <div className="mt-6">
+              <a href="/login" className="px-4 py-2 bg-blue-600 text-white rounded">Sign in</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 p-6 min-h-0 overflow-y-auto bg-white">
@@ -152,24 +163,8 @@ export default function ManageRoles() {
         <div className="mb-4 p-4 rounded border bg-gray-50">
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <p className="text-sm text-gray-700">Admin approval requires a server-side admin secret.</p>
-              <p className="text-sm text-gray-500">Provide the admin secret below or set `VITE_ADMIN_SECRET` in your environment for automatic loading (not recommended for production clients).</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="password"
-                value={adminSecret}
-                onChange={(e) => setAdminSecret(e.target.value)}
-                placeholder="Admin secret"
-                className="px-3 py-2 border rounded-md"
-              />
-              <button
-                onClick={() => fetchRequests(adminSecret)}
-                className="px-3 py-2 bg-blue-600 text-white rounded-md"
-                disabled={loading || !adminSecret}
-              >
-                {loading ? 'Loading…' : 'Load Requests'}
-              </button>
+              <p className="text-sm text-gray-700">Pending requests load automatically when you are signed in as an administrator.</p>
+              <p className="text-sm text-gray-500">If you see no requests, ensure you are signed in and have the Admin role.</p>
             </div>
           </div>
           {error && <div className="mt-3 text-sm text-red-600">{error}</div>}

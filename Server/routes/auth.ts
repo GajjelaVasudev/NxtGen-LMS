@@ -416,42 +416,32 @@ export const firebaseLogin: RequestHandler = async (req, res) => {
 
 // Helper to ensure requester is an admin based on x-user-id header
 export async function requireAdmin(req: any) {
-  // Prefer Authorization Bearer token when available (validate via Supabase)
+  // Enforce Authorization Bearer token only. Legacy test fallbacks (headers)
+  // were removed to ensure production-grade security.
   try {
     const authHeader = String(req.headers['authorization'] || '');
-    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
-      const token = authHeader.slice(7).trim();
-      if (token) {
-        try {
-          // Try to get user from Supabase using the token
-          // supabase.auth.getUser returned object shape may vary across SDK versions
-          const userResp: any = await (supabase as any).auth.getUser?.(token) || (await (supabase as any).auth.api?.getUser?.(token));
-          const foundUser = userResp?.data?.user || userResp?.user || null;
-          if (foundUser && foundUser.id) {
-            // Confirm role from DB row
-            const { data: dbUser, error: dbErr } = await supabase.from('users').select('id, role').eq('id', foundUser.id).maybeSingle();
-            if (dbErr || !dbUser) return { ok: false, status: 401, msg: 'Requester not found' };
-            if (String(dbUser.role) !== 'admin') return { ok: false, status: 403, msg: 'admin role required' };
-            return { ok: true, user: dbUser };
-          }
-        } catch (tokenErr) {
-          console.warn('[requireAdmin] token validation failed', tokenErr?.message || tokenErr);
-          // fall through to x-admin-secret or x-user-id fallback
-        }
-      }
+    if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+      return { ok: false, status: 401, msg: 'Authorization bearer token required' };
     }
 
-    // DEV fallback `x-admin-secret` removed: require Authorization Bearer token
-    // or the legacy `x-user-id` header. Removing the secret fallback hardens
-    // admin checks; to re-enable, use a secure service-to-service mechanism.
+    const token = authHeader.slice(7).trim();
+    if (!token) return { ok: false, status: 401, msg: 'Authorization bearer token required' };
 
-    // Fallback: legacy x-user-id header (keeps compatibility with existing clients)
-    const reqId = String(req.headers['x-user-id'] || '');
-    if (!reqId) return { ok: false, status: 401, msg: 'x-user-id header required' };
-    const { data: user, error } = await supabase.from('users').select('id, role').eq('id', reqId).maybeSingle();
-    if (error || !user) return { ok: false, status: 401, msg: 'Requester not found' };
-    if (String(user.role) !== 'admin') return { ok: false, status: 403, msg: 'admin role required' };
-    return { ok: true, user };
+    try {
+      // Validate token with Supabase and retrieve the associated user
+      const userResp: any = await (supabase as any).auth.getUser?.(token) || (await (supabase as any).auth.api?.getUser?.(token));
+      const foundUser = userResp?.data?.user || userResp?.user || null;
+      if (!foundUser || !foundUser.id) return { ok: false, status: 401, msg: 'Invalid token or user not found' };
+
+      // Confirm role from DB row
+      const { data: dbUser, error: dbErr } = await supabase.from('users').select('id, role').eq('id', foundUser.id).maybeSingle();
+      if (dbErr || !dbUser) return { ok: false, status: 401, msg: 'Requester not found' };
+      if (String(dbUser.role) !== 'admin') return { ok: false, status: 403, msg: 'admin role required' };
+      return { ok: true, user: dbUser };
+    } catch (tokenErr) {
+      console.warn('[requireAdmin] token validation failed', tokenErr?.message || tokenErr);
+      return { ok: false, status: 401, msg: 'Invalid or expired token' };
+    }
   } catch (ex) {
     console.error('[requireAdmin] unexpected error', ex);
     return { ok: false, status: 500, msg: 'failed to verify admin' };
@@ -487,7 +477,7 @@ export const updateUserRole: RequestHandler = async (req, res) => {
 
     // Attempt to write a simple audit entry. If the audit table doesn't exist, don't fail the request.
     try {
-      const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+      const adminId = String((chk.user && (chk.user as any).id) || '');
       const metadata = { changedBy: adminId, newRole: role, targetUser: id, timestamp: new Date().toISOString() };
       await supabase.from('admin_audit').insert([{ action: 'update_user_role', admin_id: adminId, target_user_id: id, metadata }]);
     } catch (auditErr) {
@@ -520,7 +510,7 @@ export const requestRole: RequestHandler = (req, res) => {
   return res.json({ success: true, message: 'Role request submitted' });
 };
 
-// Admin: list pending role requests (protected by ADMIN_SECRET header)
+// Admin: list pending role requests (protected by requireAdmin middleware)
 export const listRoleRequests: RequestHandler = async (req, res) => {
   const chk = await requireAdmin(req);
   if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
@@ -547,7 +537,7 @@ export const approveRole: RequestHandler = async (req, res) => {
 
   // Audit
   try {
-    const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+    const adminId = String((chk.user && (chk.user as any).id) || '');
     const metadata = { action: 'approve_role', target: email, by: adminId, timestamp: new Date().toISOString() };
     await supabase.from('admin_audit').insert([{ action: 'approve_role', admin_id: adminId, target_user_id: userWithoutPassword.id, metadata }]);
   } catch (auditErr) {
@@ -571,7 +561,7 @@ export const denyRole: RequestHandler = async (req, res) => {
 
   // Audit
   try {
-    const adminId = String((chk.user && (chk.user as any).id) || (req.headers['x-user-id'] || ''));
+    const adminId = String((chk.user && (chk.user as any).id) || '');
     const metadata = { action: 'deny_role', target: email, by: adminId, timestamp: new Date().toISOString() };
     await supabase.from('admin_audit').insert([{ action: 'deny_role', admin_id: adminId, target_user_id: user.id, metadata }]);
   } catch (auditErr) {

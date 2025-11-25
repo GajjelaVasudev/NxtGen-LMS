@@ -151,14 +151,15 @@ const userGroups: UserGroup[] = [
 
 export default function UserManagement() {
   const { user } = useAuth();
-  // Supabase + admin secret fallback
+  // Supabase client helper
   function makeSupabase() {
     const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
     const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
     if (!url || !key) return null;
     return createClient(url, key);
   }
-  const ENV_SECRET = (import.meta.env.VITE_ADMIN_SECRET as string) || '';
+  const ENV_SECRET = '';
+  const [unauthorized, setUnauthorized] = useState(false);
   const [currentTab, setCurrentTab] = useState<"users" | "roles" | "access" | "groups" | "activity" | "profile" | "notifications">("users");
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>(() => {
     const stored = localStorage.getItem(ADMIN_STORAGE);
@@ -207,16 +208,33 @@ export default function UserManagement() {
     forceComplete: false
   });
 
-  // Activity tracking
-  const [activityRecords] = useState<UserActivity[]>([
-    { id: "1", userId: "1", userName: "Admin User", action: "System login", timestamp: "2024-01-28 10:30 AM", ipAddress: "192.168.1.1" },
-    { id: "2", userId: "2", userName: "Instructor User", action: "Course published", timestamp: "2024-01-28 09:15 AM", ipAddress: "192.168.1.2" }
-  ]);
+  // Activity state (populated from server)
+  const [activity, setActivity] = useState<UserActivity[]>([]);
+
+  // Activity tracking (server-backed)
+  // initial seed removed; activity is populated from server into `activity` state
 
   // Persist data
   useEffect(() => {
     localStorage.setItem(ADMIN_STORAGE, JSON.stringify({ users: systemUsers, roles: permissionRoles, groups }));
   }, [systemUsers, permissionRoles, groups]);
+
+  // If unauthorized, render an explanatory page
+  if (unauthorized) {
+    return (
+      <main className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="bg-white p-8 rounded-lg shadow text-center">
+            <h2 className="text-2xl font-bold text-red-600">Unauthorized</h2>
+            <p className="mt-4 text-gray-700">You must sign in as an administrator to access this section. Please sign in with an admin account.</p>
+            <div className="mt-6">
+              <a href="/login" className="px-4 py-2 bg-blue-600 text-white rounded">Sign in</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   // Fetch real users from server if current user is admin (fallback to local data otherwise)
   useEffect(() => {
@@ -235,11 +253,19 @@ export default function UserManagement() {
 
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET; // DEV fallback only
+        else {
+          // no admin token -> mark unauthorized UI
+          setUnauthorized(true);
+          setLoading(false);
+          return;
+        }
 
         setLoading(true);
         const res = await fetch(`${API}/admin/users`, { headers });
         if (!res.ok) {
+          if (res.status === 401) {
+            setUnauthorized(true);
+          }
           console.warn('Failed to fetch admin users', res.status);
           return;
         }
@@ -265,6 +291,66 @@ export default function UserManagement() {
     })();
   }, [user]);
 
+  // Fetch roles, groups, activity when admin
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = makeSupabase();
+        let token: string | null = null;
+        if (supabase) {
+          try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch (_) { token = null; }
+        }
+        const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+        if (!token) return; // cannot fetch admin data without token
+
+        const headers: Record<string,string> = { 'Authorization': `Bearer ${token}` };
+
+        // Roles
+        try {
+          const r = await fetch(`${API}/admin/roles`, { headers });
+          if (r.status === 401) { setUnauthorized(true); return; }
+          const body = await r.json().catch(() => ({}));
+          if (body?.roles) {
+            const mapped = body.roles.map((rr:any) => ({ id: rr.id || rr.name || String(Date.now()), name: rr.id || rr.name, description: rr.description || '' , permissions: [] , isCustom: false }));
+            setPermissionRoles(mapped);
+          }
+        } catch (e) { console.warn('[roles] fetch failed', e); }
+
+        // Groups
+        try {
+          const g = await fetch(`${API}/admin/groups`, { headers });
+          if (g.status === 401) { setUnauthorized(true); return; }
+          const body = await g.json().catch(() => ({}));
+          if (body?.groups) {
+            const mapped = body.groups.map((gg:any) => ({ id: gg.id, name: gg.name, userCount: gg.member_count || 0, createdAt: gg.created_at }));
+            setGroups(mapped);
+          }
+        } catch (e) { console.warn('[groups] fetch failed', e); }
+
+        // Activity
+        try {
+          const a = await fetch(`${API}/admin/activity`, { headers });
+          if (a.status === 401) { setUnauthorized(true); return; }
+          const body = await a.json().catch(() => ({}));
+          if (body?.activity) {
+            // map into activityRecords shape
+            const mapped = (body.activity as any[]).map(act => ({ id: act.id, userId: act.user_id || '', userName: act.metadata?.userName || act.user_id || '', action: act.action, timestamp: act.created_at, ipAddress: act.metadata?.ip || '' }));
+            // replace activityRecords via state setter - activityRecords was const, so use local set
+            // Use existing toasts to show success
+            // temporary: assign to a local state by setting toasts (we'll add state for activity)
+            // Create dedicated activity state
+            setActivity(mapped as any);
+          }
+        } catch (e) { console.warn('[activity] fetch failed', e); }
+
+      } catch (e) {
+        console.warn('admin auxiliary fetch failed', e);
+      }
+    })();
+  }, [user]);
+
+  
+
   // Apply filters
   const displayedUsers = systemUsers.filter(user => {
     const textMatch = user.name.toLowerCase().includes(filterText.toLowerCase()) ||
@@ -286,7 +372,7 @@ export default function UserManagement() {
       }
       const headers: Record<string,string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
+      else { setUnauthorized(true); pushToast('error', 'Admin session required'); return; }
 
       try {
         const payload: any = { email: userData.email, role: userData.role || 'student' };
@@ -327,7 +413,7 @@ export default function UserManagement() {
       if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
       const headers: Record<string,string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
+      else { setUnauthorized(true); pushToast('error', 'Admin session required'); return; }
 
       try {
         const payload: any = {};
@@ -377,11 +463,7 @@ export default function UserManagement() {
 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
-      else {
-        pushToast('error', 'Admin session or admin secret required');
-        return;
-      }
+      else { setUnauthorized(true); pushToast('error', 'Admin session required'); return; }
 
       const res = await fetch(`${API}/admin/users/${userId}/role`, {
         method: 'PATCH',
@@ -417,7 +499,7 @@ export default function UserManagement() {
       if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
       const headers: Record<string,string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
+      else { setUnauthorized(true); pushToast('error', 'Admin session required'); return; }
 
       try {
         const res = await fetch(`${API}/admin/users/${userId}`, { method: 'DELETE', headers });
@@ -449,7 +531,7 @@ export default function UserManagement() {
       if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
       const headers: Record<string,string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      else if (ENV_SECRET) headers['x-admin-secret'] = ENV_SECRET;
+      else { setUnauthorized(true); pushToast('error', 'Admin session required'); return; }
 
       try {
         // Try to update status via admin API (store in metadata.status if users table supports metadata)
@@ -539,7 +621,7 @@ export default function UserManagement() {
   const downloadActivityLog = () => {
     const csvData = [
       ["User", "Action", "Time", "IP"],
-      ...activityRecords.map(log => [log.userName, log.action, log.timestamp, log.ipAddress])
+      ...activity.map(log => [log.userName, log.action, log.timestamp, log.ipAddress])
     ].map(row => row.join(",")).join("\n");
     
     const file = new Blob([csvData], { type: "text/csv" });
@@ -764,6 +846,30 @@ export default function UserManagement() {
                             >
                               <Edit2 size={16} />
                             </button>
+                            {user.role === 'user' && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+                                    const res = await fetch(`${API}/auth/request-role`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email, requestedRole: 'instructor' }) });
+                                    if (!res.ok) {
+                                      const b = await res.json().catch(()=>({}));
+                                      pushToast('error', b?.error || 'Failed to request role');
+                                      return;
+                                    }
+                                    pushToast('success', 'Role request submitted');
+                                  } catch (e:any) {
+                                    console.error('request role failed', e);
+                                    pushToast('error', String(e?.message || e));
+                                  }
+                                }}
+                                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"
+                                disabled={!!actionLoading[user.id] || loading}
+                                title="Request Instructor Role"
+                              >
+                                <UserPlus size={16} />
+                              </button>
+                            )}
                             <button
                               onClick={() => switchStatus(user.id)}
                               className="p-2 text-green-600 hover:bg-green-50 rounded"
@@ -790,7 +896,111 @@ export default function UserManagement() {
             </div>
           )}
 
-          {/* Add more tab content here... */}
+          {/* ROLES TAB */}
+          {currentTab === 'roles' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Roles & Permissions</h2>
+                <button onClick={() => setDisplayAddRole(true)} className="px-3 py-2 bg-blue-600 text-white rounded-md">Add Role</button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Role</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Description</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {permissionRoles.map(r => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium">{r.name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{r.description}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            <button onClick={() => { setActiveRole(r); setDisplayAddRole(true); }} className="px-2 py-1 bg-yellow-100 rounded">Edit</button>
+                            <button onClick={() => removeRole(r.id)} className="px-2 py-1 bg-red-100 rounded">Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* GROUPS TAB */}
+          {currentTab === 'groups' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Groups</h2>
+                <button onClick={() => setDisplayAddGroup(true)} className="px-3 py-2 bg-blue-600 text-white rounded-md">Create Group</button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Group</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Members</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Created</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {groups.map(g => (
+                      <tr key={g.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">{g.name}</td>
+                        <td className="px-4 py-3">{g.userCount}</td>
+                        <td className="px-4 py-3">{g.createdAt}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            <button onClick={() => alert('Show members (not implemented)')} className="px-2 py-1 bg-gray-100 rounded">Members</button>
+                            <button onClick={() => { if (g.userCount > 0) { alert('Cannot delete non-empty group'); } else removeGroup(g.id); }} className="px-2 py-1 bg-red-100 rounded">Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ACTIVITY TAB */}
+          {currentTab === 'activity' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Activity Log</h2>
+                <div className="flex gap-2">
+                  <button onClick={downloadActivityLog} className="px-3 py-2 bg-blue-600 text-white rounded-md">Export</button>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">When</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Admin/User</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Action</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {activity.map(a => (
+                      <tr key={a.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-700">{a.timestamp}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{a.userName || a.userId}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{a.action}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{a.ipAddress}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </main>

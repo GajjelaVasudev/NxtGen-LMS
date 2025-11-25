@@ -1,6 +1,14 @@
 import './loadEnv.js';
 import express from "express";
 import cors from "cors";
+// Try to load helmet if available; optional dependency to avoid install errors in minimal dev setups
+let helmet: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  helmet = require('helmet');
+} catch (e) {
+  console.warn('[startup] optional dependency `helmet` not installed; security headers will be reduced. Install with `npm i helmet` for better protection');
+}
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { handleDemo } from "./routes/demo.js";
@@ -37,6 +45,8 @@ import {
   createUser,
   updateUser,
   deleteUser,
+  listUsers,
+  exportUsersCsv,
 } from "./routes/admin.js";
 import { getAssignments, createAssignment, getAssignment, updateAssignment } from "./routes/assignments.js";
 import {
@@ -59,8 +69,21 @@ export function createServer() {
   app.set('trust proxy', true);
 
   // Middleware
-  // allow CORS for local development; tighten origin in production
-  app.use(cors({ origin: true }));
+  // Security headers (only if helmet is available)
+  if (helmet) app.use(helmet());
+
+  // CORS: allow a specific list from env in production; allow any in development
+  const allowed = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (process.env.NODE_ENV === 'production' && allowed.length > 0) {
+    app.use(cors({ origin: function(origin, cb) {
+      if (!origin) return cb(null, false);
+      if (allowed.includes(origin)) return cb(null, true);
+      return cb(new Error('CORS origin denied'));
+    } }));
+  } else {
+    // development / testing: allow any origin
+    app.use(cors({ origin: true }));
+  }
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
@@ -73,6 +96,29 @@ export function createServer() {
     }
     next();
   });
+
+  // Lightweight admin rate limiter (in-memory). Limits requests per IP for admin endpoints.
+  const adminRateMap = new Map();
+  function adminRateLimiter(req: any, res: any, next: any) {
+    try {
+      const ip = String(req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown');
+      const now = Date.now();
+      const windowMs = 60 * 1000; // 1 minute
+      const max = 60; // max requests per window
+      const entry = adminRateMap.get(ip) || { count: 0, reset: now + windowMs };
+      if (entry.reset < now) {
+        entry.count = 0;
+        entry.reset = now + windowMs;
+      }
+      entry.count += 1;
+      adminRateMap.set(ip, entry);
+      res.setHeader('X-RateLimit-Limit', String(max));
+      res.setHeader('X-RateLimit-Remaining', String(Math.max(0, max - entry.count)));
+      res.setHeader('X-RateLimit-Reset', String(Math.floor(entry.reset / 1000)));
+      if (entry.count > max) return res.status(429).json({ error: 'Too many requests' });
+      next();
+    } catch (e) { next(); }
+  }
 
   // API routes
   app.get("/api/ping", (_req, res) => {
@@ -232,7 +278,13 @@ export function createServer() {
   // Email verification endpoint removed — manual signups create users immediately
 
   // Admin user management
-  app.get("/api/admin/users", listAllUsers);
+  // Apply admin rate limiter to admin and sensitive role endpoints
+  app.use('/api/admin', adminRateLimiter);
+  app.use('/api/auth/approve-role', adminRateLimiter);
+  app.use('/api/auth/deny-role', adminRateLimiter);
+  app.use('/api/auth/role-requests', adminRateLimiter);
+  app.get("/api/admin/users", listUsers);
+  app.get("/api/admin/users/export", exportUsersCsv);
   app.patch("/api/admin/users/:id/role", updateUserRole);
   // Roles / Permissions / Groups / Activity / Reports
   app.get('/api/admin/roles', listRoles);
