@@ -111,4 +111,33 @@
   }
 }
 
+/* Surprise page animations and styles */
+@keyframes float-heart {
+  0% { transform: translateY(0) scale(0.9); opacity: 0.9; }
+  50% { transform: translateY(-40vh) scale(1.05); opacity: 0.6; }
+  100% { transform: translateY(-80vh) scale(1); opacity: 0; }
+}
+
+.animate-float-heart { animation: float-heart 8s linear infinite; }
+
+@keyframes glow {
+  0% { box-shadow: 0 0 0px rgba(249, 115, 175, 0.0); }
+  50% { box-shadow: 0 6px 30px rgba(249,115,175,0.45); transform: translateY(-2px); }
+  100% { box-shadow: 0 0 0px rgba(249,115,175,0.0); }
+}
+
+.shadow-glow { animation: glow 1.6s ease-in-out infinite; }
+
+.heart-glitter { position: relative; }
+.heart-glitter::after {
+  content: '✨';
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  font-size: 20px;
+  opacity: 0.9;
+  animation: glow 2s ease-in-out infinite;
+}
+
+
 
