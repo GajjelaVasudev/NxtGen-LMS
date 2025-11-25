@@ -219,22 +219,6 @@ export default function UserManagement() {
     localStorage.setItem(ADMIN_STORAGE, JSON.stringify({ users: systemUsers, roles: permissionRoles, groups }));
   }, [systemUsers, permissionRoles, groups]);
 
-  // If unauthorized, render an explanatory page
-  if (unauthorized) {
-    return (
-      <main className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="bg-white p-8 rounded-lg shadow text-center">
-            <h2 className="text-2xl font-bold text-red-600">Unauthorized</h2>
-            <p className="mt-4 text-gray-700">You must sign in as an administrator to access this section. Please sign in with an admin account.</p>
-            <div className="mt-6">
-              <a href="/login" className="px-4 py-2 bg-blue-600 text-white rounded">Sign in</a>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
 
   // Fetch real users from server if current user is admin (fallback to local data otherwise)
   useEffect(() => {
@@ -648,6 +632,22 @@ export default function UserManagement() {
       default: return null;
     }
   };
+
+  if (unauthorized) {
+    return (
+      <main className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="bg-white p-8 rounded-lg shadow text-center">
+            <h2 className="text-2xl font-bold text-red-600">Unauthorized</h2>
+            <p className="mt-4 text-gray-700">You must sign in as an administrator to access this section. Please sign in with an admin account.</p>
+            <div className="mt-6">
+              <a href="/login" className="px-4 py-2 bg-blue-600 text-white rounded">Sign in</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
