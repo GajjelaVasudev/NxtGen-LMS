@@ -26,7 +26,7 @@ export default function Surprise() {
   }, [location]);
 
   useEffect(() => {
-    if (code.length >= SECRET.length) {
+    if (code.length === SECRET.length) {
       if (code === SECRET) {
         setUnlocked(true);
         setError('');
@@ -48,6 +48,9 @@ export default function Surprise() {
     setCode((c) => c.slice(0, -1));
     setError('');
   }
+
+  // enable keyboard input for digits and backspace
+  useKeypadKeyboard(press, backspace);
 
   const message = `You are my bangaram Kannu , Love You so much ra 💖\nNijanga I Love You So Much Kannamaaaa !!!`;
 
@@ -72,10 +75,11 @@ export default function Surprise() {
               {error && <div className="mt-3 text-sm text-rose-600">{error}</div>}
             </div>
 
-            <div className="mt-6 grid grid-cols-3 gap-3 max-w-xs mx-auto md:mx-0">
+            <div className="mt-6 grid grid-cols-3 gap-3 max-w-xs mx-auto md:mx-0" role="group" aria-label="keypad">
               {[1,2,3,4,5,6,7,8,9,'',0,'←'].map((d, idx) => (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => (d === '←' ? backspace() : d === '' ? null : press(String(d)))}
                   className="bg-rose-100 hover:bg-rose-200 active:scale-95 transition rounded-lg py-3 text-xl font-medium text-rose-700"
                   aria-label={`key-${d}`}
@@ -102,3 +106,18 @@ export default function Surprise() {
     </div>
   );
 }
+
+  // add keyboard support at module-level to improve UX
+  function useKeypadKeyboard(handler: (k: string) => void, backHandler: () => void) {
+    useEffect(() => {
+      const onKey = (e: KeyboardEvent) => {
+        if (/^[0-9]$/.test(e.key)) {
+          handler(e.key);
+        } else if (e.key === 'Backspace') {
+          backHandler();
+        }
+      };
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }, [handler, backHandler]);
+  }
