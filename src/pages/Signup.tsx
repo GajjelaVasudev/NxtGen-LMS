@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { FormInput } from "@/components/FormInput";
 import { SocialLogin } from "@/components/SocialLogin";
@@ -34,6 +34,8 @@ export default function Signup() {
 	const navigate = useNavigate();
 	const { login } = useAuth();
 
+	const location = useLocation();
+
 	const [firstName, setFirstName] = useState("");
 	const [lastName, setLastName] = useState("");
 	const [email, setEmail] = useState("");
@@ -45,6 +47,14 @@ export default function Signup() {
 	const [loading, setLoading] = useState(false);
 	// role selection removed; manual signups are students by default
 	const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+	useEffect(() => {
+		// If user came from landing page with an email, pre-fill the email field
+		const anyState = (location as any).state;
+		if (anyState && typeof anyState.email === 'string' && anyState.email.length > 0) {
+			setEmail(anyState.email);
+		}
+	}, [location]);
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();

@@ -42,7 +42,8 @@ export default function Landing() {
 
   function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
-    navigate("/signup");
+    // navigate to signup and pass the entered email so it can be pre-filled
+    navigate("/signup", { state: { email } });
   }
 
   const features = [
