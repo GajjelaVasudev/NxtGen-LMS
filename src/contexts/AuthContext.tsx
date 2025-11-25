@@ -12,7 +12,7 @@ export type User = {
 type AuthContextValue = {
   user: User | null;
   isAuthenticated: boolean;
-  login: (user: Partial<User> & { email?: string }) => Promise<void>;
+  login: (user: Partial<User> & { email?: string }, session?: any) => Promise<void>;
   logout: () => void;
   hasRole: (roles: Role | Role[]) => boolean;
 };
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const login = async (u: Partial<User> & { email?: string }) => {
+  const login = async (u: Partial<User> & { email?: string }, session?: any) => {
     try {
       const email = u?.email || (u && (u as any).email);
 
@@ -123,6 +123,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(finalUser);
+
+      // If server returned a Supabase session, set it into the browser Supabase client
+      if (session && session.access_token) {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+          const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+          if (url && key) {
+            const client = createClient(url, key);
+            // v2 API: set session using access + refresh tokens
+            await client.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
+          }
+        } catch (e) {
+          console.warn('[Auth.login] failed to set Supabase session in browser', e);
+        }
+      }
+
       try { window.dispatchEvent(new CustomEvent('inbox:updated')); } catch {}
     } catch (err) {
       console.error('Error in Auth.login', err);

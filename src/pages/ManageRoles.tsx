@@ -49,6 +49,14 @@ export default function ManageRoles() {
         fetchRequests(undefined, token);
         return;
       }
+      // No bearer token available. If the client-side auth context indicates
+      // this user is an admin (demo flow), allow the page to render in read-only
+      // mode (requests will be empty). Otherwise mark unauthorized.
+      if (user && (user as any).role === 'admin') {
+        setUnauthorized(false);
+        setRequests([]);
+        return;
+      }
       setUnauthorized(true);
     })();
   }, []);

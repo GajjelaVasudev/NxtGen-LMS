@@ -75,7 +75,8 @@ export default function Login() {
             }
 
             const data = await res.json();
-            await login(data.user);
+            // If server returned a Supabase session include it when logging in
+            await login(data.user, data.session);
             navigate("/app");
         } catch (err: any) {
             console.error("Login error:", err);

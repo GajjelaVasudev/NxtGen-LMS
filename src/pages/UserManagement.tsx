@@ -238,7 +238,14 @@ export default function UserManagement() {
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
         else {
-          // no admin token -> mark unauthorized UI
+          // no admin token -> if the local auth context shows an admin user,
+          // allow the admin UI to render using local/demo data (skip server fetches).
+          if (user && (user as any).role === 'admin') {
+            // keep unauthorized=false and skip remote fetch
+            setLoading(false);
+            return;
+          }
+          // otherwise mark unauthorized
           setUnauthorized(true);
           setLoading(false);
           return;
@@ -285,7 +292,12 @@ export default function UserManagement() {
           try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch (_) { token = null; }
         }
         const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
-        if (!token) return; // cannot fetch admin data without token
+        if (!token) {
+          // If there's no token but the signed-in user is an admin (demo/local),
+          // skip remote fetches and keep existing local/demo data.
+          if (user && (user as any).role === 'admin') return;
+          return;
+        }
 
         const headers: Record<string,string> = { 'Authorization': `Bearer ${token}` };
 

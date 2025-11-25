@@ -111,7 +111,19 @@ export const login: RequestHandler = async (req, res) => {
   try {
     const { data: found, error: findErr } = await supabase.from('users').select('id, email, role, first_name, last_name').ilike('email', user.email).single();
     if (found && !findErr) {
-      return res.json({ success: true, user: found, message: 'Login successful (DB user)' });
+      // attempt to ensure an auth session exists for the user (create+signin using anon key)
+      try {
+        // signUp (may return error if already exists) — ignore duplicate errors
+        await (supabase as any).auth.signUp?.({ email: user.email, password: password }).catch(() => null);
+      } catch (_) {}
+      // sign in to obtain a session for the browser
+      try {
+        const signIn = await (supabase as any).auth.signInWithPassword?.({ email: user.email, password });
+        const session = signIn?.data?.session || null;
+        return res.json({ success: true, user: found, message: 'Login successful (DB user)', session });
+      } catch (_) {
+        return res.json({ success: true, user: found, message: 'Login successful (DB user)' });
+      }
     }
 
     // Create the user in DB
@@ -119,13 +131,24 @@ export const login: RequestHandler = async (req, res) => {
     const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role, first_name, last_name').single();
     if (created && !createErr) {
       console.log('[auth] Created DB user during login', { email: user.email, id: created.id });
-      return res.json({ success: true, user: created, message: 'Login successful (created DB user)' });
+      // attempt to ensure auth user exists and sign in to obtain session
+      try {
+        await (supabase as any).auth.signUp?.({ email: user.email, password }).catch(() => null);
+      } catch (_) {}
+      try {
+        const signIn = await (supabase as any).auth.signInWithPassword?.({ email: user.email, password });
+        const session = signIn?.data?.session || null;
+        return res.json({ success: true, user: created, message: 'Login successful (created DB user)', session });
+      } catch (_) {
+        return res.json({ success: true, user: created, message: 'Login successful (created DB user)' });
+      }
     }
     console.warn('[auth] Could not create/find DB user during login, falling back to demo user', { findErr, createErr });
   } catch (ex) {
     console.error('[auth] Exception ensuring DB user during login', ex);
   }
 
+  // As a final fallback, return demo user (no session)
   return res.json({ success: true, user: userWithoutPassword, message: 'Login successful (demo user fallback)' });
 };
 
