@@ -126,18 +126,55 @@
   100% { box-shadow: 0 0 0px rgba(249,115,175,0.0); }
 }
 
-.shadow-glow { animation: glow 1.6s ease-in-out infinite; }
 
-.heart-glitter { position: relative; }
-.heart-glitter::after {
-  content: '✨';
-  position: absolute;
-  top: -12px;
-  right: -12px;
-  font-size: 20px;
-  opacity: 0.9;
-  animation: glow 2s ease-in-out infinite;
+/* Surprise page: premium action button (sparkle burst) - scoped to surprise page */
+@keyframes sparkle-pulse {
+  0% { opacity: 0; transform: scale(0.6); }
+  50% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.4); }
 }
+
+.surprise-page .surprise-btn {
+  @apply rounded-lg px-4 py-2 text-sm font-semibold bg-rose-600 text-white;
+  position: relative;
+  overflow: visible;
+  transition: box-shadow 180ms ease, transform 120ms ease;
+}
+
+.surprise-page .surprise-btn:hover {
+  box-shadow: 0 8px 30px rgba(249, 115, 175, 0.18);
+  transform: translateY(-2px);
+}
+
+/* Particles container (generated via pseudo-elements) */
+.surprise-page .surprise-btn:after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+/* small burst elements - created dynamically via JS by toggling a class */
+.surprise-page .burst-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.surprise-page .burst-particles span {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg,#fff5f7,#fecdd3);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.2);
+  animation: sparkle-pulse 420ms ease-out forwards;
+}
+
 
 
 

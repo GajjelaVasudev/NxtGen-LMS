@@ -1,227 +1,248 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { useAuth } from '@/contexts/AuthContext';
 
-const SECRET = '2431';
+/*
+  Surprise (memory vault) page
+  - Loads shared row from Supabase table `special_surprise` (id='princess')
+  - Shows message (preserve line breaks) and single shared photo (Supabase Storage)
+  - Allows editing and photo replacement for emails listed in VITE_SURPRISE_ALLOWED_EDITORS
+*/
 
-function FloatingHearts() {
-  const hearts = Array.from({ length: 10 }).map((_, i) => ({ id: i, left: Math.random() * 100, delay: Math.random() * 5 }));
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden -z-10">
-      {hearts.map((h) => (
-        <div
-          key={h.id}
-          className="absolute text-pink-400 opacity-80 animate-float-heart"
-          style={{ left: `${h.left}%`, bottom: '-10%', animationDelay: `${h.delay}s` }}
-        >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="drop-shadow-lg">
-            <path d="M12 21s-7-4.35-10-7.12C-1.1 10.9 2 6 6 7.5 8.2 8.3 9 10 12 12c3-2 3.8-3.7 6-4.5 4-1.5 7.1 3.4 4 6.38C19 16.65 12 21 12 21z"/>
-          </svg>
-        </div>
-      ))}
-    </div>
-  );
+type SurpriseRow = {
+  id: string;
+  message: string | null;
+  photo_url: string | null;
+  updated_by: string | null;
+  updated_at: string | null;
+};
+
+function formatDate(ts?: string | null) {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleString();
+  } catch { return ts; }
 }
 
 export default function Surprise() {
-  const [code, setCode] = useState('');
-  const [unlocked, setUnlocked] = useState(false);
-  const [error, setError] = useState('');
-  const [glow, setGlow] = useState(false);
-  const [photo, setPhoto] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
 
-  const PHOTO_KEY = 'surprisePhoto';
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [row, setRow] = useState<SurpriseRow | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // Create Supabase client from Vite env vars
+  const SUPA_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const allowedRaw = (import.meta.env.VITE_SURPRISE_ALLOWED_EDITORS as string | undefined) || '';
+  const allowedEditors = allowedRaw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+  const isEditor = !!user?.email && allowedEditors.includes(user.email.toLowerCase());
+
+  function createSupabaseClient(): SupabaseClient | null {
+    if (!SUPA_URL || !SUPA_KEY) {
+      console.warn('Surprise: missing Supabase VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY');
+      return null;
+    }
+    return createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } });
+  }
 
   useEffect(() => {
-    if (code.length >= SECRET.length) {
-      if (code === SECRET) {
-        setUnlocked(true);
-        setError('');
-      } else {
-        setError('Wrong code — try again 💕');
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      const supabase = createSupabaseClient();
+      if (!supabase) {
+        if (mounted) {
+          setError('Configuration missing. Surprise is unavailable.');
+          setLoading(false);
+        }
+        return;
       }
-      setCode('');
-    }
-  }, [code]);
 
-  // load saved photo from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(PHOTO_KEY);
-      if (saved) setPhoto(saved);
-    } catch (e) {
-      // ignore
-    }
+      try {
+        // Try to fetch the row
+        const { data, error: fetchErr } = await supabase.from<SurpriseRow>('special_surprise').select('*').eq('id', 'princess').maybeSingle();
+        if (fetchErr) {
+          console.error('[surprise] fetch error', fetchErr);
+          throw fetchErr;
+        }
+
+        if (!data) {
+          // create default row
+          const defaultMsg = `Hey princess,\nYou make everything in my life beautiful.\nI’m lucky to love you every day.\n\nForever ours ❤️`;
+          const { data: insData, error: insErr } = await supabase.from('special_surprise').upsert({ id: 'princess', message: defaultMsg, photo_url: null, updated_by: null }).select().maybeSingle();
+          if (insErr) {
+            console.error('[surprise] insert error', insErr);
+            throw insErr;
+          }
+          if (mounted) setRow(insData as SurpriseRow);
+        } else {
+          if (mounted) setRow(data as SurpriseRow);
+        }
+      } catch (ex) {
+        console.error('Surprise load failed', ex);
+        if (mounted) setError('Could not load surprise.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => { mounted = false; };
   }, []);
 
-  // auto-unlock if navigated with state
+  // handle auto-unlock via route state
   useEffect(() => {
     const anyState = (location as any).state;
     if (anyState && anyState.autoUnlock) {
-      setUnlocked(true);
+      // no-op for now; access to this route is sufficient
     }
   }, [location]);
 
-  // allow typing digits / backspace when on page
-  // Removed global on-page key listeners; keypad UI still works for entering code.
-
-  // paste support (image paste)
-  useEffect(() => {
-    function onPaste(e: ClipboardEvent) {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (const it of Array.from(items)) {
-        if (it.type.startsWith('image/')) {
-          const blob = it.getAsFile();
-          if (blob) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const result = String(reader.result || '');
-              setPhoto(result);
-              try { localStorage.setItem(PHOTO_KEY, result); } catch (e) {}
-            };
-            reader.readAsDataURL(blob);
-            e.preventDefault();
-            break;
-          }
-        }
-      }
-    }
-
-    window.addEventListener('paste', onPaste);
-    return () => window.removeEventListener('paste', onPaste);
-  }, []);
-
-  function openFilePicker() {
-    fileInputRef.current?.click();
-  }
-
-  function readFileAsDataUrl(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onerror = () => reject(new Error('Failed to read file'));
-      r.onload = () => resolve(String(r.result || ''));
-      r.readAsDataURL(file);
-    });
-  }
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  async function saveMessage() {
+    const supabase = createSupabaseClient();
+    if (!supabase) return setError('Supabase not configured');
     try {
-      const data = await readFileAsDataUrl(f);
-      setPhoto(data);
-      try { localStorage.setItem(PHOTO_KEY, data); } catch (err) {}
-    } catch (err) {
-      console.error('Failed to load image', err);
+      setLoading(true);
+      const payload = {
+        id: 'princess',
+        message: editText,
+        updated_by: user?.email || 'unknown',
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error: upErr } = await supabase.from('special_surprise').upsert(payload).select().maybeSingle();
+      if (upErr) {
+        console.error('[surprise] update message error', upErr);
+        setError('Failed to save message');
+      } else {
+        setRow(data as SurpriseRow);
+        setEditing(false);
+      }
+    } catch (ex) {
+      console.error(ex);
+      setError('Failed to save message');
+    } finally {
+      setLoading(false);
     }
-    // reset input so same file can be picked again
-    e.currentTarget.value = '';
   }
 
-  function press(d: string) {
-    if (unlocked) return;
-    setError('');
-    setCode((c) => (c + d).slice(0, SECRET.length));
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const supabase = createSupabaseClient();
+    if (!supabase) return setError('Supabase not configured');
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setLoading(true);
+      const path = 'princess/main.jpg';
+      const bucket = 'surprise-photos';
+      const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+      if (upErr) {
+        console.error('[surprise] storage upload error', upErr);
+        setError('Photo upload failed');
+        return;
+      }
+      const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
+      const publicUrl = (publicData as any)?.publicUrl || null;
+      // save url to row
+      const { data: rowData, error: rowErr } = await supabase.from('special_surprise').upsert({ id: 'princess', photo_url: publicUrl, updated_by: user?.email || null, updated_at: new Date().toISOString() }).select().maybeSingle();
+      if (rowErr) {
+        console.error('[surprise] update photo url error', rowErr);
+        setError('Failed to attach photo');
+      } else {
+        setRow(rowData as SurpriseRow);
+      }
+    } catch (ex) {
+      console.error(ex);
+      setError('Upload failed');
+    } finally {
+      setLoading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   }
 
-  function backspace() {
-    if (unlocked) return;
-    setCode((c) => c.slice(0, -1));
-    setError('');
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">Preparing your surprise…</div>
+      </div>
+    );
   }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-red-600">{error}</div>
+      </div>
+    );
+  }
+
+  const message = row?.message || '';
+  const photoUrl = row?.photo_url || '';
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-b from-pink-50 via-white to-rose-50 p-6 relative overflow-hidden">
-      <FloatingHearts />
-
+    <div className="surprise-page min-h-screen w-full flex items-center justify-center bg-gradient-to-b from-pink-50 via-white to-rose-50 p-6 relative overflow-hidden">
       <div className="max-w-4xl w-full bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl p-6 md:p-10">
-        {!unlocked ? (
-          <div className="flex flex-col md:flex-row items-center gap-6">
-            <div className="flex-1 text-center md:text-left">
-              <h2 className="text-3xl md:text-4xl font-bold text-pink-600">A little secret…</h2>
-              <p className="mt-2 text-sm text-gray-600">Enter the secret code to reveal a surprise made just for you 💖</p>
-
-              <div className="mt-6 inline-block px-6 py-4 bg-pink-50 rounded-xl shadow-inner">
-                <div className="flex items-center justify-center gap-3">
-                  {Array.from({ length: SECRET.length }).map((_, i) => (
-                    <div key={i} className="w-10 h-10 rounded-lg bg-white border border-pink-200 flex items-center justify-center text-lg font-semibold text-pink-600">
-                      {code[i] || '•'}
-                    </div>
-                  ))}
-                </div>
-                {error && <div className="mt-3 text-sm text-rose-600">{error}</div>}
-              </div>
-
-              <div className="mt-6 grid grid-cols-3 gap-3 max-w-xs mx-auto md:mx-0">
-                {[1,2,3,4,5,6,7,8,9,'',0,'←'].map((d, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => (d === '←' ? backspace() : d === '' ? null : press(String(d)))}
-                    className="bg-pink-100 hover:bg-pink-200 active:scale-95 transition rounded-lg py-3 text-xl font-medium text-pink-700"
-                    aria-label={`key-${d}`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="w-full md:w-80 text-center">
-              <div className="inline-flex items-center justify-center w-40 h-40 rounded-full bg-gradient-to-tr from-pink-300 to-rose-400 shadow-xl">
-                <svg className="w-20 h-20 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.35-10-7.12C-1.1 10.9 2 6 6 7.5 8.2 8.3 9 10 12 12c3-2 3.8-3.7 6-4.5 4-1.5 7.1 3.4 4 6.38C19 16.65 12 21 12 21z"/></svg>
-              </div>
-              <p className="mt-4 text-sm text-gray-600">Tap the hearts while you wait 💞</p>
-            </div>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-rose-600">For My Princess</h1>
+          <div className="flex gap-3">
+            <button onClick={() => navigate('/')} className="px-4 py-2 rounded-lg border border-pink-200 text-pink-600 bg-white">Close</button>
           </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h1 className="text-3xl md:text-4xl font-extrabold text-rose-600">For My Princess <span className="text-xl">❤️</span></h1>
-              <div className="flex gap-3">
-                <button onClick={() => setGlow((g) => !g)} className={`px-4 py-2 rounded-full text-white ${glow ? 'bg-rose-500 shadow-glow' : 'bg-pink-500 hover:bg-pink-600'}`}>
-                  {glow ? 'Glowing ♥' : 'Glow ♥'}
-                </button>
-                <button onClick={() => navigate('/')} className="px-4 py-2 rounded-lg border border-pink-200 text-pink-600 bg-white">Close</button>
-              </div>
-            </div>
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <div className="rounded-xl overflow-hidden shadow-lg bg-white">
-                <img src={photo || "https://via.placeholder.com/900x600?text=Our+Photo"} alt="Our special photo" className="w-full h-64 object-cover md:h-full"/>
-              </div>
-
-              <div className="space-y-4">
-                <div className="p-6 bg-pink-50 rounded-xl border border-pink-100 relative overflow-hidden">
-                  <div className="absolute -top-6 -right-6 w-40 h-40 bg-gradient-to-br from-pink-200 to-rose-300 rounded-full opacity-40 filter blur-3xl"></div>
-                  <h3 className="text-xl font-semibold text-rose-600">A love note</h3>
-                  <p className="mt-3 text-gray-700">My dearest, every moment with you is a treasure. You make my heart race and my days brighter. Thank you for being my everything. Forever and always, yours.</p>
-
-                  <div className="mt-4 flex gap-2">
-                    <span className="text-2xl">✨</span>
-                    <span className="text-2xl">💖</span>
-                    <span className="text-2xl">🌸</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start mt-6">
+          <div className="rounded-xl overflow-hidden shadow-lg bg-white p-4 flex items-center justify-center">
+            {photoUrl ? (
+              <img src={photoUrl} alt="Special" className="w-full h-64 object-cover rounded-md" />
+            ) : (
+              <div className="text-center text-gray-500">
+                <div className="mb-3">No special photo yet</div>
+                {isEditor && (
+                  <div>
+                    <label className="surprise-btn inline-flex items-center gap-2 cursor-pointer">
+                      Change photo
+                      <input ref={fileRef} onChange={handleFile} type="file" accept="image/*" className="hidden" />
+                    </label>
                   </div>
-                </div>
+                )}
+              </div>
+            )}
+          </div>
 
+          <div className="space-y-4">
+            <div className="p-6 bg-pink-50 rounded-xl border border-pink-100 relative overflow-hidden">
+              <h3 className="text-xl font-semibold text-rose-600">A love note</h3>
+              {!editing ? (
                 <div>
-                  <h4 className="text-sm font-medium text-rose-600 mb-2">Memory Cards</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-lg bg-white border border-pink-100 shadow-sm p-3 flex flex-col items-center justify-center h-28">
-                      <div className="text-sm text-gray-500">Photo placeholder</div>
+                  <pre className="whitespace-pre-wrap mt-3 text-gray-700">{message}</pre>
+                  <div className="mt-3 text-sm text-gray-500">{row?.updated_by ? `Last updated by ${row.updated_by} at ${formatDate(row.updated_at)}` : ''}</div>
+                  {isEditor && (
+                    <div className="mt-4">
+                      <button onClick={() => { setEditText(message); setEditing(true); }} className="surprise-btn">Edit message</button>
                     </div>
-                    <div className="rounded-lg bg-white border border-pink-100 shadow-sm p-3 flex items-center justify-center h-28">
-                      <button onClick={openFilePicker} className="text-pink-600 font-medium">Add photo</button>
-                      <input ref={fileInputRef} onChange={handleFileChange} type="file" accept="image/*" className="hidden" />
-                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={8} className="w-full p-3 rounded-md border" />
+                  <div className="mt-3 flex gap-3">
+                    <button onClick={saveMessage} className="surprise-btn">Save</button>
+                    <button onClick={() => setEditing(false)} className="px-4 py-2 rounded-md border">Cancel</button>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
