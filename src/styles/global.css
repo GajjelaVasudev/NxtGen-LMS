@@ -175,6 +175,41 @@
   animation: sparkle-pulse 420ms ease-out forwards;
 }
 
+/* Rose petals and reveal animations for Surprise page */
+.petal {
+  position: absolute;
+  top: -10vh;
+  width: 22px;
+  height: 28px;
+  background: radial-gradient(ellipse at center, rgba(255,200,215,0.95) 0%, rgba(255,120,170,0.95) 70%);
+  opacity: 0.95;
+  border-radius: 50% 60% 40% 50%;
+  transform-origin: center;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.08));
+  animation: petal-fall 8s linear infinite;
+}
+
+@keyframes petal-fall {
+  0% { transform: translateY(-10vh) rotate(0deg) translateX(0); opacity: 0.95; }
+  30% { transform: translateY(25vh) rotate(45deg) translateX(8vw); opacity: 0.95; }
+  60% { transform: translateY(60vh) rotate(120deg) translateX(-6vw); opacity: 0.9; }
+  100% { transform: translateY(120vh) rotate(200deg) translateX(0); opacity: 0; }
+}
+
+.fade-in-image { opacity: 0; animation: fadeIn 1.2s ease forwards 0.25s; }
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+
+.love-message { opacity: 0; animation: lovePop 1s ease forwards 0.1s; }
+@keyframes lovePop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.98); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 640px) {
+  .petal { width: 14px; height: 18px; }
+}
+
 
 
 
