@@ -25,10 +25,16 @@ function KeyboardShortcuts() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      // Ctrl+Shift+S opens the surprise directly
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
+      // Don't hijack when focused on form controls or contenteditable
+      const active = document.activeElement as HTMLElement | null;
+      const tag = active?.tagName?.toLowerCase();
+      if (active && (tag === 'input' || tag === 'textarea' || active.isContentEditable)) return;
+
+      // Use Ctrl+Shift+Alt+S to avoid common browser/OS shortcuts
+      if (e.ctrlKey && e.shiftKey && e.altKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        navigate('/surprise');
+        // navigate to the correct route (guard against typos elsewhere)
+        navigate('/surprise', { state: { autoUnlock: false } });
         return;
       }
 
