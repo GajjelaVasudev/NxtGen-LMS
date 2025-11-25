@@ -65,24 +65,7 @@ export default function Surprise() {
   }, [location]);
 
   // allow typing digits / backspace when on page
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (unlocked) return;
-      if (e.key >= '0' && e.key <= '9') {
-        setError('');
-        setCode((c) => (c + e.key).slice(0, SECRET.length));
-      } else if (e.key === 'Backspace') {
-        setCode((c) => c.slice(0, -1));
-        setError('');
-      } else if (e.key === 'Escape') {
-        setCode('');
-        setError('');
-      }
-    }
-
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [unlocked]);
+  // Removed global on-page key listeners; keypad UI still works for entering code.
 
   // paste support (image paste)
   useEffect(() => {

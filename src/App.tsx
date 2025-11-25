@@ -1,8 +1,8 @@
 import "./styles/global.css";
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
@@ -17,43 +17,7 @@ import RequireAuth from "@/components/RequireAuth";
 
 const queryClient = new QueryClient();
 
-const SECRET = '2431';
-
-function KeyboardShortcuts() {
-  const navigate = useNavigate();
-  const bufRef = useRef('');
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      // Don't hijack when focused on form controls or contenteditable
-      const active = document.activeElement as HTMLElement | null;
-      const tag = active?.tagName?.toLowerCase();
-      if (active && (tag === 'input' || tag === 'textarea' || active.isContentEditable)) return;
-
-      // Use Ctrl+Shift+Alt+S to avoid common browser/OS shortcuts
-      if (e.ctrlKey && e.shiftKey && e.altKey && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        // navigate to the correct route (guard against typos elsewhere)
-        navigate('/surprise', { state: { autoUnlock: false } });
-        return;
-      }
-
-      // Accumulate digits typed anywhere; unlock when SECRET matched
-      if (e.key >= '0' && e.key <= '9') {
-        bufRef.current = (bufRef.current + e.key).slice(-SECRET.length);
-        if (bufRef.current === SECRET) {
-          navigate('/surprise', { state: { autoUnlock: true } });
-          bufRef.current = '';
-        }
-      }
-    }
-
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [navigate]);
-
-  return null;
-}
+// Global keyboard shortcuts removed per request.
 
 export default function App() {
   return (
