@@ -10,7 +10,17 @@ export const getCourses: RequestHandler = async (_req, res) => {
       console.error("Supabase getCourses error:", error);
       return res.status(500).json({ error: error.message });
     }
-    return res.json({ courses: data || [] });
+    // merge metadata into top-level for client compatibility (videos/quizzes stored in metadata)
+    const normalized = (data || []).map((row: any) => {
+      try {
+        const meta = row?.metadata || null;
+        if (meta && typeof meta === 'object') {
+          return { ...row, ...meta };
+        }
+      } catch (_) {}
+      return row;
+    });
+    return res.json({ courses: normalized });
   } catch (err: any) {
     console.error("Unexpected getCourses error:", err);
     return res.status(500).json({ error: "Unexpected server error" });
@@ -33,6 +43,14 @@ export const getCourse: RequestHandler = async (req, res) => {
       return res.status(500).json({ error: error.message || 'Database error' });
     }
     if (!data) return res.status(404).json({ error: "Course not found" });
+    // If course.metadata contains structured fields (videos/quizzes/etc), merge them
+    try {
+      const meta = data?.metadata || null;
+      if (meta && typeof meta === 'object') {
+        const merged = { ...data, ...meta };
+        return res.json({ course: merged });
+      }
+    } catch (_) {}
     return res.json({ course: data });
   } catch (err: any) {
     console.error("Unexpected getCourse error:", err);
