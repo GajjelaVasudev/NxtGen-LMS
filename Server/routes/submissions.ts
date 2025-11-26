@@ -2,7 +2,19 @@ import { RequestHandler } from "express";
 import { supabase } from "../supabaseClient.js";
 import { requireInstructor, requireAuth } from "./auth.js";
 import multer from 'multer';
-import type { File as MulterFile } from 'multer';
+
+// Local Multer file type to avoid depending on ambient module augmentations
+type MulterFile = {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+  destination?: string;
+  filename?: string;
+  path?: string;
+};
 
 // Configure multer to store uploads in memory, with a reasonable default limit
 const DEFAULT_MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES || String(10 * 1024 * 1024)); // 10MB
