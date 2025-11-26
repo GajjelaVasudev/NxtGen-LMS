@@ -172,32 +172,41 @@ export default function Assignments() {
     if (!user) return;
 
     try {
-      const imageUrl = await handleImageUpload(imageFile);
-      // Create submission via API
-      const { headers, token } = await (async () => {
-        const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-        const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-        let token: string | null = null;
-        if (supUrl && supKey) {
-          try {
-            const sup = createClient(supUrl, supKey);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const resp: any = sup.auth.getSession ? await sup.auth.getSession() : null;
-            token = resp?.data?.session?.access_token || null;
-          } catch (_) { token = null; }
-        }
-        const h: Record<string,string> = { 'Content-Type': 'application/json' };
-        if (token) h['Authorization'] = `Bearer ${token}`;
-        return { headers: h, token };
-      })();
+      // Prepare FormData to send the file as multipart/form-data
+      const form = new FormData();
+      form.append('file', imageFile, imageFile.name);
+
+      // Resolve Supabase session token (if available) to send Authorization header
+      const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+      let token: string | null = null;
+      if (supUrl && supKey) {
+        try {
+          const sup = createClient(supUrl, supKey);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const resp: any = sup.auth.getSession ? await sup.auth.getSession() : null;
+          token = resp?.data?.session?.access_token || null;
+        } catch (_) { token = null; }
+      }
+
+      const headers: Record<string,string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const res = await fetch(`${API}/assignments/${assignmentId}/submissions`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ content: { imageUrl } }),
+        body: form,
       });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error || "Failed to submit");
+
+      const json = await res.json().catch(() => ({}));
+      if (!json.success) {
+        // Show clear message if file too large
+        if (res.status === 413) throw new Error(json.error || 'File too large');
+        throw new Error(json.error || 'Failed to submit');
+      }
+
+      // derive file URL from response content if provided
+      const fileUrl = (json.data?.content && (json.data.content.fileUrl || json.data.content.imageUrl)) || null;
 
       // update local view
       setSubmissions((s) => [{
@@ -205,7 +214,7 @@ export default function Assignments() {
         assignmentId: json.data.assignment_id,
         userId: json.data.user_id,
         userName: user.name || user.email,
-        imageUrl: imageUrl,
+        imageUrl: fileUrl || '',
         submittedAt: new Date(json.data.submitted_at).getTime(),
         graded: (json.data.status === 'graded' || json.data.grade != null)
       }, ...s]);
@@ -223,12 +232,16 @@ export default function Assignments() {
             fromName: user.name || user.email,
             toUserId: assignment.instructorId,
             subject: 'New Assignment Submission',
-            content: `${user.name || user.email} submitted assignment \"${assignment.title}\"`
+            content: `${user.name || user.email} submitted assignment "${assignment.title}"`
           })
         });
       }
-    } catch (error) {
-      alert("Failed to submit assignment");
+
+      // Signal instructors to refresh their pending submissions
+      try { window.dispatchEvent(new CustomEvent('submissions:updated')); } catch {}
+    } catch (error: any) {
+      const msg = String(error?.message || error || 'Failed to submit assignment');
+      alert(msg);
     }
   };
 

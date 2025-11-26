@@ -1,6 +1,12 @@
 import { RequestHandler } from "express";
 import { supabase } from "../supabaseClient.js";
 import { requireInstructor, requireAuth } from "./auth.js";
+import multer from 'multer';
+
+// Configure multer to store uploads in memory, with a reasonable default limit
+const DEFAULT_MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES || String(10 * 1024 * 1024)); // 10MB
+const uploadStorage = multer.memoryStorage();
+const uploadMiddleware = multer({ storage: uploadStorage, limits: { fileSize: DEFAULT_MAX_BYTES } }).single('file');
 
 // GET /api/submissions?userId=<id>
 export const listUserSubmissions: RequestHandler = async (req, res) => {
@@ -51,6 +57,24 @@ export const createSubmission: RequestHandler = async (req, res) => {
     console.log("[submit] incoming");
     const assignmentId = req.params.assignmentId;
     // Prefer authenticated user; fall back to body.userId when absent
+    // If multipart/form-data we need to run multer to populate req.file and req.body
+    let multerRan = false;
+    if (String(req.headers['content-type'] || '').startsWith('multipart/')) {
+      await new Promise<void>((resolve, reject) => {
+        uploadMiddleware(req as any, res as any, (err: any) => {
+          multerRan = true;
+          if (err) return reject(err);
+          return resolve();
+        });
+      }).catch((multerErr: any) => {
+        console.warn('[submit] multer error', multerErr?.code || String(multerErr));
+        if (multerErr && multerErr.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ success: false, error: `File too large. Maximum allowed size is ${Math.round(DEFAULT_MAX_BYTES / 1024 / 1024)}MB.` });
+        }
+        return res.status(400).json({ success: false, error: 'Failed to parse file upload' });
+      });
+    }
+
     let userId = String(req.body?.userId || "");
     try {
       const { requireAuth } = await import('./auth.js');
@@ -67,6 +91,35 @@ export const createSubmission: RequestHandler = async (req, res) => {
     }
 
     const content = req.body.content || {};
+
+    // If a file was uploaded via multipart form-data, handle uploading it to Supabase Storage
+    if (multerRan && (req as any).file) {
+      try {
+        const file = (req as any).file as Express.Multer.File;
+        const bucket = process.env.SUPABASE_SUBMISSIONS_BUCKET || 'submissions';
+        const safeName = (file.originalname || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filePath = `${assignmentId}/${userId}/${Date.now()}-${safeName}`;
+
+        // upload to supabase storage (buffer)
+        const { data: uploadData, error: uploadErr } = await supabase.storage.from(bucket).upload(filePath, file.buffer as Buffer, { contentType: file.mimetype });
+        if (uploadErr) {
+          console.error('[submit] supabase storage upload error', uploadErr);
+          // return friendly message
+          return res.status(500).json({ success: false, error: 'Failed to store uploaded file' });
+        }
+
+        // get a public url (or signed URL if you prefer)
+        const { data: publicData } = await supabase.storage.from(bucket).getPublicUrl(filePath);
+        const publicUrl = publicData?.publicUrl || null;
+        content.fileUrl = publicUrl;
+        content.fileName = file.originalname;
+        content.fileSize = file.size;
+        content.fileMime = file.mimetype;
+      } catch (e: any) {
+        console.error('[submit] failed handling uploaded file', e);
+        return res.status(500).json({ success: false, error: 'Failed to process uploaded file' });
+      }
+    }
 
     const row: any = {
       assignment_id: assignmentId,

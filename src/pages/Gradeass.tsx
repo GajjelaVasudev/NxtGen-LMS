@@ -13,9 +13,9 @@ export default function Gradeass() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const load = async () => {
       try {
-        setLoading(true);
+        if (mounted) setLoading(true);
         const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
         const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
         let token: string | null = null;
@@ -28,20 +28,22 @@ export default function Gradeass() {
         }
         const headers = token ? { Authorization: `Bearer ${token}` } : { 'x-user-id': user?.id || '' };
         const res = await fetch(`${API}/instructor/submissions`, { headers });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (!mounted) return;
-        if (json.success) {
-          setSubmissions(json.submissions || []);
-        } else {
-          setSubmissions([]);
-        }
+        if (json.success) setSubmissions(json.submissions || []);
+        else setSubmissions([]);
       } catch (err) {
         setSubmissions([]);
       } finally {
         if (mounted) setLoading(false);
       }
-    })();
-    return () => { mounted = false; };
+    };
+
+    load();
+    // refresh when submissions are updated elsewhere (student uploaded)
+    const onUpdate = () => { load(); };
+    window.addEventListener('submissions:updated', onUpdate);
+    return () => { mounted = false; window.removeEventListener('submissions:updated', onUpdate); };
   }, [user]);
 
   const handleEdit = (s: any) => {
@@ -125,6 +127,11 @@ export default function Gradeass() {
                   <div className="font-semibold">{s.studentName}</div>
                   <div className="text-sm text-gray-600">{s.studentEmail}</div>
                   <div className="text-sm text-gray-800 mt-2">{s.assignmentTitle}</div>
+                  {s.raw && s.raw.content && (s.raw.content.fileUrl || s.raw.content.imageUrl) && (
+                    <div className="mt-2">
+                      <a href={`${API}/submissions/${s.submissionId}/file`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">View uploaded file</a>
+                    </div>
+                  )}
                   <div className="text-xs text-gray-500">Submitted: {new Date(s.submitted_at).toLocaleString()}</div>
                 </div>
 
