@@ -558,7 +558,6 @@ export default function CourseView() {
     </div>
   );
 }
-}
 
 // Normalize course object to support legacy field names and ensure arrays exist
 function normalizeCourse(raw: any): Course {
