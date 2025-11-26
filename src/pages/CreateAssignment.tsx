@@ -105,7 +105,13 @@ export default function CreateAssignment() {
       const token = await getAccessToken();
 
       const headers: Record<string,string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else if (user) {
+        // Demo fallback: include x-user-id as email or id so server can canonicalize
+        if (user.email) headers['x-user-id'] = String(user.email);
+        else if (user.id) headers['x-user-id'] = String(user.id);
+      }
 
       const res = await fetch(url, { method: isEditing ? 'PUT' : 'POST', headers, body: JSON.stringify(body) });
       const json = await res.json();

@@ -110,7 +110,7 @@ export const createAssignment: RequestHandler = async (req, res) => {
       }
       if (!userRow) return res.status(401).json({ success: false, error: 'Creator user not found' });
       const role = String((userRow as any).role || '');
-      if (role !== 'instructor' && role !== 'admin') return res.status(403).json({ success: false, error: 'Only instructors or admins can create assignments' });
+      if (role !== 'instructor' && role !== 'admin' && role !== 'content_creator') return res.status(403).json({ success: false, error: 'Only instructors, content creators, or admins can create assignments' });
     } catch (ex) {
       console.error('[createAssignment] unexpected role verify error', ex);
       return res.status(500).json({ success: false, error: 'Failed to verify creator role' });
@@ -187,7 +187,7 @@ export const updateAssignment: RequestHandler = async (req, res) => {
       }
       if (!userRow) return res.status(401).json({ success: false, error: 'Updater user not found' });
       const role = String((userRow as any).role || '');
-      if (role !== 'instructor' && role !== 'admin') return res.status(403).json({ success: false, error: 'Only instructors or admins can update assignments' });
+      if (role !== 'instructor' && role !== 'admin' && role !== 'content_creator') return res.status(403).json({ success: false, error: 'Only instructors, content creators, or admins can update assignments' });
     } catch (ex) {
       console.error('[updateAssignment] unexpected role verify error', ex);
       return res.status(500).json({ success: false, error: 'Failed to verify updater role' });
