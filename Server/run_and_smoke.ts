@@ -1,4 +1,4 @@
-import { createServer } from './index';
+import { createServer } from './index.js';
 
 async function sleep(ms: number) { return new Promise((res) => setTimeout(res, ms)); }
 
