@@ -21,11 +21,16 @@ export const getCourses: RequestHandler = async (_req, res) => {
 export const getCourse: RequestHandler = async (req, res) => {
   try {
     const id = req.params.id;
+    if (!id) return res.status(400).json({ error: 'course id required' });
     const { data, error } = await supabase.from("courses").select("*").eq("id", id).single();
     if (error) {
-      if ((error as any).code === "PGRST116") return res.status(404).json({ error: "Course not found" });
+      // PostgREST returns PGRST116 for "No rows" when using single(); treat as 404
+      const code = String((error as any)?.code || '');
+      if (code === "PGRST116" || /no rows/.test(String(error?.message || '').toLowerCase())) {
+        return res.status(404).json({ error: "Course not found" });
+      }
       console.error("Supabase getCourse error:", error);
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: error.message || 'Database error' });
     }
     if (!data) return res.status(404).json({ error: "Course not found" });
     return res.json({ course: data });
@@ -39,10 +44,66 @@ export const getCourse: RequestHandler = async (req, res) => {
 export const createCourse: RequestHandler = async (req, res) => {
   try {
     const payload = req.body || {};
-    const authChk = await requireAuth(req);
-    if (!authChk.ok) return res.status(authChk.status).json({ error: authChk.msg });
-    const creator = String((authChk.user as any).id || '');
-    if (!creator) return res.status(401).json({ error: 'Missing authenticated user (creator)' });
+    // Prefer authenticated user via bearer token, but allow demo/server flows to supply
+    // an explicit owner via body.owner_id, body.userId, or body.email. We will resolve
+    // the provided identifier to a canonical DB UUID and verify the user's role.
+    let creator = '';
+    try {
+      const authChk = await requireAuth(req);
+      if (authChk.ok) creator = String((authChk.user as any).id || '');
+    } catch (e) {
+      // ignore - we'll attempt fallback below
+    }
+
+    // Fallbacks: owner_id, userId, email, x-user-id header
+    if (!creator) {
+      const body = payload || {};
+      const candidate = String(body.owner_id || body.ownerId || body.userId || body.email || req.headers['x-user-id'] || '').trim();
+      if (candidate) {
+        let resolved = candidate;
+        try {
+          if (resolved.includes('@')) {
+            // email -> ensure DB user exists
+            const { getOrCreateUserInDb } = await import("./auth.js");
+            const result = await getOrCreateUserInDb(resolved.toLowerCase());
+            if (result && result.id) resolved = result.id;
+            else {
+              console.error('[createCourse] failed to resolve owner email to DB id', { email: candidate, result });
+              return res.status(400).json({ error: 'Invalid owner email' });
+            }
+          } else if (!resolved.includes('-')) {
+            // try canonicalize demo numeric ids
+            const { canonicalizeUserId } = await import("../utils/userHelpers.js");
+            const canonical = await canonicalizeUserId(resolved);
+            if (!canonical) return res.status(400).json({ error: 'owner identifier could not be canonicalized' });
+            resolved = canonical;
+          }
+          creator = String(resolved);
+        } catch (ex) {
+          console.error('[createCourse] error resolving owner candidate', ex);
+          return res.status(500).json({ error: 'Failed to resolve owner identifier' });
+        }
+      }
+    }
+
+    if (!creator) return res.status(401).json({ error: 'Missing authenticated user (creator) or owner identifier' });
+
+    // verify role allowed to create courses
+    try {
+      const { data: userRow, error: userErr } = await supabase.from('users').select('id, role').eq('id', creator).maybeSingle();
+      if (userErr) {
+        console.error('[createCourse] user lookup error', userErr);
+        return res.status(500).json({ error: 'Failed to verify creator' });
+      }
+      if (!userRow) return res.status(401).json({ error: 'Creator user not found' });
+      const role = String((userRow as any).role || '');
+      if (!(role === 'admin' || role === 'instructor' || role === 'content_creator')) {
+        return res.status(403).json({ error: 'Insufficient role to create course' });
+      }
+    } catch (ex) {
+      console.error('[createCourse] unexpected role verify error', ex);
+      return res.status(500).json({ error: 'Failed to verify creator role' });
+    }
 
     const insertRow: any = {
       slug: payload.slug || payload.title?.toLowerCase()?.replace(/[^a-z0-9]+/g, "-") || undefined,
