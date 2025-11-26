@@ -119,8 +119,9 @@ export const createSubmission: RequestHandler = async (req, res) => {
         const { data: uploadData, error: uploadErr } = await supabase.storage.from(bucket).upload(filePath, file.buffer as Buffer, { contentType: file.mimetype });
         if (uploadErr) {
           console.error('[submit] supabase storage upload error', uploadErr);
-          // return friendly message
-          return res.status(500).json({ success: false, error: 'Failed to store uploaded file' });
+          // In non-production return detailed message to aid debugging of deploy failures
+          const safeMessage = process.env.NODE_ENV === 'production' ? 'Failed to store uploaded file' : `Failed to store uploaded file: ${uploadErr?.message || String(uploadErr)}`;
+          return res.status(500).json({ success: false, error: safeMessage, details: uploadErr });
         }
 
         // get a public url (or signed URL if you prefer)
