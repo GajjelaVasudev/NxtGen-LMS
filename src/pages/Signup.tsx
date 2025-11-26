@@ -88,7 +88,8 @@ export default function Signup() {
 						const data = await res.json();
 						// Server now creates users immediately — auto-login when user object returned
 						try { if (data?.created) localStorage.setItem('nxtgen_justSignedUp', '1'); } catch {}
-						await login(data.user || data);
+						// Pass password so the AuthContext can persist a Supabase session if the server didn't return one
+						await login({ ...(data.user || data), password } as any, data.session);
 						navigate('/app');
 		} catch (err: any) {
 			console.error(err);

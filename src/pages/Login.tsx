@@ -76,7 +76,8 @@ export default function Login() {
 
             const data = await res.json();
             // If server returned a Supabase session include it when logging in
-            await login(data.user, data.session);
+            // Also pass the plaintext password so AuthContext can fallback to signInWithPassword
+            await login({ ...(data.user || {}), email, password } as any, data.session);
             navigate("/app");
         } catch (err: any) {
             console.error("Login error:", err);
