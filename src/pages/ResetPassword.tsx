@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/utils/supabaseBrowser';
 
 function makeSupabase() {
-  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!url || !key) return null;
-  return createClient(url, key);
+  return supabase;
 }
 
 export default function ResetPassword() {

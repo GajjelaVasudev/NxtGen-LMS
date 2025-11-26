@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { createClient } from '@supabase/supabase-js';
+import { getAccessToken } from '@/utils/supabaseBrowser';
 import {
   Users,
   Search,
@@ -151,12 +151,16 @@ const userGroups: UserGroup[] = [
 
 export default function UserManagement() {
   const { user } = useAuth();
-  // Supabase client helper
+  // Supabase token helper (keeps compatibility with older makeSupabase usage)
   function makeSupabase() {
-    const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-    if (!url || !key) return null;
-    return createClient(url, key);
+    return {
+      auth: {
+        getSession: async () => {
+          const token = await getAccessToken();
+          return { data: { session: token ? { access_token: token } : null } } as any;
+        }
+      }
+    };
   }
   const ENV_SECRET = '';
   const [unauthorized, setUnauthorized] = useState(false);

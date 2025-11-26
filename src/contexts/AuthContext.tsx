@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase, onAuthChange } from '@/utils/supabaseBrowser';
 
 export type Role = "user" | "instructor" | "contentCreator" | "admin";
 
@@ -52,6 +53,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // ignore
       }
     })();
+
+    // Subscribe to Supabase auth changes to keep session in sync across tabs
+    const unsub = onAuthChange((event, session) => {
+      // when auth state changes we don't modify the canonical user row here,
+      // but consumers may rely on `supabase.auth.getSession()` via helpers.
+      // If sign out occurred, clear stored user.
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        setUser(null);
+      }
+    });
+    return () => unsub();
   }, []);
 
   const login = async (u: Partial<User> & { email?: string }, session?: any) => {
@@ -125,16 +137,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(finalUser);
 
       // If server returned a Supabase session, set it into the browser Supabase client
-      if (session && session.access_token) {
+      if (session && session.access_token && supabase) {
         try {
-          const { createClient } = await import('@supabase/supabase-js');
-          const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-          const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-          if (url && key) {
-            const client = createClient(url, key);
-            // v2 API: set session using access + refresh tokens
-            await client.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
-          }
+          // Use the shared browser supabase client to set the session so tokens
+          // are persisted and automatically refreshed by the client.
+          await supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
         } catch (e) {
           console.warn('[Auth.login] failed to set Supabase session in browser', e);
         }

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlayCircle, FileText, CheckCircle } from "lucide-react";
-import { createClient } from '@supabase/supabase-js';
+import { getAccessToken } from "@/utils/supabaseBrowser";
 
 type Todo = { id: string; text: string; done: boolean };
 type Course = { id: string; title: string; thumbnail?: string; description?: string; price?: number; creator?: string; createdAt: number; };
@@ -46,15 +46,7 @@ export default function Overview() {
         if (!user) return;
         const role = (user as any).role || '';
         if (role !== 'instructor') return;
-        const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-        const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-        if (!url || !key) return;
-        const sup = createClient(url, key as string);
-        let token: string | null = null;
-        try {
-          const resp: any = await sup.auth.getSession?.();
-          token = resp?.data?.session?.access_token || null;
-        } catch (_) { token = null; }
+        const token = await getAccessToken();
         if (!token) return;
         const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
         const res = await fetch(`${API}/instructor/summary`, { headers: { Authorization: `Bearer ${token}` } });
@@ -72,12 +64,7 @@ export default function Overview() {
         if (!user) return;
         const role = (user as any).role || '';
         if (role !== 'instructor') return;
-        const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-        const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-        if (!url || !key) return;
-        const sup = createClient(url, key as string);
-        let token: string | null = null;
-        try { const resp: any = await sup.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch (_) { token = null; }
+        const token = await getAccessToken();
         if (!token) return;
         const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
         const res = await fetch(`${API}/instructor/submissions`, { headers: { Authorization: `Bearer ${token}` } });

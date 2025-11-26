@@ -20,19 +20,10 @@ export interface InboxMessage {
 }
 
 const API = import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL as string) || '/api';
-import { createClient } from '@supabase/supabase-js';
+import { getAccessToken } from '@/utils/supabaseBrowser';
 
 async function getSupabaseToken() {
-  const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!supUrl || !supKey) return null;
-  try {
-    const sup = createClient(supUrl, supKey);
-    const resp: any = await sup.auth.getSession?.();
-    return resp?.data?.session?.access_token || null;
-  } catch (e) {
-    return null;
-  }
+  return await getAccessToken();
 }
 
 function mapServerRowToInbox(row: any): InboxMessage {

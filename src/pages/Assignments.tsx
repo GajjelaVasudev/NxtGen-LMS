@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Search, Plus, Edit, Calendar, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { createClient } from '@supabase/supabase-js';
+import { getAccessToken } from '@/utils/supabaseBrowser';
 
 type Assignment = {
   id: string;
@@ -54,16 +54,7 @@ export default function Assignments() {
     let mounted = true;
     const load = async () => {
       if (!user) return;
-      const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-      let token: string | null = null;
-      if (supUrl && supKey) {
-        try {
-          const sup = createClient(supUrl, supKey);
-          const resp: any = await sup.auth.getSession?.();
-          token = resp?.data?.session?.access_token || null;
-        } catch (_) { token = null; }
-      }
+      const token = await getAccessToken();
       try {
         const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
         const [cRes, eRes, sRes] = await Promise.all([
@@ -177,17 +168,7 @@ export default function Assignments() {
       form.append('file', imageFile, imageFile.name);
 
       // Resolve Supabase session token (if available) to send Authorization header
-      const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-      let token: string | null = null;
-      if (supUrl && supKey) {
-        try {
-          const sup = createClient(supUrl, supKey);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const resp: any = sup.auth.getSession ? await sup.auth.getSession() : null;
-          token = resp?.data?.session?.access_token || null;
-        } catch (_) { token = null; }
-      }
+      const token = await getAccessToken();
 
       const headers: Record<string,string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;

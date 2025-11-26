@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ConfirmModal from '@/components/ConfirmModal';
-import { createClient } from '@supabase/supabase-js';
+import { getAccessToken } from '@/utils/supabaseBrowser';
 
 function makeSupabase() {
-  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!url || !key) return null;
-  return createClient(url, key);
+  return {
+    auth: {
+      getSession: async () => {
+        const token = await getAccessToken();
+        return { data: { session: token ? { access_token: token } : null } } as any;
+      }
+    }
+  };
 }
 
 type RoleRequest = {

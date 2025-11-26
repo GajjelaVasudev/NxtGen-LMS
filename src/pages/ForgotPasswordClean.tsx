@@ -4,13 +4,10 @@ import { ChevronLeft } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { FormInput } from '@/components/FormInput';
 import { SocialLogin } from '@/components/SocialLogin';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/utils/supabaseBrowser';
 
 function makeSupabase() {
-  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!url || !key) return null;
-  return createClient(url, key);
+  return supabase;
 }
 
 export default function ForgotPassword(): JSX.Element {

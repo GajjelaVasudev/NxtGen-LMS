@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { createClient } from '@supabase/supabase-js';
+import { getAccessToken } from "@/utils/supabaseBrowser";
+import { toast, Toaster } from 'sonner';
 
 export default function Gradeass() {
   const { user } = useAuth();
@@ -8,6 +9,7 @@ export default function Gradeass() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Record<string, { grade: string; feedback: string }>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [hasAuthError, setHasAuthError] = useState(false);
 
   const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
@@ -16,19 +18,26 @@ export default function Gradeass() {
     const load = async () => {
       try {
         if (mounted) setLoading(true);
-        const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-        const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-        let token: string | null = null;
-        if (supUrl && supKey) {
-          try {
-            const sup = createClient(supUrl, supKey);
-            const resp: any = await sup.auth.getSession?.();
-            token = resp?.data?.session?.access_token || null;
-          } catch (_) { token = null; }
+        // Resolve access token via centralized Supabase browser client which
+        // persists sessions and attempts silent refresh when possible.
+        const token = await getAccessToken();
+        if (!token) {
+          // Instructor endpoints require bearer auth in production. Show a banner + toast
+          setHasAuthError(true);
+          toast.error('Instructor access requires signing in. Please login to view submissions.');
+          setSubmissions([]);
+          return;
         }
-        const headers = token ? { Authorization: `Bearer ${token}` } : { 'x-user-id': user?.id || '' };
+
+        const headers = { Authorization: `Bearer ${token}` };
         const res = await fetch(`${API}/instructor/submissions`, { headers });
         const json = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          setHasAuthError(true);
+          toast.error('Session expired or unauthorized. Please sign in again.');
+          setSubmissions([]);
+          return;
+        }
         if (!mounted) return;
         if (json.success) setSubmissions(json.submissions || []);
         else setSubmissions([]);
@@ -55,20 +64,11 @@ export default function Gradeass() {
     if (!payload) return;
     const grade = parseInt(payload.grade);
     if (isNaN(grade) || grade < 0 || grade > 100) {
-      alert('Please enter a valid grade (0-100)');
+      toast.error('Please enter a valid grade (0-100)');
       return;
     }
-    try {
-      const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-      let token: string | null = null;
-      if (supUrl && supKey) {
-        try {
-          const sup = createClient(supUrl, supKey);
-          const resp: any = await sup.auth.getSession?.();
-          token = resp?.data?.session?.access_token || null;
-        } catch (_) { token = null; }
-      }
+      try {
+        const token = await getAccessToken();
 
       const headers = { 'Content-Type': 'application/json' } as Record<string,string>;
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -106,13 +106,22 @@ export default function Gradeass() {
         // ignore notify errors
       }
     } catch (err) {
-      alert('Failed to save grade');
+      toast.error('Failed to save grade');
     }
   };
 
   return (
     <main className="flex-1 p-6 overflow-y-auto bg-white">
+      <Toaster position="top-right" />
       <div className="max-w-6xl mx-auto">
+        {hasAuthError && (
+          <div className="mb-4 p-3 border rounded bg-yellow-50 text-yellow-800">
+            <div className="flex items-center justify-between">
+              <div>Instructor access requires signing in. Please sign in to view and grade submissions.</div>
+              <button onClick={() => setHasAuthError(false)} className="text-sm underline">Dismiss</button>
+            </div>
+          </div>
+        )}
         <h1 className="text-2xl font-bold text-nxtgen-text-primary mb-6">Grade Assignments</h1>
 
         {loading ? (
@@ -129,7 +138,11 @@ export default function Gradeass() {
                   <div className="text-sm text-gray-800 mt-2">{s.assignmentTitle}</div>
                   {s.raw && s.raw.content && (s.raw.content.fileUrl || s.raw.content.imageUrl) && (
                     <div className="mt-2">
-                      <a href={`${API}/submissions/${s.submissionId}/file`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">View uploaded file</a>
+                      {s.raw.content.fileUrl && typeof s.raw.content.fileUrl === 'string' ? (
+                        <a href={s.raw.content.fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">View uploaded file</a>
+                      ) : (
+                        <a href={`${API}/submissions/${s.submissionId}/file`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">View uploaded file</a>
+                      )}
                     </div>
                   )}
                   <div className="text-xs text-gray-500">Submitted: {new Date(s.submitted_at).toLocaleString()}</div>
