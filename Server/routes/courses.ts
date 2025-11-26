@@ -146,10 +146,29 @@ export const createCourse: RequestHandler = async (req, res) => {
       console.warn('[createCourse] failed to consolidate metadata', ex);
     }
 
-    const { data, error } = await supabase.from("courses").insert([insertRow]).select().single();
-    if (error) {
-      console.error("Supabase createCourse error:", error);
-      return res.status(500).json({ error: error.message });
+    // Try inserting including metadata; if DB schema doesn't include metadata, retry without it
+    let data: any = null;
+    try {
+      const res = await supabase.from("courses").insert([insertRow]).select().single();
+      data = (res as any).data;
+      const err = (res as any).error;
+      if (err) throw err;
+    } catch (firstErr: any) {
+      console.warn('[createCourse] initial insert error, attempting without metadata', firstErr?.message || firstErr);
+      // If error mentions metadata column, try again without metadata
+      if (insertRow.metadata) delete insertRow.metadata;
+      try {
+        const retry = await supabase.from("courses").insert([insertRow]).select().single();
+        data = (retry as any).data;
+        const err2 = (retry as any).error;
+        if (err2) {
+          console.error("Supabase createCourse error after retry:", err2);
+          return res.status(500).json({ error: err2.message || String(err2) });
+        }
+      } catch (retryErr: any) {
+        console.error("Supabase createCourse unexpected error on retry:", retryErr);
+        return res.status(500).json({ error: retryErr?.message || String(retryErr) });
+      }
     }
     return res.json({ success: true, course: data });
   } catch (err: any) {
@@ -175,13 +194,32 @@ export const updateCourse: RequestHandler = async (req, res) => {
         }
       });
       if (Object.keys(meta).length > 0) payloadToUpdate.metadata = meta;
-      const { data, error } = await supabase.from("courses").update(payloadToUpdate).eq("id", id).select().single();
-      if (error) {
-        console.error("Supabase updateCourse error:", error);
-        return res.status(500).json({ error: error.message });
+      // Attempt update; if schema lacks metadata, retry without it
+      try {
+        const dbRes = await supabase.from("courses").update(payloadToUpdate).eq("id", id).select().single();
+        const updated = (dbRes as any).data;
+        const updErr = (dbRes as any).error;
+        if (updErr) throw updErr;
+        if (!updated) return res.status(404).json({ error: "Course not found" });
+        return res.json({ success: true, course: updated });
+      } catch (upErr: any) {
+        console.warn('[updateCourse] initial update error, retrying without metadata if present', upErr?.message || upErr);
+        if (payloadToUpdate.metadata) delete payloadToUpdate.metadata;
+        try {
+          const retry = await supabase.from("courses").update(payloadToUpdate).eq("id", id).select().single();
+          const updated2 = (retry as any).data;
+          const retryErr = (retry as any).error;
+          if (retryErr) {
+            console.error('Supabase updateCourse error after retry:', retryErr);
+            return res.status(500).json({ error: retryErr?.message || String(retryErr) });
+          }
+          if (!updated2) return res.status(404).json({ error: "Course not found" });
+          return res.json({ success: true, course: updated2 });
+        } catch (finalErr: any) {
+          console.error('[updateCourse] unexpected error on retry', finalErr);
+          return res.status(500).json({ error: finalErr?.message || String(finalErr) });
+        }
       }
-      if (!data) return res.status(404).json({ error: "Course not found" });
-      return res.json({ success: true, course: data });
     } catch (ex) {
       console.error('[updateCourse] metadata consolidation failed', ex);
       return res.status(500).json({ error: 'Failed to process update payload' });
