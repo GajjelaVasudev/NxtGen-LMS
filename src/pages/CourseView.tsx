@@ -105,6 +105,10 @@ export default function CourseView() {
   const { user } = useAuth();
   
   const [course, setCourse] = useState<Course | null>(null);
+  const [activeContentTab, setActiveContentTab] = useState<'learn' | 'practice' | 'submit'>('learn');
+  const [loadingServer, setLoadingServer] = useState<boolean>(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [enrolled, setEnrolled] = useState<boolean>(false);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [activeSection, setActiveSection] = useState<"overview" | "content">("overview");
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
@@ -122,108 +126,108 @@ export default function CourseView() {
         const foundCourse = courses.find(c => c.id === courseId);
         if (foundCourse) {
           if (!mounted) return;
-          setCourse(foundCourse);
+          setCourse(normalizeCourse(foundCourse));
           const userProgress = loadProgress(user.id, courseId);
           setProgress(userProgress);
           if (foundCourse.videos && foundCourse.videos.length > 0 && !selectedVideo) {
             setSelectedVideo(foundCourse.videos[0]);
-          }
-          return;
-        }
-
-        // Fallback: fetch from API
-        try {
-          const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
-          const res = await fetch(`${API}/courses/${courseId}`);
-          if (res.ok) {
+          // Fallback: fetch from API
+          try {
+            setLoadingServer(true);
+            setServerError(null);
+            const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+            const res = await fetch(`${API}/courses/${courseId}`);
+            if (!res.ok) {
+              const text = await res.text().catch(() => '');
+              const msg = `Failed to load course: ${res.status} ${res.statusText} ${text}`;
+              console.warn('[CourseView] server fetch non-ok', msg);
+              setServerError(msg);
+              return;
+            }
             const body = await res.json().catch(() => null);
             const serverCourse = body?.course || null;
             if (serverCourse) {
               if (!mounted) return;
-              setCourse(serverCourse);
+              const normalized = normalizeCourse(serverCourse);
+              setCourse(normalized);
+              // cache normalized course locally
+              try {
+                const all = loadCourses();
+                const others = all.filter((c: any) => c.id !== normalized.id);
+                localStorage.setItem(COURSES_KEY, JSON.stringify([normalized, ...others]));
+              } catch (_) {}
+
               const userProgress = loadProgress(user.id, courseId);
               setProgress(userProgress);
-              if (serverCourse.videos && serverCourse.videos.length > 0 && !selectedVideo) {
-                setSelectedVideo(serverCourse.videos[0]);
+              if (normalized.videos && normalized.videos.length > 0 && !selectedVideo) {
+                setSelectedVideo(normalized.videos[0]);
               }
+
+              // fetch assignments scoped to this course (server authoritative)
+              (async () => {
+                try {
+                  const aRes = await fetch(`${API}/assignments?courseId=${encodeURIComponent(courseId)}`);
+                  if (aRes.ok) {
+                    const aBody = await aRes.json().catch(() => null);
+                    const list = (aBody && aBody.data) || [];
+                    const updated = { ...normalized, assignments: list.map((a: any) => ({ id: a.id, title: a.title, files: a.files || [], courseId: a.course_id })) };
+                    setCourse(updated);
+                    // update cache
+                    try {
+                      const all2 = loadCourses();
+                      const others2 = all2.filter((c: any) => c.id !== updated.id);
+                      localStorage.setItem(COURSES_KEY, JSON.stringify([updated, ...others2]));
+                    } catch (_) {}
+                  }
+                } catch (ae) {
+                  console.warn('[CourseView] failed to fetch assignments for course', ae);
+                }
+              })();
+
+              // fetch user's submissions once to compute assignment submission status
+              (async () => {
+                try {
+                  const sRes = await fetch(`${API}/submissions?userId=${encodeURIComponent(user.id)}`);
+                  if (sRes.ok) {
+                    const sBody = await sRes.json().catch(() => null);
+                    const subs = (sBody && sBody.data) || [];
+                    // map submissions by assignment_id for quick lookup
+                    const subMap: Record<string, any> = {};
+                    subs.forEach((s: any) => { subMap[s.assignment_id] = s; });
+                    // if there are any matching assignments, mark them completed in progress
+                    const completed = Object.keys(subMap).filter(k => Boolean(subMap[k] && subMap[k].assignment_id));
+                    if (completed.length > 0) {
+                      const newProgress = { ...userProgress, completedAssignments: completed };
+                      setProgress(newProgress);
+                      saveProgress(newProgress);
+                    }
+                  }
+                } catch (se) {
+                  console.warn('[CourseView] failed to fetch user submissions', se);
+                }
+              })();
+
+              // verify enrollment (students only) - call enrollments endpoint
+              (async () => {
+                try {
+                  const eRes = await fetch(`${API}/enrollments?userId=${encodeURIComponent(user.id)}`);
+                  if (eRes.ok) {
+                    const eBody = await eRes.json().catch(() => null);
+                    const enrolls = (eBody && eBody.enrollments) || [];
+                    const found = enrolls.some((en: any) => String(en.course_id) === String(courseId));
+                    setEnrolled(found || String(user.id) === String((normalized as any).creator) || String(user.id) === String((normalized as any).owner_id));
+                  }
+                } catch (ee) {
+                  console.warn('[CourseView] failed to verify enrollment', ee);
+                }
+              })();
             }
+          } catch (ex) {
+            console.error('[CourseView] failed to fetch course from API', ex);
+            setServerError(String(ex?.message || ex));
+          } finally {
+            setLoadingServer(false);
           }
-        } catch (ex) {
-          console.error('[CourseView] failed to fetch course from API', ex);
-        }
-      })();
-    }
-  }, [courseId, user]);
-
-  if (!course) {
-    return (
-      <div className="flex-1 min-h-0 overflow-y-auto bg-white">
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="text-center py-12">
-            <p className="text-gray-500 mb-4">Course not found</p>
-            <Link to="/app/courses" className="text-blue-600 hover:underline">
-              Back to My Courses
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const markVideoComplete = (videoId: string) => {
-    if (!progress || !user) return;
-    
-    if (!progress.completedVideos.includes(videoId)) {
-      const updated = {
-        ...progress,
-        completedVideos: [...progress.completedVideos, videoId]
-      };
-      setProgress(updated);
-      saveProgress(updated);
-    }
-  };
-
-  const isVideoCompleted = (videoId: string) => {
-    return progress?.completedVideos.includes(videoId) || false;
-  };
-
-  const isQuizUnlocked = (quizIndex: number) => {
-    if (!course.videos || course.videos.length === 0) return true;
-    const videoToComplete = course.videos[quizIndex];
-    return videoToComplete ? isVideoCompleted(videoToComplete.id) : true;
-  };
-
-  const isQuizCompleted = (quizId: string) => {
-    return progress?.completedQuizzes.some(q => q.quizId === quizId) || false;
-  };
-
-  const handleQuizSubmit = () => {
-    if (!selectedQuiz || selectedQuiz.type !== "mcq" || !progress || !user) return;
-
-    let correct = 0;
-    selectedQuiz.questions.forEach((q, idx) => {
-      if (quizAnswers[idx] === q.answer) {
-        correct++;
-      }
-    });
-
-    const score = Math.round((correct / selectedQuiz.questions.length) * 100);
-    setQuizScore(score);
-    setShowQuizResults(true);
-
-    const updated = {
-      ...progress,
-      completedQuizzes: [
-        ...progress.completedQuizzes.filter(q => q.quizId !== selectedQuiz.id),
-        { quizId: selectedQuiz.id, score, answers: quizAnswers }
-      ]
-    };
-    setProgress(updated);
-    saveProgress(updated);
-  };
-
-  const getQuizScore = (quizId: string) => {
-    return progress?.completedQuizzes.find(q => q.quizId === quizId)?.score;
   };
 
   const courseProgress = () => {
@@ -236,38 +240,52 @@ export default function CourseView() {
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-6">
-          <button
-            onClick={() => navigate("/app/courses")}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft size={20} />
-            Back to My Courses
-          </button>
-          
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <div className="flex items-start gap-6">
-              {course.thumbnail && (
-                <img 
-                  src={course.thumbnail} 
-                  alt={course.title} 
-                  className="w-48 h-32 object-cover rounded-lg"
-                />
-              )}
-              <div className="flex-1">
-                <h1 className="text-3xl font-bold mb-2">{course.title}</h1>
-                <p className="text-gray-600 mb-4">{course.description}</p>
-                
-                {/* Progress Bar */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Course Progress</span>
-                    <span className="text-sm font-bold text-blue-600">{courseProgress()}%</span>
-                  </div>
+    // show loading / error states
+    if (loadingServer) {
+      return (
+        <div className="flex-1 min-h-0 overflow-y-auto bg-white">
+          <div className="max-w-7xl mx-auto p-6 text-center">
+            <p className="text-gray-500">Loading course...</p>
+          </div>
+        </div>
+      );
+    }
+    if (serverError) {
+      return (
+        <div className="flex-1 min-h-0 overflow-y-auto bg-white">
+          <div className="max-w-7xl mx-auto p-6 text-center">
+            <p className="text-red-600 mb-4">{serverError}</p>
+            <Link to="/app/courses" className="text-blue-600 hover:underline">Back to My Courses</Link>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto bg-white">
+        <div className="max-w-7xl mx-auto p-6">
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-4">Course not found</p>
+            <Link to="/app/courses" className="text-blue-600 hover:underline">Back to My Courses</Link>
+          </div>
+        </div>
+      </div>
+    );
                   <div className="w-full bg-gray-200 rounded-full h-2">
+
+  // Access control: students must be enrolled to view purchased course
+  const userRole = (user as any)?.role || 'student';
+  if (userRole === 'student' && !enrolled) {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto bg-white">
+        <div className="max-w-7xl mx-auto p-6 text-center">
+          <h2 className="text-xl font-semibold mb-4">Access Denied</h2>
+          <p className="text-gray-600 mb-6">You do not own this course. Purchase or enroll to access the content.</p>
+          <Link to="/app/courses" className="px-4 py-2 bg-blue-600 text-white rounded">Back to Courses</Link>
+        </div>
+      </div>
+    );
+  }
                     <div 
                       className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all"
                       style={{ width: `${courseProgress()}%` }}
@@ -480,12 +498,12 @@ export default function CourseView() {
               <h3 className="text-lg font-bold mb-4">Course Curriculum</h3>
               
               {/* Videos */}
-              {course.videos && course.videos.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <PlayCircle size={16} />
-                    Video Lessons
-                  </h4>
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <PlayCircle size={16} />
+                  Video Lessons
+                </h4>
+                {course.videos && course.videos.length > 0 ? (
                   <div className="space-y-2">
                     {course.videos.map((video, idx) => (
                       <button
@@ -494,6 +512,7 @@ export default function CourseView() {
                           setSelectedVideo(video);
                           setSelectedQuiz(null);
                           setShowQuizResults(false);
+                          setActiveContentTab('learn');
                         }}
                         className={`w-full text-left p-3 rounded-lg border transition-all ${
                           selectedVideo?.id === video.id
@@ -518,16 +537,18 @@ export default function CourseView() {
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-sm text-gray-500">Nothing to complete here yet 👀</div>
+                )}
+              </div>
 
               {/* Quizzes */}
-              {course.quizzes && course.quizzes.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <ClipboardList size={16} />
-                    Quizzes
-                  </h4>
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <ClipboardList size={16} />
+                  Quizzes
+                </h4>
+                {course.quizzes && course.quizzes.length > 0 ? (
                   <div className="space-y-2">
                     {course.quizzes.map((quiz, idx) => {
                       const unlocked = isQuizUnlocked(idx);
@@ -543,6 +564,7 @@ export default function CourseView() {
                               setSelectedVideo(null);
                               setShowQuizResults(false);
                               setQuizAnswers({});
+                              setActiveContentTab('practice');
                             }
                           }}
                           disabled={!unlocked}
@@ -579,38 +601,78 @@ export default function CourseView() {
                       );
                     })}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-sm text-gray-500">Nothing to complete here yet 👀</div>
+                )}
+              </div>
 
               {/* Assignments */}
-              {course.assignments && course.assignments.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <FileText size={16} />
-                    Assignments
-                  </h4>
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <FileText size={16} />
+                  Assignments
+                </h4>
+                {course.assignments && course.assignments.length > 0 ? (
                   <div className="space-y-2">
-                    {course.assignments.map((assignment, idx) => (
-                      <div
-                        key={assignment.id}
-                        className="p-3 rounded-lg border border-gray-200 bg-gray-50"
-                      >
+                    {course.assignments.map((assignment, idx) => {
+                      const submitted = progress?.completedAssignments.includes(String(assignment.id));
+                      return (
+                      <div key={assignment.id} className="p-3 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <FileText size={20} className="text-gray-400 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{assignment.title}</div>
-                            <div className="text-xs text-gray-500">{assignment.files.length} file(s)</div>
+                            <div className="text-xs text-gray-500">{(assignment.files || []).length} file(s)</div>
                           </div>
                         </div>
+                        <div>
+                          {submitted ? (
+                            <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">Submitted</span>
+                          ) : (
+                            <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">Not submitted</span>
+                          )}
+                        </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-sm text-gray-500">Nothing to complete here yet 👀</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+// Normalize course object to support legacy field names and ensure arrays exist
+function normalizeCourse(raw: any): Course {
+  if (!raw) return raw;
+  const out: any = { ...raw };
+
+  // Videos: new key `videos`, legacy `contents`
+  if (!Array.isArray(out.videos) && Array.isArray(out.contents)) {
+    out.videos = out.contents.map((c: any, idx: number) => ({ id: c.id || `v-${idx}`, title: c.title || c.name || `Video ${idx+1}`, url: c.url || c.dataUrl || c.videoUrl, duration: c.duration }));
+  }
+  out.videos = Array.isArray(out.videos) ? out.videos.map((v: any, i: number) => ({ id: String(v.id || `v-${i}`), title: v.title || v.name || `Video ${i+1}`, url: v.url || v.dataUrl || v.videoUrl || undefined, duration: v.duration })) : [];
+
+  // Quizzes: new key `quizzes`, legacy `assessments`
+  if (!Array.isArray(out.quizzes) && Array.isArray(out.assessments)) {
+    out.quizzes = out.assessments.map((q: any, idx: number) => ({ id: q.id || `q-${idx}`, type: q.type || 'mcq', questions: q.questions || [] }));
+  }
+  out.quizzes = Array.isArray(out.quizzes) ? out.quizzes.map((q: any, i: number) => ({ id: String(q.id || `q-${i}`), type: q.type || 'mcq', questions: q.questions || [] })) : [];
+
+  // Assignments: new key `assignments`, legacy `homeworks` or `assessments` with assignment flag
+  if (!Array.isArray(out.assignments) && Array.isArray(out.homeworks)) {
+    out.assignments = out.homeworks.map((a: any, idx: number) => ({ id: a.id || `a-${idx}`, title: a.title || a.name || `Assignment ${idx+1}`, files: a.files || [] }));
+  }
+  // Some legacy courses used `assessments` containing mixed items; extract assignments where type === 'assignment' or has files
+  if (!Array.isArray(out.assignments) && Array.isArray(out.assessments)) {
+    out.assignments = out.assessments.filter((x: any) => x.type === 'assignment' || (x.files && x.files.length)).map((a: any, idx: number) => ({ id: a.id || `a-${idx}`, title: a.title || a.name || `Assignment ${idx+1}`, files: a.files || [] }));
+  }
+  out.assignments = Array.isArray(out.assignments) ? out.assignments.map((a: any, i: number) => ({ id: String(a.id || `a-${i}`), title: a.title || a.name || `Assignment ${i+1}`, files: Array.isArray(a.files) ? a.files : [] })) : [];
+
+  return out as Course;
 }
