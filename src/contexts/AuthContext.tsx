@@ -137,69 +137,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(finalUser);
 
-      // Ensure the Supabase browser client has a persisted session.
-      // 1) If the server returned a session object, use it to setSession.
-      // 2) Otherwise, if a password was provided to this helper, attempt signInWithPassword.
-      // 3) Verify localStorage contains the Supabase session key and notify on failure.
+      // Ensure the Supabase browser client has a persisted session by signing in with password.
+      // We intentionally avoid calling `setSession` from arbitrary server responses
+      // and instead let Supabase issue tokens via `signInWithPassword` so `localStorage` is populated.
       try {
         if (supabase) {
-          let persisted = false;
-
-          if (session && (session.access_token || session.refresh_token)) {
-            try {
-              await supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
-              persisted = true;
-            } catch (e) {
-              console.warn('[Auth.login] failed to set Supabase session from server response', e);
-            }
-          }
-
-          // If no session was provided by the API, try to sign in directly with provided password
           const maybePassword = (u as any).password;
-          if (!persisted) {
-            try {
-              const current = await supabase.auth.getSession();
-              const hasToken = !!(current?.data?.session?.access_token);
-              if (hasToken) persisted = true;
-            } catch (_e) {
-              // ignore
-            }
-          }
-
-          if (!persisted && maybePassword && email) {
+          if (maybePassword && email) {
             try {
               const res = await supabase.auth.signInWithPassword({ email: String(email), password: String(maybePassword) });
               const err = (res as any).error;
-              const data = (res as any).data || (res as any).data?.session;
               if (err) {
                 console.warn('[Auth.login] signInWithPassword failed', err);
                 toast.error('Login succeeded but failed to persist Supabase session');
               } else {
-                // signInWithPassword should persist session in the client automatically
-                persisted = true;
+                // Verify session now exists
+                try {
+                  const current = await supabase.auth.getSession();
+                  const hasToken = !!(current?.data?.session?.access_token);
+                  if (hasToken) {
+                    toast.success('Login successful');
+                  } else {
+                    console.warn('[Auth.login] supabase.auth.getSession returned no access token after signIn');
+                    toast.error('Login succeeded but no Supabase token was found');
+                  }
+                } catch (e) {
+                  console.warn('[Auth.login] error verifying Supabase session', e);
+                  toast.error('Login succeeded but could not verify Supabase session');
+                }
               }
             } catch (e) {
               console.warn('[Auth.login] signInWithPassword exception', e);
+              toast.error('Login succeeded but sign-in to Supabase failed');
             }
-          }
-
-          // Final verification: check localStorage for Supabase auth token
-          try {
-            const key = localStorage.getItem('supabase.auth.token');
-            if (key) {
-              toast.success('Login successful');
-            } else {
-              // If we couldn't persist the token, warn and surface a toast
-              console.warn('[Auth.login] supabase.auth.token missing from localStorage after login');
-              toast.error('Login succeeded but session persistence failed in this browser');
+          } else {
+            // No password available: check if a session already exists
+            try {
+              const current = await supabase.auth.getSession();
+              const hasToken = !!(current?.data?.session?.access_token);
+              if (hasToken) {
+                toast.success('Login successful');
+              } else {
+                console.warn('[Auth.login] no password provided and no Supabase session found');
+                toast.error('Login successful but no Supabase session present (provide password to persist)');
+              }
+            } catch (e) {
+              console.warn('[Auth.login] error checking Supabase session', e);
             }
-          } catch (e) {
-            console.warn('[Auth.login] error checking localStorage for supabase token', e);
-            toast.error('Login succeeded but could not verify session persistence');
           }
         }
       } catch (e) {
-        console.warn('[Auth.login] unexpected error during supabase session persistence', e);
+        console.warn('[Auth.login] unexpected error during Supabase session persistence', e);
       }
 
       try { window.dispatchEvent(new CustomEvent('inbox:updated')); } catch {}
