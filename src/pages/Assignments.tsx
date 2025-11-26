@@ -174,7 +174,7 @@ export default function Assignments() {
     try {
       const imageUrl = await handleImageUpload(imageFile);
       // Create submission via API
-      const headers = (() => {
+      const { headers, token } = await (async () => {
         const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
         const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
         let token: string | null = null;
@@ -188,7 +188,7 @@ export default function Assignments() {
         }
         const h: Record<string,string> = { 'Content-Type': 'application/json' };
         if (token) h['Authorization'] = `Bearer ${token}`;
-        return h;
+        return { headers: h, token };
       })();
 
       const res = await fetch(`${API}/assignments/${assignmentId}/submissions`, {
