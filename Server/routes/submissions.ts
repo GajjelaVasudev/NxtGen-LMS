@@ -2,6 +2,7 @@ import { RequestHandler } from "express";
 import { supabase } from "../supabaseClient.js";
 import { requireInstructor, requireAuth } from "./auth.js";
 import multer from 'multer';
+import type { File as MulterFile } from 'multer';
 
 // Configure multer to store uploads in memory, with a reasonable default limit
 const DEFAULT_MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES || String(10 * 1024 * 1024)); // 10MB
@@ -95,7 +96,7 @@ export const createSubmission: RequestHandler = async (req, res) => {
     // If a file was uploaded via multipart form-data, handle uploading it to Supabase Storage
     if (multerRan && (req as any).file) {
       try {
-        const file = (req as any).file as Express.Multer.File;
+        const file = (req as any).file as MulterFile;
         const bucket = process.env.SUPABASE_SUBMISSIONS_BUCKET || 'submissions';
         const safeName = (file.originalname || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
         const filePath = `${assignmentId}/${userId}/${Date.now()}-${safeName}`;

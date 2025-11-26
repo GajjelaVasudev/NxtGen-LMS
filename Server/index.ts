@@ -85,8 +85,14 @@ export function createServer() {
     // development / testing: allow any origin
     app.use(cors({ origin: true }));
   }
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  // Configure request body size limits. If MAX_UPLOAD_BYTES is set (bytes),
+  // use it to compute a reasonable megabyte limit for express body parsers.
+  // Default: 10MB to avoid small base64 payloads causing 413 errors.
+  const bodyLimit = process.env.MAX_UPLOAD_BYTES
+    ? `${Math.max(1, Math.round(Number(process.env.MAX_UPLOAD_BYTES) / 1024 / 1024))}mb`
+    : '10mb';
+  app.use(express.json({ limit: bodyLimit }));
+  app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 
   // Global request logger (temporary) — logs method and path for every request
   app.use((req, _res, next) => {
