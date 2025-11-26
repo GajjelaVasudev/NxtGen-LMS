@@ -405,21 +405,34 @@ export default function CourseView() {
                 {selectedVideo && (
                   <div className="bg-white rounded-lg p-6 shadow-sm">
                     <h3 className="text-xl font-bold mb-4">{selectedVideo.title}</h3>
-                    <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center mb-4">
-                      {selectedVideo.url ? (
-                        <iframe
-                          src={selectedVideo.url}
-                          className="w-full h-full rounded-lg"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      ) : (
-                        <div className="text-white text-center">
-                          <PlayCircle size={64} className="mx-auto mb-4 opacity-50" />
-                          <p>Video not available</p>
+                        <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center mb-4">
+                          {(() => {
+                            const embedUrl = getEmbeddableVideoUrl(selectedVideo?.url);
+                            if (embedUrl) {
+                              return (
+                                <iframe
+                                  title={selectedVideo?.title || 'video'}
+                                  src={embedUrl}
+                                  className="w-full h-full rounded-lg"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                />
+                              );
+                            }
+
+                            return (
+                              <div className="text-white text-center p-6">
+                                <PlayCircle size={64} className="mx-auto mb-4 opacity-50" />
+                                <div>Invalid or unsupported video URL.</div>
+                                {selectedVideo?.url && (
+                                  <div className="mt-2">
+                                    <a className="underline text-blue-200" href={selectedVideo.url} target="_blank" rel="noreferrer noopener">Open original link</a>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
-                      )}
-                    </div>
 
                     {!isVideoCompleted(selectedVideo.id) && (
                       <button onClick={() => markVideoComplete(selectedVideo.id)} className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">Mark as Complete</button>
@@ -560,6 +573,43 @@ export default function CourseView() {
 }
 
 // Normalize course object to support legacy field names and ensure arrays exist
+// Convert common video links (YouTube watch / youtu.be) into embeddable URLs.
+function getEmbeddableVideoUrl(raw?: string): string | null {
+  if (!raw) return null;
+  try {
+    const trimmed = String(raw).trim();
+    if (!/^https?:\/\//i.test(trimmed)) return null;
+    const u = new URL(trimmed);
+    const host = u.hostname.replace(/^www\./, '').toLowerCase();
+
+    // youtu.be short links
+    if (host === 'youtu.be') {
+      const id = u.pathname.split('/').filter(Boolean)[0];
+      if (!id) return null;
+      return `https://www.youtube.com/embed/${id}`;
+    }
+
+    // youtube.com links (watch?v=, /embed/, /v/ID)
+    if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com')) {
+      // watch?v=VIDEO_ID
+      const v = u.searchParams.get('v');
+      if (v) return `https://www.youtube.com/embed/${v}`;
+
+      // already embed
+      if (u.pathname.startsWith('/embed/')) return trimmed;
+
+      // path-based id like /v/ID
+      const m = u.pathname.match(/\/(?:v|embed)\/([A-Za-z0-9_-]+)/);
+      if (m && m[1]) return `https://www.youtube.com/embed/${m[1]}`;
+    }
+
+    // If it's already an absolute http(s) URL, allow embedding as-is (useful for other providers)
+    return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function normalizeCourse(raw: any): Course {
   if (!raw) return raw;
   const out: any = { ...raw };
