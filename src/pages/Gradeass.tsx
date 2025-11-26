@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAccessToken } from "@/utils/supabaseBrowser";
 import { toast, Toaster } from 'sonner';
 
 export default function Gradeass() {
@@ -18,23 +17,15 @@ export default function Gradeass() {
     const load = async () => {
       try {
         if (mounted) setLoading(true);
-        // Resolve access token via centralized Supabase browser client which
-        // persists sessions and attempts silent refresh when possible.
-        const token = await getAccessToken();
-        if (!token) {
-          // Instructor endpoints require bearer auth in production. Show a banner + toast
-          setHasAuthError(true);
-          toast.error('Instructor access requires signing in. Please login to view submissions.');
+        // Fetch instructor submissions using user.id only (no bearer token required)
+        if (!user || !user.id) {
           setSubmissions([]);
           return;
         }
-
-        const headers = { Authorization: `Bearer ${token}` };
-        const res = await fetch(`${API}/instructor/submissions`, { headers });
+        const res = await fetch(`${API}/instructor/submissions?userId=${encodeURIComponent(user.id)}`);
         const json = await res.json().catch(() => ({}));
         if (res.status === 401) {
-          setHasAuthError(true);
-          toast.error('Session expired or unauthorized. Please sign in again.');
+          toast.error(json?.error || 'Unauthorized');
           setSubmissions([]);
           return;
         }
@@ -68,16 +59,13 @@ export default function Gradeass() {
       return;
     }
       try {
-        const token = await getAccessToken();
+        const headers = { 'Content-Type': 'application/json' } as Record<string,string>;
 
-      const headers = { 'Content-Type': 'application/json' } as Record<string,string>;
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(`${API}/submissions/${submissionId}/grade`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ submissionId, grade, feedback: payload.feedback })
-      });
+        const res = await fetch(`${API}/submissions/${submissionId}/grade`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ submissionId, grade, feedback: payload.feedback, graderId: user?.id })
+        });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to grade');
 
@@ -87,21 +75,21 @@ export default function Gradeass() {
 
       // notify student via inbox
       try {
-        try {
-          await fetch(`${API}/inbox/send`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: JSON.stringify({
-              fromUserId: user?.id || '',
-              fromName: user?.name || user?.email || 'Instructor',
-              toUserId: (json.data && json.data.user_id) || undefined,
-              subject: 'Assignment Graded',
-              content: `Your assignment \"${json.data && json.data.assignment_title ? json.data.assignment_title : ''}\" has been graded: ${grade}/100. ${payload.feedback || ''}`
-            })
-          });
-        } catch (e) {
-          // ignore notify errors
-        }
+          try {
+            await fetch(`${API}/inbox/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fromUserId: user?.id || '',
+                fromName: user?.name || user?.email || 'Instructor',
+                toUserId: (json.data && json.data.user_id) || undefined,
+                subject: 'Assignment Graded',
+                content: `Your assignment \"${json.data && json.data.assignment_title ? json.data.assignment_title : ''}\" has been graded: ${grade}/100. ${payload.feedback || ''}`
+              })
+            });
+          } catch (e) {
+            // ignore notify errors
+          }
       } catch (e) {
         // ignore notify errors
       }
@@ -136,9 +124,11 @@ export default function Gradeass() {
                   <div className="font-semibold">{s.studentName}</div>
                   <div className="text-sm text-gray-600">{s.studentEmail}</div>
                   <div className="text-sm text-gray-800 mt-2">{s.assignmentTitle}</div>
-                  {s.raw && s.raw.content && (s.raw.content.fileUrl || s.raw.content.imageUrl) && (
+                  {s.raw && s.raw.content && (s.raw.content.filePath || s.raw.content.fileUrl || s.raw.content.imageUrl) && (
                     <div className="mt-2">
-                      {s.raw.content.fileUrl && typeof s.raw.content.fileUrl === 'string' ? (
+                      {s.raw.content.filePath ? (
+                        <a href={`${API}/submissions/${s.submissionId}/file`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Download uploaded file</a>
+                      ) : s.raw.content.fileUrl && typeof s.raw.content.fileUrl === 'string' ? (
                         <a href={s.raw.content.fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">View uploaded file</a>
                       ) : (
                         <a href={`${API}/submissions/${s.submissionId}/file`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">View uploaded file</a>

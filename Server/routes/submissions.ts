@@ -1,6 +1,5 @@
 import { RequestHandler } from "express";
 import { supabase } from "../supabaseClient.js";
-import { requireInstructor, requireAuth } from "./auth.js";
 import multer from 'multer';
 
 // Local Multer file type to avoid depending on ambient module augmentations
@@ -69,7 +68,7 @@ export const createSubmission: RequestHandler = async (req, res) => {
   try {
     console.log("[submit] incoming");
     const assignmentId = req.params.assignmentId;
-    // Prefer authenticated user; fall back to body.userId when absent
+    // Require userId in the request body for demo/user-based auth (no bearer token required)
     // If multipart/form-data we need to run multer to populate req.file and req.body
     let multerRan = false;
     if (String(req.headers['content-type'] || '').startsWith('multipart/')) {
@@ -91,13 +90,7 @@ export const createSubmission: RequestHandler = async (req, res) => {
     }
 
     let userId = String(req.body?.userId || "");
-    try {
-      const { requireAuth } = await import('./auth.js');
-      const authChk = await requireAuth(req);
-      if (authChk.ok) userId = String((authChk.user as any).id || userId);
-    } catch (_) {}
-
-    if (!userId) return res.status(401).json({ success: false, error: "Missing authenticated user or userId in body" });
+    if (!userId) return res.status(401).json({ success: false, error: "Missing userId in body (students must include their user.id)" });
     if (!userId.includes('-')) {
       const { canonicalizeUserId } = await import("../utils/userHelpers.js");
       const canonical = await canonicalizeUserId(userId);
@@ -119,15 +112,12 @@ export const createSubmission: RequestHandler = async (req, res) => {
         const { data: uploadData, error: uploadErr } = await supabase.storage.from(bucket).upload(filePath, file.buffer as Buffer, { contentType: file.mimetype });
         if (uploadErr) {
           console.error('[submit] supabase storage upload error', uploadErr);
-          // In non-production return detailed message to aid debugging of deploy failures
           const safeMessage = process.env.NODE_ENV === 'production' ? 'Failed to store uploaded file' : `Failed to store uploaded file: ${uploadErr?.message || String(uploadErr)}`;
           return res.status(500).json({ success: false, error: safeMessage, details: uploadErr });
         }
 
-        // get a public url (or signed URL if you prefer)
-        const { data: publicData } = await supabase.storage.from(bucket).getPublicUrl(filePath);
-        const publicUrl = publicData?.publicUrl || null;
-        content.fileUrl = publicUrl;
+        // Store the internal storage path (do not expose a public URL here)
+        content.filePath = filePath;
         content.fileName = file.originalname;
         content.fileSize = file.size;
         content.fileMime = file.mimetype;
@@ -184,10 +174,14 @@ export const submitAssignment: RequestHandler = async (req, res, next) => {
 export const listInstructorSubmissions: RequestHandler = async (req, res) => {
   try {
       console.log('[instructor/submissions] incoming');
-      const chk = await requireInstructor(req);
-      if (!chk.ok) return res.status(chk.status).json({ success: false, error: chk.msg });
-      const instructorId = String((chk.user as any).id || '');
-      console.log('[instructor/submissions] instructorId resolved:', instructorId);
+      // Expect instructorId (user id) to be provided as a query parameter or body value.
+      let instructorId = String(req.query.userId || req.query.instructorId || req.body?.userId || '');
+      if (!instructorId) return res.status(401).json({ success: false, error: 'Missing instructor userId in request' });
+      // Verify role in DB
+      const { data: userRow, error: userErr } = await supabase.from('users').select('id, role').eq('id', instructorId).maybeSingle();
+      if (userErr || !userRow) return res.status(401).json({ success: false, error: 'Instructor not found' });
+      const role = String((userRow as any).role || '');
+      if (role !== 'instructor' && role !== 'admin') return res.status(403).json({ success: false, error: 'instructor role required' });
 
     const courseId = String(req.query.courseId || "");
 
@@ -297,10 +291,19 @@ export const getSubmissionFile: RequestHandler = async (req, res) => {
 export const gradeSubmission: RequestHandler = async (req, res) => {
   try {
     const submissionId = req.params.submissionId;
-    const authChk = await requireAuth(req);
-    if (!authChk.ok) return res.status(authChk.status).json({ success: false, error: authChk.msg });
-    let graderId = String((authChk.user as any).id || '');
-    const role = String((authChk.user as any).role || '');
+    // Expect graderId to be provided in the request body (no bearer token required)
+    let graderId = String(req.body?.graderId || req.body?.userId || req.query?.userId || '');
+    if (!graderId) return res.status(401).json({ success: false, error: 'Missing graderId in request' });
+    if (!graderId.includes('-')) {
+      const { canonicalizeUserId } = await import('../utils/userHelpers.js');
+      const canonical = await canonicalizeUserId(graderId);
+      if (!canonical) return res.status(401).json({ success: false, error: 'graderId could not be canonicalized' });
+      graderId = canonical;
+    }
+    // verify role from DB
+    const { data: graderRow, error: graderErr } = await supabase.from('users').select('id, role').eq('id', graderId).maybeSingle();
+    if (graderErr || !graderRow) return res.status(401).json({ success: false, error: 'Grader not found' });
+    const role = String((graderRow as any).role || '');
     console.log('[grade] incoming', { submissionId, graderId, role, body: req.body });
 
     // Validate presence of identifiers
@@ -432,11 +435,18 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
 export const updateSubmission: RequestHandler = async (req, res) => {
   try {
     const submissionId = req.params.submissionId;
-    const authChk = await requireAuth(req);
-    if (!authChk.ok) return res.status(authChk.status).json({ success: false, error: authChk.msg });
-    const updaterId = String((authChk.user as any).id || '');
-    const role = String((authChk.user as any).role || '');
-    if (!updaterId) return res.status(401).json({ success: false, error: 'Missing authenticated user' });
+    // Use provided updaterId (no bearer token required)
+    let updaterId = String(req.body?.updaterId || req.body?.userId || req.query?.userId || '');
+    if (!updaterId) return res.status(401).json({ success: false, error: 'Missing updaterId in request' });
+    if (!updaterId.includes('-')) {
+      const { canonicalizeUserId } = await import('../utils/userHelpers.js');
+      const canonical = await canonicalizeUserId(updaterId);
+      if (!canonical) return res.status(401).json({ success: false, error: 'updaterId could not be canonicalized' });
+      updaterId = canonical;
+    }
+    const { data: updaterRow, error: updaterErr } = await supabase.from('users').select('id, role').eq('id', updaterId).maybeSingle();
+    if (updaterErr || !updaterRow) return res.status(401).json({ success: false, error: 'Updater not found' });
+    const role = String((updaterRow as any).role || '');
     if (!role || (role !== 'instructor' && role !== 'admin')) {
       return res.status(403).json({ success: false, error: 'Only instructors or admins can grade submissions' });
     }
@@ -464,9 +474,19 @@ export const updateSubmission: RequestHandler = async (req, res) => {
 // GET /api/instructor/summary
 export const getInstructorSummary: RequestHandler = async (req, res) => {
   try {
-    const chk = await requireInstructor(req);
-    if (!chk.ok) return res.status(chk.status).json({ success: false, error: chk.msg });
-    const instructorId = String((chk.user as any).id || '');
+    // Accept instructorId from query or body and verify role in DB (no bearer token required)
+    let instructorId = String(req.query.userId || req.query.instructorId || req.body?.userId || '');
+    if (!instructorId) return res.status(401).json({ success: false, error: 'Missing instructor userId in request' });
+    if (!instructorId.includes('-')) {
+      const { canonicalizeUserId } = await import('../utils/userHelpers.js');
+      const canonical = await canonicalizeUserId(instructorId);
+      if (!canonical) return res.status(401).json({ success: false, error: 'instructorId could not be canonicalized' });
+      instructorId = canonical;
+    }
+    const { data: userRow, error: userErr } = await supabase.from('users').select('id, role').eq('id', instructorId).maybeSingle();
+    if (userErr || !userRow) return res.status(401).json({ success: false, error: 'Instructor not found' });
+    const role = String((userRow as any).role || '');
+    if (role !== 'instructor' && role !== 'admin') return res.status(403).json({ success: false, error: 'instructor role required' });
 
     // Fetch instructor's courses
     const { data: courses = [], error: coursesErr } = await supabase.from('courses').select('*').eq('owner_id', instructorId).order('updated_at', { ascending: false });
