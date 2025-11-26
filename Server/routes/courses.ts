@@ -130,6 +130,21 @@ export const createCourse: RequestHandler = async (req, res) => {
       owner_id: creator,
     };
 
+    // Persist media/content fields into the metadata JSON column for backward compatibility
+    try {
+      const meta: any = {};
+      if (payload?.metadata && typeof payload.metadata === 'object') {
+        Object.assign(meta, payload.metadata);
+      }
+      // copy common editable content into metadata so client-side ManageCourse can save videos/quizzes
+      ["videos", "quizzes", "assignments", "thumbnail", "price", "tags"].forEach((k) => {
+        if ((payload as any)[k] !== undefined) meta[k] = (payload as any)[k];
+      });
+      if (Object.keys(meta).length > 0) insertRow.metadata = meta;
+    } catch (ex) {
+      console.warn('[createCourse] failed to consolidate metadata', ex);
+    }
+
     const { data, error } = await supabase.from("courses").insert([insertRow]).select().single();
     if (error) {
       console.error("Supabase createCourse error:", error);
@@ -147,13 +162,29 @@ export const updateCourse: RequestHandler = async (req, res) => {
   try {
     const id = req.params.id;
     const payload = req.body || {};
-    const { data, error } = await supabase.from("courses").update(payload).eq("id", id).select().single();
-    if (error) {
-      console.error("Supabase updateCourse error:", error);
-      return res.status(500).json({ error: error.message });
+    // Move media/content fields into metadata before updating to avoid updating non-existent columns
+    try {
+      const payloadToUpdate: any = { ...payload };
+      const meta: any = {};
+      if (payloadToUpdate.metadata && typeof payloadToUpdate.metadata === 'object') Object.assign(meta, payloadToUpdate.metadata);
+      ["videos", "quizzes", "assignments", "thumbnail", "price", "tags"].forEach((k) => {
+        if (payloadToUpdate[k] !== undefined) {
+          meta[k] = payloadToUpdate[k];
+          delete payloadToUpdate[k];
+        }
+      });
+      if (Object.keys(meta).length > 0) payloadToUpdate.metadata = meta;
+      const { data, error } = await supabase.from("courses").update(payloadToUpdate).eq("id", id).select().single();
+      if (error) {
+        console.error("Supabase updateCourse error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+      if (!data) return res.status(404).json({ error: "Course not found" });
+      return res.json({ success: true, course: data });
+    } catch (ex) {
+      console.error('[updateCourse] metadata consolidation failed', ex);
+      return res.status(500).json({ error: 'Failed to process update payload' });
     }
-    if (!data) return res.status(404).json({ error: "Course not found" });
-    return res.json({ success: true, course: data });
   } catch (err: any) {
     console.error("Unexpected updateCourse error:", err);
     return res.status(500).json({ error: "Unexpected server error" });
