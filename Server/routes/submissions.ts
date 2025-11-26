@@ -86,6 +86,8 @@ export const createSubmission: RequestHandler = async (req, res) => {
         }
         return res.status(400).json({ success: false, error: 'Failed to parse file upload' });
       });
+      // If multer already sent a response (e.g. LIMIT_FILE_SIZE), stop processing
+      if (res.headersSent) return;
     }
 
     let userId = String(req.body?.userId || "");
