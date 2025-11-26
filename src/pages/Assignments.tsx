@@ -191,7 +191,11 @@ export default function Assignments() {
 
       const headers: Record<string,string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
-
+      // If no token is available (demo/local mode), include a userId fallback
+      // so the server can accept the submission without bearer auth.
+      if (!token && user?.id) {
+        form.append('userId', String(user.id));
+      }
       const res = await fetch(`${API}/assignments/${assignmentId}/submissions`, {
         method: 'POST',
         headers,
