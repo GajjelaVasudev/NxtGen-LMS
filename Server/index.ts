@@ -55,6 +55,7 @@ import {
   createSubmission,
   updateSubmission,
   listInstructorSubmissions,
+  getInstructorSummary,
   submitAssignment,
   gradeSubmission,
   getSubmissionFile,
@@ -331,6 +332,7 @@ export function createServer() {
   app.post("/api/assignments/:assignmentId/submissions", createSubmission);
   app.post("/api/assignments/:id/submit", submitAssignment);
   app.get("/api/instructor/submissions", listInstructorSubmissions);
+  app.get("/api/instructor/summary", getInstructorSummary);
   app.get("/api/submissions/:submissionId/file", getSubmissionFile);
   app.patch("/api/submissions/:submissionId/grade", gradeSubmission);
   app.put("/api/submissions/:submissionId", updateSubmission);

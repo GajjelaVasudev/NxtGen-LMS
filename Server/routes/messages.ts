@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
 import { supabase } from "../supabaseClient.js";
+import { requireAuth } from "./auth.js";
 
 // ---------- Inbox endpoints (notifications + teacher/admin messages) ----------
 
@@ -65,37 +66,25 @@ export const getInbox: RequestHandler = async (req, res) => {
 
 // POST /api/inbox/send
 export const sendInboxMessage: RequestHandler = async (req, res) => {
-  console.log('[inbox] sendInboxMessage called', { method: req.method, url: req.originalUrl, body: req.body, headers: { 'x-user-id': req.headers['x-user-id'] } });
+  console.log('[inbox] sendInboxMessage called', { method: req.method, url: req.originalUrl, body: req.body });
   try {
     const payload = req.body || {};
-    const senderId = String(payload.fromUserId || req.headers["x-user-id"] || "");
     const fromName = payload.fromName || payload.from_name || null;
     const subject = payload.subject;
     const body = payload.content || payload.body || null;
 
+    // Require authenticated sender
+    const authChk = await requireAuth(req);
+    if (!authChk.ok) return res.status(authChk.status).json({ success: false, error: authChk.msg });
+    const senderId = String((authChk.user as any).id || '');
+    const role = String((authChk.user as any).role || '');
+
     if (!senderId || !fromName || !subject || !body) {
-      return res.status(400).json({ success: false, error: "fromUserId, fromName, subject and content required" });
+      return res.status(400).json({ success: false, error: "fromName, subject and content required" });
     }
 
-    // verify sender role from Supabase only
-    let role: string | null = null;
-    try {
-      const { data: userData, error: userErr } = await supabase.from("users").select("role").eq("id", senderId).maybeSingle();
-      if (userErr) {
-        console.warn('[inbox] Supabase error looking up sender role', { senderId, userErr });
-        return res.status(500).json({ success: false, error: userErr.message || 'Supabase lookup error' });
-      }
-      if (!userData) {
-        return res.status(403).json({ success: false, error: 'Sender not recognized' });
-      }
-      role = (userData as any)?.role || null;
-    } catch (ex) {
-      console.error('[inbox] Exception during Supabase user lookup', ex);
-      return res.status(500).json({ success: false, error: 'Unexpected server error' });
-    }
-
-    if (!role || (role !== "admin" && role !== "instructor")) {
-      return res.status(403).json({ success: false, error: "Only admin or instructor may send inbox messages" });
+    if (!role || (role !== 'admin' && role !== 'instructor')) {
+      return res.status(403).json({ success: false, error: 'Only admin or instructor may send inbox messages' });
     }
 
     const insertRow: any = {

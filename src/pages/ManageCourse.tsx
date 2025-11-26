@@ -4,37 +4,52 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, AlertCircle, Edit2, Trash2 } from "lucide-react";
 
 const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+import { createClient } from '@supabase/supabase-js';
+
+async function getSupabaseToken() {
+  const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!supUrl || !supKey) return null;
+  try {
+    const sup = createClient(supUrl, supKey);
+    const resp: any = await sup.auth.getSession?.();
+    return resp?.data?.session?.access_token || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 async function apiFetchCourse(id: string) {
   return fetch(`${API}/courses/${id}`).then(r => r.json()).catch(() => ({ course: null }));
 }
 async function apiCreateCourse(course: any, userId?: string) {
-  return fetch(`${API}/courses`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(userId ? { "x-user-id": userId } : {}) },
-    body: JSON.stringify(course),
-  }).then(r => r.json());
+  const token = await getSupabaseToken();
+  const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  else if (userId) headers['x-user-id'] = userId;
+  return fetch(`${API}/courses`, { method: 'POST', headers, body: JSON.stringify(course) }).then(r => r.json());
 }
 async function apiUpdateCourse(id: string, course: any) {
-  return fetch(`${API}/courses/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(course),
-  }).then(r => r.json());
+  const token = await getSupabaseToken();
+  const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return fetch(`${API}/courses/${id}`, { method: 'PUT', headers, body: JSON.stringify(course) }).then(r => r.json());
 }
 
 // --- Additional API helpers used by the Manage list ---
 async function apiFetchAllCourses() {
-  return fetch(`${API}/courses`).then(r => r.json()).catch(() => ({ courses: [] }));
+  const token = await getSupabaseToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+  return fetch(`${API}/courses`, { headers }).then(r => r.json()).catch(() => ({ courses: [] }));
 }
 async function apiDeleteCourse(id: string, userId?: string) {
   try {
+    const token = await getSupabaseToken();
     const headers: Record<string, string> = {};
-    if (userId) headers['x-user-id'] = userId;
-    const res = await fetch(`${API}/courses/${id}`, { method: "DELETE", headers: Object.keys(headers).length ? headers : undefined });
-    // try to parse JSON; if parsing fails, return a safe shape
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    else if (userId) headers['x-user-id'] = userId;
+    const res = await fetch(`${API}/courses/${id}`, { method: 'DELETE', headers: Object.keys(headers).length ? headers : undefined });
     const json = await res.json().catch(() => ({}));
-    // normalize to { success: boolean, error?: string }
     if (json && typeof json === 'object') {
       return { success: Boolean((json as any).success === true), error: (json as any).error || undefined };
     }

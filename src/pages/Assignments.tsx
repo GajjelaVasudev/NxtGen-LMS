@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Search, Plus, Edit, Calendar, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { createClient } from '@supabase/supabase-js';
 
 type Assignment = {
   id: string;
@@ -53,11 +54,22 @@ export default function Assignments() {
     let mounted = true;
     const load = async () => {
       if (!user) return;
+      const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+      let token: string | null = null;
+      if (supUrl && supKey) {
+        try {
+          const sup = createClient(supUrl, supKey);
+          const resp: any = await sup.auth.getSession?.();
+          token = resp?.data?.session?.access_token || null;
+        } catch (_) { token = null; }
+      }
       try {
+        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
         const [cRes, eRes, sRes] = await Promise.all([
-          fetch(`${API}/courses`).then(r => r.json()).catch(() => ({ courses: [] })),
-          fetch(`${API}/enrollments?userId=${user.id}`).then(r => r.json()).catch(() => ({ enrollments: [] })),
-          fetch(`${API}/submissions?userId=${user.id}`).then(r => r.json()).catch(() => ({ data: [] })),
+          fetch(`${API}/courses`, { headers }).then(r => r.json()).catch(() => ({ courses: [] })),
+          fetch(`${API}/enrollments${token ? '' : `?userId=${user.id}`}`, { headers }).then(r => r.json()).catch(() => ({ enrollments: [] })),
+          fetch(`${API}/submissions${token ? '' : `?userId=${user.id}`}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
         ]);
 
         if (!mounted) return;
@@ -84,7 +96,7 @@ export default function Assignments() {
         // If the user is an instructor/admin also fetch assignments they created so they can view/edit them
         if (hasRole && hasRole(["instructor", "admin"])) {
           try {
-            const mineRes = await fetch(`${API}/assignments?creatorId=${user.id}`).then(r => r.json()).catch(() => ({ data: [] }));
+            const mineRes = await fetch(`${API}/assignments?creatorId=${user.id}`, { headers }).then(r => r.json()).catch(() => ({ data: [] }));
             const mine = (mineRes.data || mineRes.assignments || []);
             // merge and dedupe by id
             const byId: Record<string, any> = {};
@@ -162,9 +174,26 @@ export default function Assignments() {
     try {
       const imageUrl = await handleImageUpload(imageFile);
       // Create submission via API
+      const headers = (() => {
+        const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+        const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+        let token: string | null = null;
+        if (supUrl && supKey) {
+          try {
+            const sup = createClient(supUrl, supKey);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const resp: any = sup.auth.getSession ? await sup.auth.getSession() : null;
+            token = resp?.data?.session?.access_token || null;
+          } catch (_) { token = null; }
+        }
+        const h: Record<string,string> = { 'Content-Type': 'application/json' };
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        return h;
+      })();
+
       const res = await fetch(`${API}/assignments/${assignmentId}/submissions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": user.id },
+        method: 'POST',
+        headers,
         body: JSON.stringify({ content: { imageUrl } }),
       });
       const json = await res.json();
@@ -187,13 +216,13 @@ export default function Assignments() {
       const assignment = assignments.find(a => a.id === assignmentId);
       if (assignment) {
         await fetch(`${API}/inbox/send`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({
             fromUserId: user.id,
             fromName: user.name || user.email,
             toUserId: assignment.instructorId,
-            subject: "New Assignment Submission",
+            subject: 'New Assignment Submission',
             content: `${user.name || user.email} submitted assignment \"${assignment.title}\"`
           })
         });

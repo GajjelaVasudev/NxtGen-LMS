@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
 import { supabase } from "../supabaseClient.js";
+import { requireAuth } from "./auth.js";
 
 // GET /api/assignments?courseId=<id>
 export const getAssignments: RequestHandler = async (req, res) => {
@@ -65,26 +66,13 @@ export const createAssignment: RequestHandler = async (req, res) => {
     if (!course_id) return res.status(400).json({ success: false, error: "course_id is required" });
     if (!title) return res.status(400).json({ success: false, error: "title is required" });
 
-    // Determine creator from header (demo auth). In production use JWT/session.
-    let creatorId = String(req.headers["x-user-id"] || req.headers["x-userid"] || "");
-    if (!creatorId) return res.status(401).json({ success: false, error: "Missing x-user-id header (sender)" });
-    if (!creatorId.includes('-')) {
-      const { canonicalizeUserId } = await import("../utils/userHelpers.js");
-      const canonical = await canonicalizeUserId(creatorId);
-      if (!canonical) return res.status(401).json({ success: false, error: "Missing x-user-id header (sender)" });
-      creatorId = canonical;
-    }
-
-    // Verify user role (only instructor or admin allowed to create)
-    const { data: userData, error: userErr } = await supabase.from("users").select("role").eq("id", creatorId).single();
-    if (userErr) {
-      console.error("Supabase user lookup error:", userErr);
-      return res.status(500).json({ success: false, error: "Failed to verify user role" });
-    }
-    const role = (userData as any)?.role;
-    if (!role || (role !== "instructor" && role !== "admin")) {
-      return res.status(403).json({ success: false, error: "Only instructors or admins can create assignments" });
-    }
+    // Determine creator from bearer token
+    const authChk = await requireAuth(req);
+    if (!authChk.ok) return res.status(authChk.status).json({ success: false, error: authChk.msg });
+    let creatorId = String((authChk.user as any).id || '');
+    const role = String((authChk.user as any).role || '');
+    if (!creatorId) return res.status(401).json({ success: false, error: 'Missing authenticated user' });
+    if (role !== 'instructor' && role !== 'admin') return res.status(403).json({ success: false, error: 'Only instructors or admins can create assignments' });
 
     const insertRow: any = {
       course_id,
@@ -116,19 +104,12 @@ export const updateAssignment: RequestHandler = async (req, res) => {
     if (!id) return res.status(400).json({ success: false, error: "assignment id required" });
 
     const payload = req.body || {};
-    const updaterId = String(req.headers["x-user-id"] || "");
-    if (!updaterId) return res.status(401).json({ success: false, error: "Missing x-user-id header (updater)" });
-
-    // Verify updater role (must be instructor or admin)
-    const { data: userData, error: userErr } = await supabase.from("users").select("role").eq("id", updaterId).single();
-    if (userErr) {
-      console.error("Supabase user lookup error:", userErr);
-      return res.status(500).json({ success: false, error: "Failed to verify updater" });
-    }
-    const role = (userData as any)?.role;
-    if (!role || (role !== "instructor" && role !== "admin")) {
-      return res.status(403).json({ success: false, error: "Only instructors or admins can update assignments" });
-    }
+    const authChk = await requireAuth(req);
+    if (!authChk.ok) return res.status(authChk.status).json({ success: false, error: authChk.msg });
+    const updaterId = String((authChk.user as any).id || '');
+    const role = String((authChk.user as any).role || '');
+    if (!updaterId) return res.status(401).json({ success: false, error: 'Missing authenticated user (updater)' });
+    if (role !== 'instructor' && role !== 'admin') return res.status(403).json({ success: false, error: 'Only instructors or admins can update assignments' });
 
     const update: any = {};
     if (typeof payload.title !== "undefined") update.title = payload.title;

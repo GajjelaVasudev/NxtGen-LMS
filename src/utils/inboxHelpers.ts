@@ -20,6 +20,20 @@ export interface InboxMessage {
 }
 
 const API = import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL as string) || '/api';
+import { createClient } from '@supabase/supabase-js';
+
+async function getSupabaseToken() {
+  const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!supUrl || !supKey) return null;
+  try {
+    const sup = createClient(supUrl, supKey);
+    const resp: any = await sup.auth.getSession?.();
+    return resp?.data?.session?.access_token || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 function mapServerRowToInbox(row: any): InboxMessage {
   return {
@@ -37,8 +51,10 @@ function mapServerRowToInbox(row: any): InboxMessage {
 
 export async function loadInboxMessages(userId?: string, role?: string): Promise<InboxMessage[]> {
   try {
-    const q = userId ? `?userId=${encodeURIComponent(userId)}&role=${encodeURIComponent(role || '')}` : '';
-    const res = await fetch(`${API}/inbox${q}`);
+    const token = await getSupabaseToken();
+    const q = (!token && userId) ? `?userId=${encodeURIComponent(userId)}&role=${encodeURIComponent(role || '')}` : (role ? `?role=${encodeURIComponent(role)}` : '');
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+    const res = await fetch(`${API}/inbox${q}`, { headers });
     if (!res.ok) return [];
     const body = await res.json();
     const rows = body.data || body.messages || [];
@@ -51,8 +67,10 @@ export async function loadInboxMessages(userId?: string, role?: string): Promise
 
 export async function sendInboxMessage(payload: any, fromUserId?: string) {
   try {
+    const token = await getSupabaseToken();
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (fromUserId) headers['x-user-id'] = String(fromUserId);
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    else if (fromUserId) headers['x-user-id'] = String(fromUserId);
     const res = await fetch(`${API}/inbox/send`, { method: 'POST', headers, body: JSON.stringify(payload) });
     if (!res.ok) {
       const txt = await res.text();

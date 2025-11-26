@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { createClient } from '@supabase/supabase-js';
 
 export default function Gradeass() {
   const { user } = useAuth();
@@ -15,7 +16,18 @@ export default function Gradeass() {
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${API}/instructor/submissions`, { headers: { 'x-user-id': user?.id || '' } });
+        const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+        const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+        let token: string | null = null;
+        if (supUrl && supKey) {
+          try {
+            const sup = createClient(supUrl, supKey);
+            const resp: any = await sup.auth.getSession?.();
+            token = resp?.data?.session?.access_token || null;
+          } catch (_) { token = null; }
+        }
+        const headers = token ? { Authorization: `Bearer ${token}` } : { 'x-user-id': user?.id || '' };
+        const res = await fetch(`${API}/instructor/submissions`, { headers });
         const json = await res.json();
         if (!mounted) return;
         if (json.success) {
@@ -45,9 +57,23 @@ export default function Gradeass() {
       return;
     }
     try {
+      const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+      let token: string | null = null;
+      if (supUrl && supKey) {
+        try {
+          const sup = createClient(supUrl, supKey);
+          const resp: any = await sup.auth.getSession?.();
+          token = resp?.data?.session?.access_token || null;
+        } catch (_) { token = null; }
+      }
+
+      const headers = { 'Content-Type': 'application/json' } as Record<string,string>;
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`${API}/submissions/${submissionId}/grade`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        headers,
         body: JSON.stringify({ submissionId, grade, feedback: payload.feedback })
       });
       const json = await res.json();
@@ -59,17 +85,21 @@ export default function Gradeass() {
 
       // notify student via inbox
       try {
-        await fetch(`${API}/inbox/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
-          body: JSON.stringify({
-            fromUserId: user?.id || '',
-            fromName: user?.name || user?.email || 'Instructor',
-            toUserId: (json.data && json.data.user_id) || undefined,
-            subject: 'Assignment Graded',
-            content: `Your assignment "${json.data && json.data.assignment_title ? json.data.assignment_title : ''}" has been graded: ${grade}/100. ${payload.feedback || ''}`
-          })
-        });
+        try {
+          await fetch(`${API}/inbox/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({
+              fromUserId: user?.id || '',
+              fromName: user?.name || user?.email || 'Instructor',
+              toUserId: (json.data && json.data.user_id) || undefined,
+              subject: 'Assignment Graded',
+              content: `Your assignment \"${json.data && json.data.assignment_title ? json.data.assignment_title : ''}\" has been graded: ${grade}/100. ${payload.feedback || ''}`
+            })
+          });
+        } catch (e) {
+          // ignore notify errors
+        }
       } catch (e) {
         // ignore notify errors
       }

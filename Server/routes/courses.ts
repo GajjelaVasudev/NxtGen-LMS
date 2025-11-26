@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
 import { supabase } from "../supabaseClient.js";
+import { requireAuth } from "./auth.js";
 
 // GET /api/courses
 export const getCourses: RequestHandler = async (_req, res) => {
@@ -38,8 +39,10 @@ export const getCourse: RequestHandler = async (req, res) => {
 export const createCourse: RequestHandler = async (req, res) => {
   try {
     const payload = req.body || {};
-    const creator = String(req.headers["x-user-id"] || "");
-    if (!creator) return res.status(401).json({ error: "Missing x-user-id header (creator)" });
+    const authChk = await requireAuth(req);
+    if (!authChk.ok) return res.status(authChk.status).json({ error: authChk.msg });
+    const creator = String((authChk.user as any).id || '');
+    if (!creator) return res.status(401).json({ error: 'Missing authenticated user (creator)' });
 
     const insertRow: any = {
       slug: payload.slug || payload.title?.toLowerCase()?.replace(/[^a-z0-9]+/g, "-") || undefined,
@@ -82,16 +85,11 @@ export const updateCourse: RequestHandler = async (req, res) => {
 export const deleteCourse: RequestHandler = async (req, res) => {
   try {
     const id = req.params.id;
-
-    // Require authenticated user (via x-user-id header)
-    let requester = String(req.headers["x-user-id"] || "");
-    if (!requester) return res.status(401).json({ error: 'Missing x-user-id header' });
-    if (!requester.includes('-')) {
-      const { canonicalizeUserId } = await import("../utils/userHelpers.js");
-      const canonical = await canonicalizeUserId(requester);
-      if (!canonical) return res.status(401).json({ error: 'Invalid requester id' });
-      requester = canonical;
-    }
+    // Require authenticated user
+    const authChk = await requireAuth(req);
+    if (!authChk.ok) return res.status(authChk.status).json({ error: authChk.msg });
+    let requester = String((authChk.user as any).id || '');
+    if (!requester) return res.status(401).json({ error: 'Missing authenticated requester id' });
 
     // Fetch course to get owner
     const { data: courseRow, error: courseErr } = await supabase.from('courses').select('id, owner_id').eq('id', id).maybeSingle();
@@ -158,20 +156,26 @@ export const enrollCourse: RequestHandler = async (req, res) => {
   try {
     const courseId = req.params.id;
 
-    // Log incoming request
+    // Log incoming request (avoid echoing legacy headers)
     console.log('[enroll] incoming request:', {
       courseId,
       bodyType: typeof req.body,
-      body: req.body,
       query: req.query,
-      headers: { 'x-user-id': req.headers['x-user-id'], 'content-type': req.headers['content-type'] },
+      contentType: req.headers['content-type'],
     });
 
-    // Accept user identifier from multiple places: body.userId, body.email, query.userId, query.email, header x-user-id
+    // Accept user identifier from multiple places: body.userId, body.email, query.userId, query.email
     const bodyIsObject = req.body && typeof req.body === 'object';
     const bodyUserId = bodyIsObject ? (req.body as any).userId : undefined;
     const bodyEmail = bodyIsObject ? (req.body as any).email : undefined;
-    const rawUserCandidate = bodyUserId || bodyEmail || req.query.userId || req.query.email || req.headers['x-user-id'];
+    // Prefer an authenticated user if present
+    let rawUserCandidate = bodyUserId || bodyEmail || req.query.userId || req.query.email;
+    try {
+      const authChk = await requireAuth(req);
+      if (authChk.ok && (!rawUserCandidate || rawUserCandidate === '')) {
+        rawUserCandidate = String((authChk.user as any).id || '');
+      }
+    } catch (_) { /* ignore */ }
     const rawUser = rawUserCandidate ? String(rawUserCandidate) : "";
     if (!rawUser) {
       console.warn('[enroll] validation failed: missing identifier', { courseId, bodyUserId, bodyEmail, query: req.query, headers: req.headers });

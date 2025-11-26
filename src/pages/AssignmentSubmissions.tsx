@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { createClient } from '@supabase/supabase-js';
 import { ArrowLeft, Eye } from "lucide-react";
 
 type Assignment = {
@@ -102,9 +103,23 @@ export default function AssignmentSubmissions() {
     }
     (async () => {
       try {
+        const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+        const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+        let token: string | null = null;
+        if (supUrl && supKey) {
+          try {
+            const sup = createClient(supUrl, supKey);
+            const resp: any = await sup.auth.getSession?.();
+            token = resp?.data?.session?.access_token || null;
+          } catch (_) { token = null; }
+        }
+
+        const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch(`/api/submissions/${selectedSubmission.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", "x-user-id": user?.id || "" },
+          method: 'PUT',
+          headers,
           body: JSON.stringify({ grade, feedback: gradeForm.feedback })
         });
         const json = await res.json();
@@ -117,8 +132,8 @@ export default function AssignmentSubmissions() {
 
         // notify student via inbox
         await fetch(`/api/inbox/send`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" , "x-user-id": user?.id || ""},
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({
             fromUserId: user?.id || "",
             fromName: user?.name || user?.email || "Instructor",

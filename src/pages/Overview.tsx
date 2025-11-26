@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { PlayCircle, FileText, CheckCircle } from "lucide-react";
+import { createClient } from '@supabase/supabase-js';
 
 type Todo = { id: string; text: string; done: boolean };
 type Course = { id: string; title: string; thumbnail?: string; description?: string; price?: number; creator?: string; createdAt: number; };
@@ -32,10 +33,65 @@ export default function Overview() {
   const [enrollments, setEnrollments] = useState<{ courseId: string; userId?: string }[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [instructorSummary, setInstructorSummary] = useState<any | null>(null);
   const [justSignedUp, setJustSignedUp] = useState(false);
+  const [pendingForGrading, setPendingForGrading] = useState<any[]>([]);
+  const navigate = useNavigate();
 
   // Load server-backed courses & user enrollments
   useEffect(() => {
+    // If the signed-in user is an instructor, fetch instructor summary KPIs
+    (async () => {
+      try {
+        if (!user) return;
+        const role = (user as any).role || '';
+        if (role !== 'instructor') return;
+        const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+        const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+        if (!url || !key) return;
+        const sup = createClient(url, key as string);
+        let token: string | null = null;
+        try {
+          const resp: any = await sup.auth.getSession?.();
+          token = resp?.data?.session?.access_token || null;
+        } catch (_) { token = null; }
+        if (!token) return;
+        const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+        const res = await fetch(`${API}/instructor/summary`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const body = await res.json().catch(() => null);
+        if (body?.data) setInstructorSummary(body.data);
+      } catch (e) {
+        // ignore
+      }
+    })();
+
+    // also fetch pending submissions for grading (instructor)
+    (async () => {
+      try {
+        if (!user) return;
+        const role = (user as any).role || '';
+        if (role !== 'instructor') return;
+        const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+        const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+        if (!url || !key) return;
+        const sup = createClient(url, key as string);
+        let token: string | null = null;
+        try { const resp: any = await sup.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch (_) { token = null; }
+        if (!token) return;
+        const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+        const res = await fetch(`${API}/instructor/submissions`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const body = await res.json().catch(() => null);
+        if (body?.submissions && Array.isArray(body.submissions)) {
+          const pending = body.submissions.filter((s:any) => s.grade === null || typeof s.grade === 'undefined').slice(0, 10);
+          setPendingForGrading(pending);
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+
     try {
       const flag = localStorage.getItem('nxtgen_justSignedUp');
       if (flag) {
@@ -152,18 +208,75 @@ export default function Overview() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-sm text-gray-500">Ongoing Courses</div>
-              <div className="text-xl font-semibold">{enrolledCourses.length}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-500">Pending Assignments</div>
-              <div className="text-xl font-semibold">{pendingAssignments.length}</div>
-            </div>
+            {/* If instructor show instructor KPIs else student summary */}
+            {user?.role === 'instructor' && instructorSummary ? (
+              <>
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Active Courses</div>
+                  <div className="text-xl font-semibold">{instructorSummary.activeCourses}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Total Students</div>
+                  <div className="text-xl font-semibold">{instructorSummary.totalEnrolled}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Pending Grading</div>
+                  <div className="text-xl font-semibold">{instructorSummary.pendingSubmissions}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Avg Rating</div>
+                  <div className="text-xl font-semibold">{instructorSummary.avgRating ? instructorSummary.avgRating.toFixed(2) : '-'}</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Ongoing Courses</div>
+                  <div className="text-xl font-semibold">{enrolledCourses.length}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Pending Assignments</div>
+                  <div className="text-xl font-semibold">{pendingAssignments.length}</div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* To-do list */}
+        {/* Quick actions + To-do list */}
+        {/* Instructor quick actions & pending grading */}
+        {user?.role === 'instructor' && (
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <button onClick={() => navigate('/app/courses/create')} className="px-3 py-2 bg-green-600 text-white rounded">Create Course</button>
+              <button onClick={() => navigate('/app/assignments/create')} className="px-3 py-2 bg-blue-600 text-white rounded">Add Assignment</button>
+              <button onClick={() => navigate('/app/reports?scope=course')} className="px-3 py-2 bg-indigo-600 text-white rounded">View Analytics</button>
+              <button onClick={() => navigate('/app/announcements')} className="px-3 py-2 bg-yellow-600 text-white rounded">Send Announcement</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white border rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Pending Grading</h3>
+                {pendingForGrading.length === 0 ? (
+                  <div className="text-gray-500">No submissions pending grading.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {pendingForGrading.map((p) => (
+                      <div key={p.submissionId || p.assignmentId} className="flex items-center justify-between p-2 border rounded">
+                        <div>
+                          <div className="font-medium">{p.assignmentTitle || 'Assignment'}</div>
+                          <div className="text-sm text-gray-500">{p.studentName || p.studentEmail || p.user_id}</div>
+                        </div>
+                        <div>
+                          <Link to={`/app/assignments/submissions/${p.assignmentId}`} className="px-3 py-1 bg-blue-600 text-white rounded">View</Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-6 mb-8">
           <section className="bg-white border rounded-lg p-6">
             <h2 className="text-lg font-semibold mb-4">To-Do List</h2>

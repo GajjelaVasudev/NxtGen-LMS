@@ -437,7 +437,9 @@ export const firebaseLogin: RequestHandler = async (req, res) => {
   }
 };
 
-// Helper to ensure requester is an admin based on x-user-id header
+// Helper to ensure requester is an admin based on `Authorization: Bearer` token
+// Note: some frontend code may still include `x-user-id` as a local/demo fallback,
+// but the server enforces bearer-only authentication for admin-protected routes.
 export async function requireAdmin(req: any) {
   // Enforce Authorization Bearer token only. Legacy test fallbacks (headers)
   // were removed to ensure production-grade security.
@@ -624,4 +626,41 @@ export function normalizeRoleForDb(role: string | undefined | null) {
   if (r === 'instructor') return 'instructor';
   if (r === 'admin') return 'admin';
   return 'student';
+}
+
+// Generic authenticated user check (validates bearer token and returns DB user row)
+export async function requireAuth(req: any) {
+  try {
+    const authHeader = String(req.headers['authorization'] || '');
+    if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+      return { ok: false, status: 401, msg: 'Authorization bearer token required' };
+    }
+    const token = authHeader.slice(7).trim();
+    if (!token) return { ok: false, status: 401, msg: 'Authorization bearer token required' };
+
+    try {
+      const userResp: any = await (supabase as any).auth.getUser?.(token) || (await (supabase as any).auth.api?.getUser?.(token));
+      const foundUser = userResp?.data?.user || userResp?.user || null;
+      if (!foundUser || !foundUser.id) return { ok: false, status: 401, msg: 'Invalid token or user not found' };
+
+      const { data: dbUser, error: dbErr } = await supabase.from('users').select('id, role, email, first_name, last_name').eq('id', foundUser.id).maybeSingle();
+      if (dbErr || !dbUser) return { ok: false, status: 401, msg: 'Requester not found' };
+      return { ok: true, user: dbUser };
+    } catch (tokenErr) {
+      console.warn('[requireAuth] token validation failed', tokenErr?.message || tokenErr);
+      return { ok: false, status: 401, msg: 'Invalid or expired token' };
+    }
+  } catch (ex) {
+    console.error('[requireAuth] unexpected error', ex);
+    return { ok: false, status: 500, msg: 'failed to verify user' };
+  }
+}
+
+// Ensure requester is an instructor or admin
+export async function requireInstructor(req: any) {
+  const chk = await requireAuth(req);
+  if (!chk.ok) return chk;
+  const role = String((chk.user as any).role || '');
+  if (role !== 'instructor' && role !== 'admin') return { ok: false, status: 403, msg: 'instructor role required' };
+  return { ok: true, user: chk.user };
 }

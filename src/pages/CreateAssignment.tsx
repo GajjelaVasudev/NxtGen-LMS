@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { createClient } from '@supabase/supabase-js';
 
 type Assignment = {
   id: string;
@@ -100,11 +101,22 @@ export default function CreateAssignment() {
         due_at: form.dueDate,
       };
       const url = isEditing ? `${API}/assignments/${id}` : `${API}/assignments`;
-      const res = await fetch(url, {
-        method: isEditing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": user.id },
-        body: JSON.stringify(body),
-      });
+      // prefer Authorization Bearer token from Supabase session
+      const supUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+      let token: string | null = null;
+      if (supUrl && supKey) {
+        try {
+          const sup = createClient(supUrl, supKey);
+          const resp: any = await sup.auth.getSession?.();
+          token = resp?.data?.session?.access_token || null;
+        } catch (_) { token = null; }
+      }
+
+      const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(url, { method: isEditing ? 'PUT' : 'POST', headers, body: JSON.stringify(body) });
       const json = await res.json();
       if (!json.success) {
         alert(json.error || "Failed to save assignment");

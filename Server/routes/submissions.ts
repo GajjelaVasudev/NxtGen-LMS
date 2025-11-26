@@ -1,5 +1,6 @@
 import { RequestHandler } from "express";
 import { supabase } from "../supabaseClient.js";
+import { requireInstructor, requireAuth } from "./auth.js";
 
 // GET /api/submissions?userId=<id>
 export const listUserSubmissions: RequestHandler = async (req, res) => {
@@ -49,12 +50,19 @@ export const createSubmission: RequestHandler = async (req, res) => {
   try {
     console.log("[submit] incoming");
     const assignmentId = req.params.assignmentId;
-    let userId = String(req.headers["x-user-id"] || req.body.userId || "");
-    if (!userId) return res.status(401).json({ success: false, error: "Missing x-user-id header" });
+    // Prefer authenticated user; fall back to body.userId when absent
+    let userId = String(req.body?.userId || "");
+    try {
+      const { requireAuth } = await import('./auth.js');
+      const authChk = await requireAuth(req);
+      if (authChk.ok) userId = String((authChk.user as any).id || userId);
+    } catch (_) {}
+
+    if (!userId) return res.status(401).json({ success: false, error: "Missing authenticated user or userId in body" });
     if (!userId.includes('-')) {
       const { canonicalizeUserId } = await import("../utils/userHelpers.js");
       const canonical = await canonicalizeUserId(userId);
-      if (!canonical) return res.status(401).json({ success: false, error: "x-user-id could not be canonicalized" });
+      if (!canonical) return res.status(401).json({ success: false, error: "userId could not be canonicalized" });
       userId = canonical;
     }
 
@@ -106,16 +114,11 @@ export const submitAssignment: RequestHandler = async (req, res, next) => {
 // GET /api/instructor/submissions?courseId=<id>
 export const listInstructorSubmissions: RequestHandler = async (req, res) => {
   try {
-    console.log('[instructor/submissions] incoming');
-    let instructorId = String(req.headers['x-user-id'] || req.query.instructorId || "");
-    console.log('[instructor/submissions] instructorId raw:', instructorId);
-    if (!instructorId) return res.status(403).json({ success: false, error: 'Forbidden: missing x-user-id header (instructor required)' });
-    if (!instructorId.includes('-')) {
-      const { canonicalizeUserId } = await import('../utils/userHelpers.js');
-      const canonical = await canonicalizeUserId(instructorId);
-      if (!canonical) return res.status(401).json({ success: false, error: 'instructorId could not be canonicalized' });
-      instructorId = canonical;
-    }
+      console.log('[instructor/submissions] incoming');
+      const chk = await requireInstructor(req);
+      if (!chk.ok) return res.status(chk.status).json({ success: false, error: chk.msg });
+      const instructorId = String((chk.user as any).id || '');
+      console.log('[instructor/submissions] instructorId resolved:', instructorId);
 
     const courseId = String(req.query.courseId || "");
 
@@ -225,36 +228,17 @@ export const getSubmissionFile: RequestHandler = async (req, res) => {
 export const gradeSubmission: RequestHandler = async (req, res) => {
   try {
     const submissionId = req.params.submissionId;
-    let graderId = String(req.headers['x-user-id'] || "");
-    console.log('[grade] incoming', { submissionId, graderId, body: req.body });
+    const authChk = await requireAuth(req);
+    if (!authChk.ok) return res.status(authChk.status).json({ success: false, error: authChk.msg });
+    let graderId = String((authChk.user as any).id || '');
+    const role = String((authChk.user as any).role || '');
+    console.log('[grade] incoming', { submissionId, graderId, role, body: req.body });
 
     // Validate presence of identifiers
     if (!submissionId) {
       console.error('[grade] missing submissionId');
       return res.status(400).json({ success: false, message: 'submissionId required' });
     }
-    if (!graderId) {
-      console.error('[grade] missing x-user-id header');
-      return res.status(400).json({ success: false, message: 'Missing x-user-id header' });
-    }
-
-    if (!graderId.includes('-')) {
-      const { canonicalizeUserId } = await import('../utils/userHelpers.js');
-      const canonical = await canonicalizeUserId(graderId);
-      if (!canonical) {
-        console.error('[grade] graderId could not be canonicalized', { graderId });
-        return res.status(400).json({ success: false, message: 'Invalid grader id' });
-      }
-      graderId = canonical;
-    }
-    // Verify grader exists and role
-    const { data: userData, error: userErr } = await supabase.from('users').select('role').eq('id', graderId).maybeSingle();
-    if (userErr) {
-      console.error('[grade] user lookup error', userErr);
-      return res.status(500).json({ success: false, error: 'Failed to verify grader' });
-    }
-    const role = (userData as any)?.role;
-    if (!role) return res.status(403).json({ success: false, error: 'Forbidden: grader not found' });
 
     const payload = req.body || {};
     const update: any = {};
@@ -379,18 +363,13 @@ export const gradeSubmission: RequestHandler = async (req, res) => {
 export const updateSubmission: RequestHandler = async (req, res) => {
   try {
     const submissionId = req.params.submissionId;
-    const updaterId = String(req.headers["x-user-id"] || "");
-    if (!updaterId) return res.status(401).json({ success: false, error: "Missing x-user-id header" });
-
-    // Verify updater role (must be instructor or admin)
-    const { data: userData, error: userErr } = await supabase.from("users").select("role").eq("id", updaterId).single();
-    if (userErr) {
-      console.error("Supabase user lookup error:", userErr);
-      return res.status(500).json({ success: false, error: "Failed to verify updater" });
-    }
-    const role = (userData as any)?.role;
-    if (!role || (role !== "instructor" && role !== "admin")) {
-      return res.status(403).json({ success: false, error: "Only instructors or admins can grade submissions" });
+    const authChk = await requireAuth(req);
+    if (!authChk.ok) return res.status(authChk.status).json({ success: false, error: authChk.msg });
+    const updaterId = String((authChk.user as any).id || '');
+    const role = String((authChk.user as any).role || '');
+    if (!updaterId) return res.status(401).json({ success: false, error: 'Missing authenticated user' });
+    if (!role || (role !== 'instructor' && role !== 'admin')) {
+      return res.status(403).json({ success: false, error: 'Only instructors or admins can grade submissions' });
     }
 
     const payload = req.body || {};
@@ -410,6 +389,95 @@ export const updateSubmission: RequestHandler = async (req, res) => {
   } catch (err: any) {
     console.error("Unexpected updateSubmission error:", err);
     return res.status(500).json({ success: false, error: "Unexpected server error" });
+  }
+};
+
+// GET /api/instructor/summary
+export const getInstructorSummary: RequestHandler = async (req, res) => {
+  try {
+    const chk = await requireInstructor(req);
+    if (!chk.ok) return res.status(chk.status).json({ success: false, error: chk.msg });
+    const instructorId = String((chk.user as any).id || '');
+
+    // Fetch instructor's courses
+    const { data: courses = [], error: coursesErr } = await supabase.from('courses').select('*').eq('owner_id', instructorId).order('updated_at', { ascending: false });
+    if (coursesErr) {
+      console.error('[instructor/summary] courses lookup error', coursesErr);
+      return res.status(500).json({ success: false, error: coursesErr.message });
+    }
+
+    const courseIds = (courses as any[]).map(c => c.id).filter(Boolean);
+
+    // Fetch assignments created by instructor
+    const { data: assignments = [], error: assignErr } = await supabase.from('assignments').select('id, course_id').eq('created_by', instructorId);
+    if (assignErr) {
+      console.error('[instructor/summary] assignments lookup error', assignErr);
+      return res.status(500).json({ success: false, error: assignErr.message });
+    }
+    const assignmentIds = (assignments as any[]).map(a => a.id).filter(Boolean);
+
+    // Pending submissions (not graded)
+    let pendingCount = 0;
+    if (assignmentIds.length > 0) {
+      const { data: pending = [], error: pendingErr } = await supabase.from('assignment_submissions').select('id').in('assignment_id', assignmentIds).is('graded_by', null);
+      if (pendingErr) {
+        console.error('[instructor/summary] pending submissions lookup error', pendingErr);
+        return res.status(500).json({ success: false, error: pendingErr.message });
+      }
+      pendingCount = (pending as any[]).length;
+    }
+
+    // Enrollments for these courses
+    let totalEnrolled = 0;
+    const enrollmentCounts: Record<string, number> = {};
+    if (courseIds.length > 0) {
+      const { data: enrolls = [], error: enrollErr } = await supabase.from('enrollments').select('course_id, user_id').in('course_id', courseIds);
+      if (enrollErr) {
+        console.error('[instructor/summary] enrollments lookup error', enrollErr);
+        return res.status(500).json({ success: false, error: enrollErr.message });
+      }
+      const uniqueStudents = new Set<string>();
+      (enrolls as any[]).forEach(e => {
+        const cid = e.course_id;
+        const uid = e.user_id;
+        if (!cid) return;
+        enrollmentCounts[cid] = (enrollmentCounts[cid] || 0) + 1;
+        if (uid) uniqueStudents.add(uid);
+      });
+      totalEnrolled = uniqueStudents.size;
+    }
+
+    // Average rating across courses (if rating field exists)
+    let avgRating: number | null = null;
+    try {
+      const ratings = (courses as any[]).map(c => Number(c.rating)).filter(r => !Number.isNaN(r));
+      if (ratings.length > 0) {
+        avgRating = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+      }
+    } catch (_) { avgRating = null; }
+
+    const recentCourses = (courses as any[]).slice(0, 8).map(c => ({
+      id: c.id,
+      title: c.title,
+      status: c.status || c.published ? 'published' : 'draft',
+      enrollment_count: enrollmentCounts[c.id] || 0,
+      updated_at: c.updated_at,
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        instructorId,
+        activeCourses: (courses as any[]).length,
+        totalEnrolled,
+        pendingSubmissions: pendingCount,
+        avgRating,
+        recentCourses,
+      }
+    });
+  } catch (err: any) {
+    console.error('[instructor/summary] unexpected error', err);
+    return res.status(500).json({ success: false, error: 'Unexpected server error' });
   }
 };
 
