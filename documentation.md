@@ -4,6 +4,7 @@
 NxtGen Learning Management System (LMS) is a comprehensive educational platform that enables online learning, course management, and content delivery. The system supports multiple user roles and provides features for course creation, student management, assignments, and analytics.
 
 ## Tech Stack
+## added changes
 
 ### Frontend
 - **React 18** with TypeScript
