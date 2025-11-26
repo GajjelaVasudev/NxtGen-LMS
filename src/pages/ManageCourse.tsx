@@ -220,6 +220,10 @@ export function AddCourse() {
         alert('Failed to save course: ' + String(msg));
         return;
       }
+      // If server accepted the course but metadata wasn't persisted (older DB schema), warn the user
+      if (res.hadMetadata && res.metadataSaved === false) {
+        alert('Course saved, but media (videos/quizzes) could not be persisted to the database on this deployment. Please run the latest migrations to add the `metadata` column, or contact the site administrator.');
+      }
       navigate("/app/managecourse");
     } catch (err) {
       console.error("Failed to save course:", err);

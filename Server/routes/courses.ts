@@ -5,22 +5,30 @@ import { requireAuth } from "./auth.js";
 // GET /api/courses
 export const getCourses: RequestHandler = async (_req, res) => {
   try {
-    const { data, error } = await supabase.from("courses").select("*").order("created_at", { ascending: false });
-    if (error) {
-      console.error("Supabase getCourses error:", error);
-      return res.status(500).json({ error: error.message });
-    }
-    // merge metadata into top-level for client compatibility (videos/quizzes stored in metadata)
-    const normalized = (data || []).map((row: any) => {
+    // Prefer * selection, but if schema lacks metadata or other column this may fail.
+    try {
+      const { data, error } = await supabase.from("courses").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      const normalized = (data || []).map((row: any) => {
+        try {
+          const meta = row?.metadata || null;
+          if (meta && typeof meta === 'object') return { ...row, ...meta };
+        } catch (_) {}
+        return row;
+      });
+      return res.json({ courses: normalized });
+    } catch (selectErr: any) {
+      console.warn('[getCourses] select(*) failed, retrying with minimal columns', selectErr?.message || selectErr);
+      // Fallback - request a minimal safe set of columns to avoid failing on missing metadata
       try {
-        const meta = row?.metadata || null;
-        if (meta && typeof meta === 'object') {
-          return { ...row, ...meta };
-        }
-      } catch (_) {}
-      return row;
-    });
-    return res.json({ courses: normalized });
+        const { data, error } = await supabase.from("courses").select("id,title,description,slug,created_at,owner_id").order("created_at", { ascending: false });
+        if (error) throw error;
+        return res.json({ courses: data || [] });
+      } catch (minimalErr: any) {
+        console.error('[getCourses] minimal select also failed', minimalErr);
+        return res.status(500).json({ error: String(minimalErr?.message || minimalErr) });
+      }
+    }
   } catch (err: any) {
     console.error("Unexpected getCourses error:", err);
     return res.status(500).json({ error: "Unexpected server error" });
@@ -32,26 +40,33 @@ export const getCourse: RequestHandler = async (req, res) => {
   try {
     const id = req.params.id;
     if (!id) return res.status(400).json({ error: 'course id required' });
-    const { data, error } = await supabase.from("courses").select("*").eq("id", id).single();
-    if (error) {
-      // PostgREST returns PGRST116 for "No rows" when using single(); treat as 404
-      const code = String((error as any)?.code || '');
-      if (code === "PGRST116" || /no rows/.test(String(error?.message || '').toLowerCase())) {
-        return res.status(404).json({ error: "Course not found" });
-      }
-      console.error("Supabase getCourse error:", error);
-      return res.status(500).json({ error: error.message || 'Database error' });
-    }
-    if (!data) return res.status(404).json({ error: "Course not found" });
-    // If course.metadata contains structured fields (videos/quizzes/etc), merge them
     try {
-      const meta = data?.metadata || null;
-      if (meta && typeof meta === 'object') {
-        const merged = { ...data, ...meta };
-        return res.json({ course: merged });
+      const { data, error } = await supabase.from("courses").select("*").eq("id", id).single();
+      if (error) {
+        const code = String((error as any)?.code || '');
+        if (code === "PGRST116" || /no rows/.test(String(error?.message || '').toLowerCase())) {
+          return res.status(404).json({ error: "Course not found" });
+        }
+        throw error;
       }
-    } catch (_) {}
-    return res.json({ course: data });
+      if (!data) return res.status(404).json({ error: "Course not found" });
+      try {
+        const meta = data?.metadata || null;
+        if (meta && typeof meta === 'object') return res.json({ course: { ...data, ...meta } });
+      } catch (_) {}
+      return res.json({ course: data });
+    } catch (selectErr: any) {
+      console.warn('[getCourse] select(*) failed, retrying with minimal columns', selectErr?.message || selectErr);
+      try {
+        const { data, error } = await supabase.from("courses").select("id,title,description,slug,created_at,owner_id").eq("id", id).maybeSingle();
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: "Course not found" });
+        return res.json({ course: data });
+      } catch (minimalErr: any) {
+        console.error('[getCourse] minimal select also failed', minimalErr);
+        return res.status(500).json({ error: String(minimalErr?.message || minimalErr) });
+      }
+    }
   } catch (err: any) {
     console.error("Unexpected getCourse error:", err);
     return res.status(500).json({ error: "Unexpected server error" });
@@ -148,6 +163,8 @@ export const createCourse: RequestHandler = async (req, res) => {
 
     // Try inserting including metadata; if DB schema doesn't include metadata, retry without it
     let data: any = null;
+    let metadataSaved = !!insertRow.metadata;
+    const hadMetadata = !!insertRow.metadata;
     try {
       const res = await supabase.from("courses").insert([insertRow]).select().single();
       data = (res as any).data;
@@ -157,6 +174,7 @@ export const createCourse: RequestHandler = async (req, res) => {
       console.warn('[createCourse] initial insert error, attempting without metadata', firstErr?.message || firstErr);
       // If error mentions metadata column, try again without metadata
       if (insertRow.metadata) delete insertRow.metadata;
+      metadataSaved = false;
       try {
         const retry = await supabase.from("courses").insert([insertRow]).select().single();
         data = (retry as any).data;
@@ -170,7 +188,7 @@ export const createCourse: RequestHandler = async (req, res) => {
         return res.status(500).json({ error: retryErr?.message || String(retryErr) });
       }
     }
-    return res.json({ success: true, course: data });
+    return res.json({ success: true, course: data, metadataSaved, hadMetadata });
   } catch (err: any) {
     console.error("Unexpected createCourse error:", err);
     return res.status(500).json({ error: "Unexpected server error" });
@@ -195,16 +213,19 @@ export const updateCourse: RequestHandler = async (req, res) => {
       });
       if (Object.keys(meta).length > 0) payloadToUpdate.metadata = meta;
       // Attempt update; if schema lacks metadata, retry without it
+      let metadataSaved = !!payloadToUpdate.metadata;
+      const hadMetadata = !!payloadToUpdate.metadata;
       try {
         const dbRes = await supabase.from("courses").update(payloadToUpdate).eq("id", id).select().single();
         const updated = (dbRes as any).data;
         const updErr = (dbRes as any).error;
         if (updErr) throw updErr;
         if (!updated) return res.status(404).json({ error: "Course not found" });
-        return res.json({ success: true, course: updated });
+        return res.json({ success: true, course: updated, metadataSaved, hadMetadata });
       } catch (upErr: any) {
         console.warn('[updateCourse] initial update error, retrying without metadata if present', upErr?.message || upErr);
         if (payloadToUpdate.metadata) delete payloadToUpdate.metadata;
+        metadataSaved = false;
         try {
           const retry = await supabase.from("courses").update(payloadToUpdate).eq("id", id).select().single();
           const updated2 = (retry as any).data;
@@ -214,7 +235,7 @@ export const updateCourse: RequestHandler = async (req, res) => {
             return res.status(500).json({ error: retryErr?.message || String(retryErr) });
           }
           if (!updated2) return res.status(404).json({ error: "Course not found" });
-          return res.json({ success: true, course: updated2 });
+          return res.json({ success: true, course: updated2, metadataSaved, hadMetadata });
         } catch (finalErr: any) {
           console.error('[updateCourse] unexpected error on retry', finalErr);
           return res.status(500).json({ error: finalErr?.message || String(finalErr) });
