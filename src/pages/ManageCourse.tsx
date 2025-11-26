@@ -207,10 +207,18 @@ export function AddCourse() {
     e.preventDefault();
     if (!form.title || form.title.trim() === "") { alert("Course title is required"); return; }
     try {
+      let res: any = null;
       if (isEditing && id) {
-        await apiUpdateCourse(id, { ...form, title: form.title.trim(), price: Number(form.price || 0) });
+        res = await apiUpdateCourse(id, { ...form, title: form.title.trim(), price: Number(form.price || 0) });
       } else {
-        await apiCreateCourse({ ...form, title: form.title.trim(), price: Number(form.price || 0) }, user?.id);
+        res = await apiCreateCourse({ ...form, title: form.title.trim(), price: Number(form.price || 0) }, user?.id);
+      }
+      // Show server-side errors when present
+      if (!res || (res.error && res.error.length !== 0) || res.success === false) {
+        console.error('Course save failed', res);
+        const msg = res?.error || res?.message || (res && JSON.stringify(res)) || 'Unknown server error';
+        alert('Failed to save course: ' + String(msg));
+        return;
       }
       navigate("/app/managecourse");
     } catch (err) {

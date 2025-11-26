@@ -62,6 +62,7 @@ export const getCourse: RequestHandler = async (req, res) => {
 export const createCourse: RequestHandler = async (req, res) => {
   try {
     const payload = req.body || {};
+    console.log('[createCourse] incoming payload', { payloadSummary: { title: payload?.title, hasVideos: Array.isArray(payload?.videos) ? payload.videos.length : undefined, headersXUser: req.headers['x-user-id'] } });
     // Prefer authenticated user via bearer token, but allow demo/server flows to supply
     // an explicit owner via body.owner_id, body.userId, or body.email. We will resolve
     // the provided identifier to a canonical DB UUID and verify the user's role.
