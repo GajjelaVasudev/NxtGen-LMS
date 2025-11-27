@@ -3,6 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import ConfirmModal from '@/components/ConfirmModal';
 import { getAccessToken } from '@/utils/supabaseBrowser';
 
+const API = import.meta.env.DEV ? (import.meta.env.VITE_API_PROXY || 'http://localhost:5000') : (import.meta.env.VITE_API_URL as string) || '/api';
+
 function makeSupabase() {
   return {
     auth: {
@@ -47,7 +49,7 @@ export default function ManageRoles() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/role-requests');
+      const res = await fetch(`${API}/auth/role-requests`);
       if (!res.ok) {
         // Try to parse JSON, but if server returned HTML (e.g. index.html) capture text
         let body: any = null;
@@ -92,7 +94,7 @@ export default function ManageRoles() {
           token = resp?.data?.session?.access_token || null;
         } catch (_) { token = null; }
       }
-      const endpoint = action === 'approve' ? '/api/auth/approve-role' : '/api/auth/deny-role';
+      const endpoint = action === 'approve' ? `${API}/auth/approve-role` : `${API}/auth/deny-role`;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       const body: any = { email };
       if (token) headers['Authorization'] = `Bearer ${token}`;
