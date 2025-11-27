@@ -295,6 +295,17 @@ export default function Signup() {
 							</div>
 
 							<SocialLogin text="Or Sign up with" />
+
+							{/* Request Instructor CTA: visible and links to request form, prefills email when available */}
+							<div className="w-full mt-4 flex items-center justify-center">
+								<Link
+									to="/request-instructor"
+									state={{ email }}
+									className="inline-flex items-center gap-2 px-4 py-2 border border-[#515DEF] text-[#515DEF] rounded hover:bg-[#515DEF] hover:text-white transition-colors text-sm font-semibold"
+								>
+									Request Instructor Role
+								</Link>
+							</div>
 						</div>
 					</form>
 				</div>
