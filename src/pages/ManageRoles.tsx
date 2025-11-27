@@ -18,6 +18,7 @@ type RoleRequest = {
   email: string;
   requestedRole: string;
   name?: string;
+  details?: { reason?: string; bio?: string; portfolio?: string } | null;
 };
 
 export default function ManageRoles() {
@@ -206,7 +207,16 @@ export default function ManageRoles() {
                     <tr key={r.email} className="border-b hover:bg-gray-50">
                       <td className="px-3 py-3 text-sm">{r.name || r.email.split('@')[0]}</td>
                       <td className="px-3 py-3 text-sm">{r.email}</td>
-                      <td className="px-3 py-3 text-sm">{r.requestedRole}</td>
+                      <td className="px-3 py-3 text-sm">
+                        <div>{r.requestedRole}</div>
+                        {r.details && (
+                          <div className="mt-2 text-xs text-gray-600">
+                            {r.details.reason && <div><strong>Reason:</strong> {r.details.reason}</div>}
+                            {r.details.bio && <div><strong>Bio:</strong> {r.details.bio}</div>}
+                            {r.details.portfolio && <div><strong>Portfolio:</strong> <a href={r.details.portfolio} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">Link</a></div>}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-3 py-3 text-sm">
                         <div className="flex gap-2">
                           <button

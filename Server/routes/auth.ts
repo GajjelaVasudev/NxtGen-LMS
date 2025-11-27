@@ -12,6 +12,7 @@ type UserRecord = {
   name: string;
   approved?: boolean; // whether account is approved for elevated roles
   requestedRole?: "admin" | "instructor" | "content_creator" | null;
+  roleRequestDetails?: any;
 };
 
 // Only these users can login (demo)
@@ -532,6 +533,12 @@ export const requestRole: RequestHandler = (req, res) => {
   const normalized = requestedRole === 'contentCreator' ? 'content_creator' : requestedRole;
   user.requestedRole = normalized as any;
   user.approved = false; // pending approval
+  // store optional request details for admin review
+  const details: any = {};
+  if (req.body.reason) details.reason = String(req.body.reason);
+  if (req.body.bio) details.bio = String(req.body.bio);
+  if (req.body.portfolio) details.portfolio = String(req.body.portfolio);
+  if (Object.keys(details).length > 0) user.roleRequestDetails = details as any;
   return res.json({ success: true, message: 'Role request submitted' });
 };
 
@@ -540,7 +547,12 @@ export const listRoleRequests: RequestHandler = async (req, res) => {
   const chk = await requireAdmin(req);
   if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
 
-  const requests = REGISTERED_USERS.filter((u) => u.requestedRole).map((u) => ({ email: u.email, requestedRole: u.requestedRole, name: u.name }));
+  const requests = REGISTERED_USERS.filter((u) => u.requestedRole).map((u) => ({
+    email: u.email,
+    requestedRole: u.requestedRole,
+    name: u.name,
+    details: (u as any).roleRequestDetails || null,
+  }));
   return res.json({ requests });
 };
 

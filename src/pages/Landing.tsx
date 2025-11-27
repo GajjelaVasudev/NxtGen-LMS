@@ -246,13 +246,12 @@ export default function Landing() {
                 type="submit" 
                 className="px-8 py-4 bg-[#1B68B3] text-white rounded-2xl hover:bg-[#1B68B3]/90 transition-colors font-semibold text-lg flex items-center justify-center gap-2"
               >
-                Get Started Free
+                Browse Courses - Lowest Prices
                 <ArrowRight className="w-5 h-5" />
               </button>
             </form>
-
             <p className="text-gray-500">
-              ✓ No credit card required  ✓ Free forever for students  ✓ Cancel anytime
+              Courses available at the lowest prices compared to other LMS platforms.
             </p>
 
             {/* Stats */}
@@ -357,7 +356,7 @@ export default function Landing() {
             {
               step: "01",
               title: "Create Your Account",
-              description: "Sign up for free and choose your role - student, instructor, or content creator.",
+              description: "Sign up to get started. Roles are assigned by administrators — request an instructor role if you wish to teach.",
               icon: <Users className="w-12 h-12" />
             },
             {
@@ -430,46 +429,9 @@ export default function Landing() {
           <p className="text-xl text-gray-600">Choose the plan that's right for you</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {pricingPlans.map((plan, index) => (
-            <div 
-              key={index}
-              className={`rounded-3xl p-8 ${
-                plan.highlighted 
-                  ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white transform scale-105 shadow-2xl' 
-                  : 'bg-white border-2 border-gray-100'
-              }`}
-            >
-              {plan.highlighted && (
-                <div className="inline-block px-3 py-1 bg-yellow-400 text-black rounded-full text-sm font-bold mb-4">
-                  MOST POPULAR
-                </div>
-              )}
-              <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-              <p className={`mb-6 ${plan.highlighted ? 'text-blue-100' : 'text-gray-600'}`}>
-                {plan.description}
-              </p>
-              <div className="mb-6">
-                <span className="text-5xl font-bold">{plan.price}</span>
-                {plan.period && <span className="text-lg">{plan.period}</span>}
-              </div>
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature, fIndex) => (
-                  <li key={fIndex} className="flex items-center gap-3">
-                    <CheckCircle className={`w-5 h-5 ${plan.highlighted ? 'text-yellow-400' : 'text-green-500'}`} />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              <button className={`w-full py-4 rounded-2xl font-semibold text-lg transition-all ${
-                plan.highlighted
-                  ? 'bg-white text-[#1B68B3] hover:bg-gray-100'
-                  : 'bg-[#1B68B3] text-white hover:bg-[#1B68B3]/90'
-              }`}>
-                Get Started
-              </button>
-            </div>
-          ))}
+        <div className="max-w-3xl mx-auto bg-white border rounded-2xl p-8 text-center">
+          <h3 className="text-xl font-bold mb-2">Lowest Pricing</h3>
+          <p className="text-gray-700">We offer competitively priced courses — priced lower than other LMS platforms for the same quality of content. For enterprise or large-scale pricing, contact our sales team.</p>
         </div>
       </section>
 
@@ -487,14 +449,7 @@ export default function Landing() {
               to="/signup"
               className="px-8 py-4 bg-white text-[#1B68B3] rounded-2xl hover:bg-gray-100 transition-colors font-semibold text-lg inline-flex items-center justify-center gap-2"
             >
-              Start Free Trial
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link 
-              to="/login"
-              className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-2xl hover:bg-white/10 transition-colors font-semibold text-lg"
-            >
-              Watch Demo
+              Browse Courses
             </Link>
           </div>
         </div>
