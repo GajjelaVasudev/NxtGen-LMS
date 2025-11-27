@@ -34,35 +34,12 @@ export default function ManageRoles() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Try to fetch using current supabase session token first, else use env secret
+    // Always fetch pending requests; the UI will gate actions based on client role
     (async () => {
-      const supabase = makeSupabase();
-      let token: string | null = null;
-      if (supabase) {
-        try {
-          const resp: any = await supabase.auth.getSession?.();
-          token = resp?.data?.session?.access_token || null;
-        } catch (_) {
-          try {
-            // fallback to older SDK method
-            const r: any = await (supabase as any).auth.getUser?.();
-            token = r?.data?.user?.id || null;
-          } catch (_) { token = null; }
-        }
-      }
-      if (token) {
-        fetchRequests(undefined, token);
-        return;
-      }
-      // No bearer token available. If the client-side auth context indicates
-      // this user is an admin (demo flow), allow the page to render in read-only
-      // mode (requests will be empty). Otherwise mark unauthorized.
-      if (user && (user as any).role === 'admin') {
-        setUnauthorized(false);
-        setRequests([]);
-        return;
-      }
-      setUnauthorized(true);
+      fetchRequests();
+      // Set unauthorized flag only by client-side role so the UI can show helpful guidance
+      if (!user || (user as any).role !== 'admin') setUnauthorized(true);
+      else setUnauthorized(false);
     })();
   }, []);
 
@@ -70,11 +47,7 @@ export default function ManageRoles() {
     setLoading(true);
     setError(null);
     try {
-      const headers: Record<string, string> = {};
-      if (bearerToken) headers['Authorization'] = `Bearer ${bearerToken}`;
-      else { setUnauthorized(true); setRequests([]); setLoading(false); return; }
-
-      const res = await fetch('/api/auth/role-requests', { headers });
+      const res = await fetch('/api/auth/role-requests');
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setError(body?.error || `Failed to load requests (${res.status})`);
@@ -102,16 +75,24 @@ export default function ManageRoles() {
           token = resp?.data?.session?.access_token || null;
         } catch (_) { token = null; }
       }
-
       const endpoint = action === 'approve' ? '/api/auth/approve-role' : '/api/auth/deny-role';
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const body: any = { email };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      else { setUnauthorized(true); return alert('Admin session required to approve/deny requests'); }
+      else {
+        // If no server token, but client-side auth says admin, include adminEmail so server can verify
+        if (user && (user as any).role === 'admin') {
+          body.adminEmail = user.email;
+        } else {
+          setUnauthorized(true);
+          return alert('Admin session required to approve/deny requests');
+        }
+      }
 
       const res = await fetch(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
