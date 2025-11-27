@@ -1,6 +1,8 @@
 import { RequestHandler } from "express";
 // Nodemailer and SMTP removed per new requirements — no email sending
 import { supabase } from "../supabaseClient.js";
+import fs from 'fs';
+import path from 'path';
 import admin from "firebase-admin";
 
 type UserRecord = {
@@ -582,6 +584,26 @@ export const requestRole: RequestHandler = async (req, res) => {
       return res.status(500).json({ error: 'Failed to submit role request' });
     }
 
+    // Persist request payload as a JSON file for audit / admin download
+    try {
+      const outDir = path.join(process.cwd(), 'Server', 'data', 'role_requests');
+      await fs.promises.mkdir(outDir, { recursive: true });
+      const fileName = `${created.id || Date.now()}_${(dbUser.email || 'user').replace(/[^a-z0-9@.]/gi, '_')}.json`;
+      const filePath = path.join(outDir, fileName);
+      const fileContent = {
+        id: created.id,
+        user_id: created.user_id,
+        email: created.email,
+        requested_role: created.requested_role,
+        details: created.details || {},
+        status: created.status,
+        created_at: created.created_at,
+      };
+      await fs.promises.writeFile(filePath, JSON.stringify(fileContent, null, 2), 'utf8');
+    } catch (fileErr) {
+      console.warn('[auth/requestRole] failed to write request file', fileErr?.message || fileErr);
+    }
+
     // Mirror in demo in-memory users if present (non-fatal)
     try {
       const demo = REGISTERED_USERS.find((u) => u.email.toLowerCase() === lc);
@@ -701,9 +723,14 @@ export const approveRole: RequestHandler = async (req, res) => {
 
     // Mark the role request as approved
     try {
-      await supabase.from('role_requests').update({ status: 'approved' }).eq('id', rr.id);
+      const { data: updatedReq, error: updReqErr } = await supabase.from('role_requests').update({ status: 'approved' }).eq('id', rr.id).select('*').maybeSingle();
+      if (updReqErr || !updatedReq) {
+        console.error('[admin/approveRole] failed to update role_requests status', updReqErr);
+        return res.status(500).json({ error: 'Failed to mark role request as approved' });
+      }
     } catch (ex) {
       console.warn('[admin/approveRole] failed to update role_requests status', ex);
+      return res.status(500).json({ error: 'Failed to mark role request as approved' });
     }
 
     // Audit
@@ -765,9 +792,14 @@ export const denyRole: RequestHandler = async (req, res) => {
 
     // Mark the role request as denied
     try {
-      await supabase.from('role_requests').update({ status: 'denied' }).eq('id', rr.id);
+      const { data: updatedReq, error: updReqErr } = await supabase.from('role_requests').update({ status: 'denied' }).eq('id', rr.id).select('*').maybeSingle();
+      if (updReqErr || !updatedReq) {
+        console.error('[admin/denyRole] failed to update role_requests status', updReqErr);
+        return res.status(500).json({ error: 'Failed to mark role request as denied' });
+      }
     } catch (ex) {
       console.warn('[admin/denyRole] failed to update role_requests status', ex);
+      return res.status(500).json({ error: 'Failed to mark role request as denied' });
     }
 
     // Mirror demo in-memory user if present

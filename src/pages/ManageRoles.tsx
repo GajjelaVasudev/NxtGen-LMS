@@ -17,6 +17,7 @@ function makeSupabase() {
 }
 
 type RoleRequest = {
+  id: string;
   email: string;
   requestedRole: string;
   name?: string;
@@ -32,6 +33,7 @@ export default function ManageRoles() {
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState<string | null>(null);
+  const [confirmRequestId, setConfirmRequestId] = useState<string | null>(null);
   const [confirmActionType, setConfirmActionType] = useState<'approve' | 'deny' | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -83,8 +85,9 @@ export default function ManageRoles() {
     }
   }
 
-  async function performAction(email: string, action: 'approve' | 'deny') {
-    setActionLoading((s) => ({ ...s, [email]: true }));
+  async function performAction(requestId: string | null, email: string, action: 'approve' | 'deny') {
+    const key = requestId || email;
+    setActionLoading((s) => ({ ...s, [key]: true }));
     try {
       const supabase = makeSupabase();
       let token: string | null = null;
@@ -96,7 +99,9 @@ export default function ManageRoles() {
       }
       const endpoint = action === 'approve' ? `${API}/auth/approve-role` : `${API}/auth/deny-role`;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      const body: any = { email };
+      const body: any = {};
+      if (requestId) body.requestId = requestId;
+      else body.email = email;
       if (token) headers['Authorization'] = `Bearer ${token}`;
       else {
         // If no server token, but client-side auth says admin, include adminEmail so server can verify
@@ -119,18 +124,19 @@ export default function ManageRoles() {
         return;
       }
       // remove from list and show success message
-      setRequests((r) => r.filter((q) => q.email.toLowerCase() !== email.toLowerCase()));
+      setRequests((r) => r.filter((q) => (requestId ? q.id !== requestId : q.email.toLowerCase() !== email.toLowerCase())));
       setSuccessMessage(`Successfully ${action}d role request for ${email}`);
       setTimeout(() => setSuccessMessage(null), 4000);
     } catch (ex: any) {
       console.error('role action failed', ex);
       alert('Action failed: ' + String(ex?.message || ex));
     } finally {
-      setActionLoading((s) => ({ ...s, [email]: false }));
+      setActionLoading((s) => ({ ...s, [key]: false }));
     }
   }
 
-  function openConfirm(email: string, action: 'approve' | 'deny') {
+  function openConfirm(requestId: string, email: string, action: 'approve' | 'deny') {
+    setConfirmRequestId(requestId);
     setConfirmEmail(email);
     setConfirmActionType(action);
     setConfirmOpen(true);
@@ -139,7 +145,8 @@ export default function ManageRoles() {
   async function handleConfirm() {
     if (!confirmEmail || !confirmActionType) return;
     setConfirmOpen(false);
-    await performAction(confirmEmail, confirmActionType);
+    await performAction(confirmRequestId, confirmEmail, confirmActionType);
+    setConfirmRequestId(null);
     setConfirmEmail(null);
     setConfirmActionType(null);
   }
@@ -204,7 +211,7 @@ export default function ManageRoles() {
                 </thead>
                 <tbody>
                   {requests.map((r) => (
-                    <tr key={r.email} className="border-b hover:bg-gray-50">
+                    <tr key={r.id} className="border-b hover:bg-gray-50">
                       <td className="px-3 py-3 text-sm">{r.name || r.email.split('@')[0]}</td>
                       <td className="px-3 py-3 text-sm">{r.email}</td>
                       <td className="px-3 py-3 text-sm">
@@ -220,18 +227,18 @@ export default function ManageRoles() {
                       <td className="px-3 py-3 text-sm">
                         <div className="flex gap-2">
                           <button
-                            onClick={() => openConfirm(r.email, 'approve')}
-                            disabled={!!actionLoading[r.email]}
+                            onClick={() => openConfirm(r.id, r.email, 'approve')}
+                            disabled={!!actionLoading[r.id] || !!actionLoading[r.email]}
                             className="px-3 py-1 bg-green-600 text-white rounded-md"
                           >
-                            {actionLoading[r.email] ? '…' : 'Approve'}
+                            {actionLoading[r.id] || actionLoading[r.email] ? '…' : 'Approve'}
                           </button>
                           <button
-                            onClick={() => openConfirm(r.email, 'deny')}
-                            disabled={!!actionLoading[r.email]}
+                            onClick={() => openConfirm(r.id, r.email, 'deny')}
+                            disabled={!!actionLoading[r.id] || !!actionLoading[r.email]}
                             className="px-3 py-1 bg-red-600 text-white rounded-md"
                           >
-                            {actionLoading[r.email] ? '…' : 'Deny'}
+                            {actionLoading[r.id] || actionLoading[r.email] ? '…' : 'Deny'}
                           </button>
                         </div>
                       </td>
