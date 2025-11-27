@@ -49,12 +49,29 @@ export default function ManageRoles() {
     try {
       const res = await fetch('/api/auth/role-requests');
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body?.error || `Failed to load requests (${res.status})`);
+        // Try to parse JSON, but if server returned HTML (e.g. index.html) capture text
+        let body: any = null;
+        try {
+          body = await res.json().catch(() => null);
+        } catch (_) { body = null; }
+        if (body && typeof body === 'object') {
+          setError(body?.error || `Failed to load requests (${res.status})`);
+        } else {
+          const txt = await res.text().catch(() => '');
+          setError(`Failed to load requests (${res.status}). Server response: ${txt.slice(0, 200)}`);
+        }
         setRequests([]);
       } else {
-        const body = await res.json();
-        setRequests(body?.requests || []);
+        // Ensure we only parse JSON when content-type is JSON
+        const ct = String(res.headers.get('content-type') || '').toLowerCase();
+        if (!ct.includes('application/json')) {
+          const text = await res.text().catch(() => '');
+          setError(`Unexpected server response (not JSON). Response preview: ${text.slice(0, 200)}`);
+          setRequests([]);
+        } else {
+          const body = await res.json().catch(() => null);
+          setRequests(body?.requests || []);
+        }
       }
     } catch (ex: any) {
       setError(String(ex?.message || ex));

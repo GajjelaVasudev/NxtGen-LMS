@@ -44,7 +44,7 @@ export default function RequestInstructor() {
         throw new Error(body?.error || body?.message || `HTTP ${res.status}`);
       }
       setMessage('Your request has been submitted. An administrator will review and respond.');
-      setTimeout(() => navigate('/app'), 2200);
+      // keep the user on this page so no unintended auth/navigation side-effects occur
     } catch (ex: any) {
       setError(ex?.message || String(ex));
     } finally {
