@@ -58,6 +58,26 @@ export const REGISTERED_USERS: UserRecord[] = [
 // Simple in-memory OTP store (demo). Use Redis or DB in production with TTL.
 const OTP_STORE = new Map<string, { code: string; expiresAt: number }>();
 
+// On server start (demo), mirror any in-memory pending role requests into the DB so admin UI sees them.
+(async function syncDemoRoleRequests() {
+  try {
+    const pending = REGISTERED_USERS.filter((u) => u.requestedRole);
+    if (!pending.length) return;
+    for (const u of pending) {
+      try {
+        // ensure a DB user exists for this email
+        const { data: dbUser } = await supabase.from('users').select('id, email').ilike('email', u.email).maybeSingle();
+        const userId = dbUser?.id || null;
+        await supabase.from('role_requests').insert([{ user_id: userId, email: u.email, requested_role: u.requestedRole, details: u.roleRequestDetails || {}, status: 'pending' }]).maybeSingle();
+      } catch (inner) {
+        console.warn('[auth/syncDemoRoleRequests] failed for', u.email, inner?.message || inner);
+      }
+    }
+  } catch (ex) {
+    console.warn('[auth/syncDemoRoleRequests] error', ex?.message || ex);
+  }
+})();
+
 // No transporter — all email-sending code removed. OTPs and verification links are logged only.
 
 // Email verification removed — no verification store required.
@@ -518,28 +538,67 @@ export const updateUserRole: RequestHandler = async (req, res) => {
   }
 };
 
-// User requests elevated role (teacher/contentCreator/admin) — creates or updates requestedRole
-export const requestRole: RequestHandler = (req, res) => {
-  const { email, requestedRole } = req.body;
+// User requests elevated role (instructor/content_creator) — persist to DB and keep demo fallback
+export const requestRole: RequestHandler = async (req, res) => {
+  const { email, requestedRole } = req.body || {};
   if (!email || !requestedRole) return res.status(400).json({ error: 'email and requestedRole required' });
   // accept either frontend form values ('contentCreator') or canonical ('content_creator')
-  const allowed = ['admin', 'instructor', 'contentCreator', 'content_creator'];
+  const allowed = ['instructor', 'contentCreator', 'content_creator'];
   if (!allowed.includes(requestedRole)) return res.status(400).json({ error: 'invalid requestedRole' });
-
-  const user = REGISTERED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-  if (!user) return res.status(404).json({ error: 'user not found; please signup first' });
 
   // normalize requested role to DB canonical form when storing
   const normalized = requestedRole === 'contentCreator' ? 'content_creator' : requestedRole;
-  user.requestedRole = normalized as any;
-  user.approved = false; // pending approval
-  // store optional request details for admin review
-  const details: any = {};
-  if (req.body.reason) details.reason = String(req.body.reason);
-  if (req.body.bio) details.bio = String(req.body.bio);
-  if (req.body.portfolio) details.portfolio = String(req.body.portfolio);
-  if (Object.keys(details).length > 0) user.roleRequestDetails = details as any;
-  return res.json({ success: true, message: 'Role request submitted' });
+
+  try {
+    // Ensure the canonical DB user exists
+    const lc = String(email || '').toLowerCase();
+    const { data: dbUser, error: findErr } = await supabase.from('users').select('id, email, role, first_name, last_name').ilike('email', lc).maybeSingle();
+    if (findErr) {
+      console.warn('[auth/requestRole] Supabase lookup error', { email: lc, findErr });
+      return res.status(500).json({ error: 'Failed to lookup user' });
+    }
+    if (!dbUser || !dbUser.id) {
+      // User not present in DB -> ask them to signup first
+      return res.status(404).json({ error: 'user not found; please signup first' });
+    }
+
+    const details: any = {};
+    if (req.body.reason) details.reason = String(req.body.reason);
+    if (req.body.bio) details.bio = String(req.body.bio);
+    if (req.body.portfolio) details.portfolio = String(req.body.portfolio);
+
+    // Insert role request into DB
+    const insertRow: any = {
+      user_id: dbUser.id,
+      email: dbUser.email,
+      requested_role: normalized,
+      details: Object.keys(details).length ? details : {},
+      status: 'pending',
+    };
+
+    const { data: created, error: createErr } = await supabase.from('role_requests').insert([insertRow]).select('*').maybeSingle();
+    if (createErr) {
+      console.error('[auth/requestRole] failed to insert role_request', createErr);
+      return res.status(500).json({ error: 'Failed to submit role request' });
+    }
+
+    // Mirror in demo in-memory users if present (non-fatal)
+    try {
+      const demo = REGISTERED_USERS.find((u) => u.email.toLowerCase() === lc);
+      if (demo) {
+        demo.requestedRole = normalized as any;
+        demo.approved = false;
+        if (Object.keys(details).length) demo.roleRequestDetails = details as any;
+      }
+    } catch (ex) {
+      console.warn('[auth/requestRole] failed to update demo user', ex);
+    }
+
+    return res.json({ success: true, message: 'Role request submitted' });
+  } catch (ex) {
+    console.error('[auth/requestRole] unexpected error', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
 };
 
 // Admin: list pending role requests (protected by requireAdmin middleware)
@@ -547,13 +606,38 @@ export const listRoleRequests: RequestHandler = async (req, res) => {
   const chk = await requireAdmin(req);
   if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
 
-  const requests = REGISTERED_USERS.filter((u) => u.requestedRole).map((u) => ({
-    email: u.email,
-    requestedRole: u.requestedRole,
-    name: u.name,
-    details: (u as any).roleRequestDetails || null,
-  }));
-  return res.json({ requests });
+  try {
+    const { data, error } = await supabase.from('role_requests').select('id, user_id, email, requested_role, details, status, created_at, updated_at').eq('status', 'pending').order('created_at', { ascending: false });
+    if (error) {
+      console.error('[admin/listRoleRequests] supabase error', error);
+      return res.status(500).json({ error: 'Failed to fetch role requests' });
+    }
+
+    const rows = data || [];
+    // Fetch related users in batch
+    const userIds = rows.map((r: any) => r.user_id).filter(Boolean);
+    let usersMap: Record<string, any> = {};
+    if (userIds.length) {
+      const { data: users, error: usersErr } = await supabase.from('users').select('id, email, first_name, last_name').in('id', userIds as any[]);
+      if (!usersErr && users) {
+        usersMap = (users as any[]).reduce((acc: any, u: any) => { acc[u.id] = u; return acc; }, {} as any);
+      }
+    }
+
+    const requests = (rows as any[]).map((r) => ({
+      id: r.id,
+      email: r.email,
+      requestedRole: r.requested_role,
+      name: (usersMap[r.user_id]?.first_name || '') ? `${usersMap[r.user_id].first_name} ${usersMap[r.user_id].last_name || ''}`.trim() : r.email,
+      details: r.details || null,
+      createdAt: r.created_at,
+      status: r.status,
+    }));
+    return res.json({ requests });
+  } catch (ex) {
+    console.error('[admin/listRoleRequests] unexpected error', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
 };
 
 // Admin: approve a role request
@@ -561,27 +645,61 @@ export const approveRole: RequestHandler = async (req, res) => {
   const chk = await requireAdmin(req);
   if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
 
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'email required' });
-  const user = REGISTERED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-  if (!user) return res.status(404).json({ error: 'user not found' });
-  if (!user.requestedRole) return res.status(400).json({ error: 'no pending request for this user' });
+  const { email, requestId } = req.body || {};
+  if (!email && !requestId) return res.status(400).json({ error: 'email or requestId required' });
 
-  user.role = user.requestedRole as any;
-  user.requestedRole = null;
-  user.approved = true;
-  const { password: _, ...userWithoutPassword } = user;
-
-  // Audit
   try {
-    const adminId = String((chk.user && (chk.user as any).id) || '');
-    const metadata = { action: 'approve_role', target: email, by: adminId, timestamp: new Date().toISOString() };
-    await supabase.from('admin_audit').insert([{ action: 'approve_role', admin_id: adminId, target_user_id: userWithoutPassword.id, metadata }]);
-  } catch (auditErr) {
-    console.warn('[admin/approveRole] audit insert failed', auditErr?.message || auditErr);
-  }
+    // Find the pending request
+    let rr: any = null;
+    if (requestId) {
+      const { data: row, error: rowErr } = await supabase.from('role_requests').select('*').eq('id', requestId).maybeSingle();
+      if (rowErr) return res.status(500).json({ error: 'Failed to query role request' });
+      rr = row;
+    } else {
+      const { data: row, error: rowErr } = await supabase.from('role_requests').select('*').ilike('email', String(email || '')).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (rowErr) return res.status(500).json({ error: 'Failed to query role request' });
+      rr = row;
+    }
+    if (!rr) return res.status(404).json({ error: 'No pending role request found for this user' });
 
-  return res.json({ success: true, user: userWithoutPassword });
+    // Update user's role in DB (if user exists)
+    if (rr.user_id) {
+      const { data: updatedUser, error: updErr } = await supabase.from('users').update({ role: rr.requested_role }).eq('id', rr.user_id).select('id, email, role, first_name, last_name').maybeSingle();
+      if (updErr) console.warn('[admin/approveRole] failed to update DB user role', updErr);
+      // Mirror demo in-memory user
+      try {
+        const demo = REGISTERED_USERS.find((u) => u.email.toLowerCase() === (rr.email || '').toLowerCase());
+        if (demo) {
+          demo.role = rr.requested_role as any;
+          demo.requestedRole = null;
+          demo.approved = true;
+        }
+      } catch (ex) {
+        console.warn('[admin/approveRole] demo update failed', ex);
+      }
+    }
+
+    // Mark the role request as approved
+    try {
+      await supabase.from('role_requests').update({ status: 'approved' }).eq('id', rr.id);
+    } catch (ex) {
+      console.warn('[admin/approveRole] failed to update role_requests status', ex);
+    }
+
+    // Audit
+    try {
+      const adminId = String((chk.user && (chk.user as any).id) || '');
+      const metadata = { action: 'approve_role', target: rr.email, by: adminId, timestamp: new Date().toISOString() };
+      await supabase.from('admin_audit').insert([{ action: 'approve_role', admin_id: adminId, target_user_id: rr.user_id || null, metadata }]);
+    } catch (auditErr) {
+      console.warn('[admin/approveRole] audit insert failed', auditErr?.message || auditErr);
+    }
+
+    return res.json({ success: true });
+  } catch (ex) {
+    console.error('[admin/approveRole] unexpected error', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
 };
 
 // Admin: deny a role request
@@ -589,23 +707,55 @@ export const denyRole: RequestHandler = async (req, res) => {
   const chk = await requireAdmin(req);
   if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
 
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'email required' });
-  const user = REGISTERED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-  if (!user) return res.status(404).json({ error: 'user not found' });
-  user.requestedRole = null;
-  user.approved = true; // keep as student
+  const { email, requestId } = req.body || {};
+  if (!email && !requestId) return res.status(400).json({ error: 'email or requestId required' });
 
-  // Audit
   try {
-    const adminId = String((chk.user && (chk.user as any).id) || '');
-    const metadata = { action: 'deny_role', target: email, by: adminId, timestamp: new Date().toISOString() };
-    await supabase.from('admin_audit').insert([{ action: 'deny_role', admin_id: adminId, target_user_id: user.id, metadata }]);
-  } catch (auditErr) {
-    console.warn('[admin/denyRole] audit insert failed', auditErr?.message || auditErr);
-  }
+    // Find the pending request
+    let rr: any = null;
+    if (requestId) {
+      const { data: row, error: rowErr } = await supabase.from('role_requests').select('*').eq('id', requestId).maybeSingle();
+      if (rowErr) return res.status(500).json({ error: 'Failed to query role request' });
+      rr = row;
+    } else {
+      const { data: row, error: rowErr } = await supabase.from('role_requests').select('*').ilike('email', String(email || '')).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (rowErr) return res.status(500).json({ error: 'Failed to query role request' });
+      rr = row;
+    }
+    if (!rr) return res.status(404).json({ error: 'No pending role request found for this user' });
 
-  return res.json({ success: true });
+    // Mark the role request as denied
+    try {
+      await supabase.from('role_requests').update({ status: 'denied' }).eq('id', rr.id);
+    } catch (ex) {
+      console.warn('[admin/denyRole] failed to update role_requests status', ex);
+    }
+
+    // Mirror demo in-memory user if present
+    try {
+      const demo = REGISTERED_USERS.find((u) => u.email.toLowerCase() === (rr.email || '').toLowerCase());
+      if (demo) {
+        demo.requestedRole = null;
+        demo.approved = true;
+      }
+    } catch (ex) {
+      console.warn('[admin/denyRole] demo update failed', ex);
+    }
+
+    // Audit
+    try {
+      const adminId = String((chk.user && (chk.user as any).id) || '');
+      const metadata = { action: 'deny_role', target: rr.email, by: adminId, timestamp: new Date().toISOString() };
+      await supabase.from('admin_audit').insert([{ action: 'deny_role', admin_id: adminId, target_user_id: rr.user_id || null, metadata }]);
+    } catch (auditErr) {
+      console.warn('[admin/denyRole] audit insert failed', auditErr?.message || auditErr);
+    }
+
+    return res.json({ success: true });
+  } catch (ex) {
+    console.error('[admin/denyRole] unexpected error', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
 };
 
 // Helper: find or create a social user based on email. Assign role according to registered list

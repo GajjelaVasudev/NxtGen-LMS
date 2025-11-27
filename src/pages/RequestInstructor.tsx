@@ -14,6 +14,7 @@ export default function RequestInstructor() {
   const [bio, setBio] = useState('');
   const [portfolio, setPortfolio] = useState('');
   const [reason, setReason] = useState('');
+  const [requestedRole, setRequestedRole] = useState<'instructor' | 'content_creator'>('instructor');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export default function RequestInstructor() {
       const res = await fetch(`${API}/auth/request-role`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, requestedRole: 'instructor', reason, bio, portfolio }),
+        body: JSON.stringify({ email, requestedRole, reason, bio, portfolio }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -54,8 +55,8 @@ export default function RequestInstructor() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="max-w-2xl w-full bg-white rounded-lg shadow p-8">
-        <h2 className="text-2xl font-bold mb-4">Request Instructor Role</h2>
-        <p className="text-sm text-gray-600 mb-4">Fill out this short form so administrators can review your request to become an instructor.</p>
+        <h2 className="text-2xl font-bold mb-4">Request Role</h2>
+        <p className="text-sm text-gray-600 mb-4">Request to become an instructor or content creator. Administrators will review your submission.</p>
 
         {message ? <div className="p-4 bg-green-50 text-green-800 rounded mb-4">{message}</div> : null}
         {error ? <div className="p-4 bg-red-50 text-red-800 rounded mb-4">{error}</div> : null}
@@ -72,6 +73,13 @@ export default function RequestInstructor() {
           <div>
             <label className="text-sm font-medium block">Short Bio / Qualifications</label>
             <textarea className="w-full border rounded px-3 py-2" rows={4} value={bio} onChange={(e) => setBio(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block">Role Requested</label>
+            <select className="w-full border rounded px-3 py-2" value={requestedRole} onChange={(e) => setRequestedRole(e.target.value as any)}>
+              <option value="instructor">Instructor</option>
+              <option value="content_creator">Content Creator</option>
+            </select>
           </div>
           <div>
             <label className="text-sm font-medium block">Portfolio / Website (optional)</label>
