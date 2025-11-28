@@ -8,11 +8,25 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-if (!firebaseConfig.apiKey) {
-  // Not configured in this environment; warn but allow build to continue.
+// If not configured, avoid initializing Firebase to prevent runtime errors
+// (this commonly happens in local/dev without env vars). Export a flag
+// so callers can gracefully degrade behavior.
+const configured = !!firebaseConfig.apiKey;
+if (!configured) {
   console.warn("Firebase not configured (VITE_FIREBASE_API_KEY missing)");
 }
 
-const app = !getApps().length ? initializeApp(firebaseConfig as any) : undefined;
+let app: any = undefined;
+let _auth: any = null;
+if (configured) {
+  try {
+    app = !getApps().length ? initializeApp(firebaseConfig as any) : undefined;
+    _auth = getAuth(app as any);
+  } catch (ex) {
+    console.warn('[firebase] initialization failed', ex?.message || ex);
+    _auth = null;
+  }
+}
 
-export const auth = getAuth(app as any);
+export const firebaseConfigured = configured && !!_auth;
+export const auth = _auth;

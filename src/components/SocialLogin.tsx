@@ -9,6 +9,23 @@ export const SocialLogin = ({ text = "Or login using" }: { text?: string }) => {
   const navigate = useNavigate();
 
   const doSocial = async () => {
+    // If Firebase isn't configured (auth may be null) avoid calling signInWithPopup
+    if (!auth) {
+      // Friendly fallback for local/dev: ask user for an email and continue with client-side login
+      const promptEmail = window.prompt(
+        "Google sign-in is not configured for this environment. Enter your email to continue (dev fallback):"
+      );
+      if (!promptEmail) return;
+      try {
+        await login({ email: promptEmail });
+        window.location.href = "/app";
+      } catch (err) {
+        console.error("Fallback client login failed:", err);
+        alert("Sign-in failed: " + (err as any)?.message || String(err));
+      }
+      return;
+    }
+
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
