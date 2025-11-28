@@ -255,10 +255,24 @@ export const updateCourse: RequestHandler = async (req, res) => {
 export const deleteCourse: RequestHandler = async (req, res) => {
   try {
     const id = req.params.id;
-    // Require authenticated user
-    const authChk = await requireAuth(req);
-    if (!authChk.ok) return res.status(authChk.status).json({ error: authChk.msg });
-    let requester = String((authChk.user as any).id || '');
+    // Require authenticated user. In development only, allow `x-user-id` header as a demo fallback
+    let requester = '';
+    try {
+      const authChk = await requireAuth(req);
+      if (authChk.ok) {
+        requester = String((authChk.user as any).id || '');
+      }
+    } catch (_) {}
+
+    // Development fallback: accept x-user-id when no bearer token available
+    if (!requester) {
+      const fallback = String(req.headers['x-user-id'] || '');
+      if (fallback && (process.env.NODE_ENV !== 'production')) {
+        requester = fallback;
+        console.log('[deleteCourse] using development fallback x-user-id', { requester });
+      }
+    }
+
     if (!requester) return res.status(401).json({ error: 'Missing authenticated requester id' });
 
     // Fetch course to get owner
@@ -275,12 +289,24 @@ export const deleteCourse: RequestHandler = async (req, res) => {
       console.error('[deleteCourse] user lookup error', userErr);
       return res.status(500).json({ error: userErr.message });
     }
-    const role = (userRow as any)?.role || null;
+    let role = (userRow as any)?.role || null;
+    // Development fallback: if user not found in DB, consult demo users
+    if (!role && (process.env.NODE_ENV !== 'production')) {
+      try {
+        const { REGISTERED_USERS } = await import('./auth.js');
+        const demo = REGISTERED_USERS.find((u: any) => String(u.id) === String(requester) || String(u.email).toLowerCase() === String(requester).toLowerCase());
+        if (demo && demo.role) {
+          role = String(demo.role || null);
+        }
+      } catch (ex) {
+        // ignore
+      }
+    }
 
-    // Only owner or admin allowed
-    if (role !== 'admin' && String((courseRow as any).owner_id) !== requester) {
-      console.warn('[deleteCourse] forbidden delete attempt', { requester, courseOwner: (courseRow as any).owner_id });
-      return res.status(403).json({ error: 'Forbidden: only course owner or admin may delete this course' });
+    // Allow deletion by admins or any instructor (not limited to owner)
+    if (role !== 'admin' && role !== 'instructor') {
+      console.warn('[deleteCourse] forbidden delete attempt - role not permitted', { requester, role, courseOwner: (courseRow as any).owner_id });
+      return res.status(403).json({ error: 'Forbidden: only admin or instructor may delete this course' });
     }
 
     const { error } = await supabase.from("courses").delete().eq("id", id);
