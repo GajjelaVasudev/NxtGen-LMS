@@ -203,6 +203,16 @@ export function AddCourse() {
 
   function updateField(k: string, v: any) { setForm((s: any) => ({ ...s, [k]: v })); }
 
+  // helper to convert an uploaded image file to a data URL for thumbnail preview/storage
+  async function fileToDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title || form.title.trim() === "") { alert("Course title is required"); return; }
@@ -239,18 +249,8 @@ export function AddCourse() {
             onClick={() => navigate("/app/managecourse")}
             className="p-2 hover:bg-gray-100 rounded-full"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </button>
-          <h1 className="text-2xl font-bold">{isEditing ? "Edit Course" : "Add Course"}</h1>
-        </div>
-
-        {/* Warning Message */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800">
-            <p className="font-semibold mb-1">Important: Use Video URLs</p>
-            <p>Please provide URLs to videos hosted on platforms like YouTube, Vimeo, or your own server. Do not upload large video files directly as they exceed storage limits.</p>
-          </div>
         </div>
 
         <form onSubmit={onSave} className="space-y-6">
@@ -266,16 +266,29 @@ export function AddCourse() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Thumbnail URL</label>
-            <input 
-              value={form.thumbnail || ""} 
-              onChange={(e) => updateField("thumbnail", e.target.value)} 
-              className="w-full border px-3 py-2 rounded" 
-              placeholder="https://example.com/image.jpg"
+            <label className="block text-sm font-medium mb-1">Thumbnail (choose file)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                try {
+                  const dataUrl = await fileToDataUrl(f);
+                  updateField('thumbnail', dataUrl);
+                } catch (err) {
+                  console.error('Failed to read thumbnail file', err);
+                  alert('Failed to read image file');
+                }
+              }}
+              className="w-full"
             />
             {form.thumbnail && (
               <div className="mt-2">
                 <img src={form.thumbnail} alt="Thumbnail preview" className="w-full max-w-sm h-40 object-cover rounded" />
+                <div className="mt-2">
+                  <button type="button" onClick={() => updateField('thumbnail', '')} className="px-3 py-1 text-sm border rounded">Clear</button>
+                </div>
               </div>
             )}
           </div>
