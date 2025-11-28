@@ -46,9 +46,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        if (user && user.id && !String(user.id).includes('-') && user.email) {
-          // Canonicalize stored demo user by email (will replace numeric id with DB UUID)
-          await login({ email: user.email });
+        // Do not perform automatic canonicalization while the user is actively
+        // on authentication pages (login/signup). This avoids silently logging
+        // a demo/admin account when someone merely visits the login page.
+        const pathname = typeof window !== 'undefined' ? (window.location?.pathname || '') : '';
+        if (!pathname.startsWith('/login') && !pathname.startsWith('/signup')) {
+          if (user && user.id && !String(user.id).includes('-') && user.email) {
+            // Canonicalize stored demo user by email (will replace numeric id with DB UUID)
+            await login({ email: user.email });
+          }
         }
       } catch (e) {
         // ignore
