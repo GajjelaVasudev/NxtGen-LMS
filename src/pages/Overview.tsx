@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { PlayCircle, FileText, CheckCircle } from "lucide-react";
+import { PlayCircle, FileText, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { getAccessToken } from "@/utils/supabaseBrowser";
 
 type Todo = { id: string; text: string; done: boolean };
@@ -183,6 +183,20 @@ export default function Overview() {
     .slice(0, 5);
 
   const displayName = user?.name || (user?.email?.split?.("@")?.[0]) || "Student";
+  const [coursePage, setCoursePage] = useState(0);
+  const [assignmentPage, setAssignmentPage] = useState(0);
+  const ITEMS_PER_PAGE = 3;
+
+  // Clamp pages when data changes
+  useEffect(() => {
+    const maxCoursePage = Math.max(0, Math.ceil(enrolledCourses.length / ITEMS_PER_PAGE) - 1);
+    if (coursePage > maxCoursePage) setCoursePage(maxCoursePage);
+  }, [enrolledCourses.length]);
+
+  useEffect(() => {
+    const maxAssignPage = Math.max(0, Math.ceil(pendingAssignments.length / ITEMS_PER_PAGE) - 1);
+    if (assignmentPage > maxAssignPage) setAssignmentPage(maxAssignPage);
+  }, [pendingAssignments.length]);
 
   return (
     <main className="flex-1 min-h-0 overflow-y-auto bg-white">
@@ -299,60 +313,134 @@ export default function Overview() {
         {/* Course & assignment insights */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <section className="bg-white border rounded-lg p-6 col-span-2">
-            <h2 className="text-lg font-semibold mb-4">Your Courses</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold mb-4">Your Courses</h2>
+              {enrolledCourses.length > ITEMS_PER_PAGE && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCoursePage((p) => Math.max(0, p - 1))}
+                    aria-label="Previous courses"
+                    className="p-2 rounded-md bg-gray-100 hover:bg-gray-200"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setCoursePage((p) => Math.min(Math.ceil(enrolledCourses.length / ITEMS_PER_PAGE) - 1, p + 1))}
+                    aria-label="Next courses"
+                    className="p-2 rounded-md bg-gray-100 hover:bg-gray-200"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+
             {enrolledCourses.length === 0 ? (
               <div className="text-gray-500">You're not enrolled in any courses yet.</div>
             ) : (
-              <div className="space-y-4">
-                {enrolledCourses.map(course => (
-                  <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      {course.thumbnail && (
-                        <img src={course.thumbnail} alt={course.title} className="w-16 h-16 rounded object-cover" />
-                      )}
+              <>
+                <div className="space-y-4">
+                  {enrolledCourses.slice(coursePage * ITEMS_PER_PAGE, (coursePage + 1) * ITEMS_PER_PAGE).map(course => (
+                    <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-4">
+                        {course.thumbnail && (
+                          <img src={course.thumbnail} alt={course.title} className="w-16 h-16 rounded object-cover" />
+                        )}
+                        <div>
+                          <div className="text-md font-semibold">{course.title}</div>
+                          <div className="text-sm text-gray-500">{course.description}</div>
+                        </div>
+                      </div>
                       <div>
-                        <div className="text-md font-semibold">{course.title}</div>
-                        <div className="text-sm text-gray-500">{course.description}</div>
+                        <Link to={`/app/courses/${course.id}`} className="px-4 py-2 bg-blue-600 text-white rounded">
+                          <PlayCircle className="w-5 h-5 inline-block mr-1 -mt-1" />
+                          Continue
+                        </Link>
                       </div>
                     </div>
-                    <div>
-                      <Link to={`/app/courses/${course.id}`} className="px-4 py-2 bg-blue-600 text-white rounded">
-                        <PlayCircle className="w-5 h-5 inline-block mr-1 -mt-1" />
-                        Continue
-                      </Link>
-                    </div>
+                  ))}
+                </div>
+
+                {/* Dots */}
+                {enrolledCourses.length > ITEMS_PER_PAGE && (
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    {Array.from({ length: Math.ceil(enrolledCourses.length / ITEMS_PER_PAGE) }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCoursePage(idx)}
+                        className={`h-2 rounded-full transition-all ${idx === coursePage ? 'w-8 bg-gray-800' : 'w-2 bg-gray-300'}`}
+                        aria-label={`Go to courses page ${idx + 1}`}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </section>
 
           <section className="bg-white border rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4">Pending Assignments</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold mb-4">Pending Assignments</h2>
+              {pendingAssignments.length > ITEMS_PER_PAGE && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setAssignmentPage((p) => Math.max(0, p - 1))}
+                    aria-label="Previous assignments"
+                    className="p-2 rounded-md bg-gray-100 hover:bg-gray-200"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setAssignmentPage((p) => Math.min(Math.ceil(pendingAssignments.length / ITEMS_PER_PAGE) - 1, p + 1))}
+                    aria-label="Next assignments"
+                    className="p-2 rounded-md bg-gray-100 hover:bg-gray-200"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+
             {pendingAssignments.length === 0 ? (
               <div className="text-gray-500">No pending assignments.</div>
             ) : (
-              <div className="space-y-4">
-                {pendingAssignments.map(assignment => (
-                  <div key={assignment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 flex items-center justify-center rounded bg-blue-100">
-                        <FileText className="w-6 h-6 text-blue-600" />
+              <>
+                <div className="space-y-4">
+                  {pendingAssignments.slice(assignmentPage * ITEMS_PER_PAGE, (assignmentPage + 1) * ITEMS_PER_PAGE).map(assignment => (
+                    <div key={assignment.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 flex items-center justify-center rounded bg-blue-100">
+                          <FileText className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="text-md font-semibold">{assignment.title}</div>
+                          <div className="text-sm text-gray-500">{assignment.courseName}</div>
+                        </div>
                       </div>
                       <div>
-                        <div className="text-md font-semibold">{assignment.title}</div>
-                        <div className="text-sm text-gray-500">{assignment.courseName}</div>
+                        <Link to={`/app/assignments/submissions/${assignment.id}`} className="px-4 py-2 bg-blue-600 text-white rounded">
+                          <CheckCircle className="w-5 h-5 inline-block mr-1 -mt-1" />
+                          View Assignment
+                        </Link>
                       </div>
                     </div>
-                    <div>
-                      <Link to={`/app/assignments/submissions/${assignment.id}`} className="px-4 py-2 bg-blue-600 text-white rounded">
-                        <CheckCircle className="w-5 h-5 inline-block mr-1 -mt-1" />
-                        View Assignment
-                      </Link>
-                    </div>
+                  ))}
+                </div>
+
+                {/* Dots */}
+                {pendingAssignments.length > ITEMS_PER_PAGE && (
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    {Array.from({ length: Math.ceil(pendingAssignments.length / ITEMS_PER_PAGE) }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setAssignmentPage(idx)}
+                        className={`h-2 rounded-full transition-all ${idx === assignmentPage ? 'w-8 bg-gray-800' : 'w-2 bg-gray-300'}`}
+                        aria-label={`Go to assignments page ${idx + 1}`}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </section>
         </div>
