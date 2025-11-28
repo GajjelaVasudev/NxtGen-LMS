@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "@/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
-export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
+export const SocialLogin = ({ text = "Or login using" }: { text?: string }) => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -63,10 +63,10 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
         <div className="h-[0.5px] flex-1 bg-[#313131] opacity-25"></div>
       </div>
 
-      <div className="flex items-start w-full">
+      <div className="flex items-start w-full mt-3">
         <button
           onClick={() => doSocial()}
-          className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-[#515DEF] rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+          className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-[#515DEF] rounded-lg hover:bg-gray-50 transition-colors shadow-sm mt-2"
           aria-label="Continue with Google"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

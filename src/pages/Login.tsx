@@ -246,7 +246,7 @@ export default function Login() {
 
                             <div className="text-center mt-4">
                                 <span className="text-gray-600 text-sm">Don't have an account? </span>
-                                <Link to="/signup" className="text-[#515DEF] text-sm font-semibold hover:underline">Contact Administrator</Link>
+                                <Link to="/signup" className="text-[#515DEF] text-sm font-semibold hover:underline">Sign up</Link>
                             </div>
                         </form>
                     </div>
@@ -254,7 +254,7 @@ export default function Login() {
             </div>
 
             {/* Right Side - Image Carousel */}
-            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden min-h-screen items-center justify-center">
+            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden min-h-screen items-start justify-start pt-16">
                 <div className="absolute inset-0">
                     <img
                         src={CAROUSEL_IMAGES[currentImageIndex].url}
@@ -272,7 +272,7 @@ export default function Login() {
                         {CAROUSEL_IMAGES[currentImageIndex].description}
                     </p>
 
-                    <div className="flex items-center gap-3 mt-auto">
+                    <div className="flex items-center gap-3 mt-6">
                         <button
                             onClick={prevImage}
                             className="p-2 bg-white/20 hover:bg-white/30 rounded-full backdrop-blur-sm transition-all"
