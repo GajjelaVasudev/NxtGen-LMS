@@ -64,10 +64,18 @@ export const SocialLogin = ({ text = "Or login with" }: { text?: string }) => {
       </div>
 
       <div className="flex items-start w-full">
-        <button onClick={() => doSocial()} className="w-full flex items-center justify-center py-4 px-6 border border-[#515DEF] rounded hover:bg-gray-50 transition-colors">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M24 12.0733C24 5.40554 18.6274 0 12 0C5.37258 0 0 5.40544 0 12.0733C0 18.0994 4.38823 23.0943 10.125 24V15.5633H7.07812V12.0733H10.125V9.41343C10.125 6.38748 11.9166 4.71615 14.6575 4.71615C15.9705 4.71615 17.3438 4.95203 17.3438 4.95203V7.92313H15.8306C14.3398 7.92313 13.875 8.85384 13.875 9.80857V12.0733H17.2031L16.6711 15.5633H13.875V24C19.6118 23.0943 24 18.0995 24 12.0733Z" fill="#1877F2"/>
+        <button
+          onClick={() => doSocial()}
+          className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-[#515DEF] rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+          aria-label="Continue with Google"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M21.35 11.1h-9.18v2.92h5.26c-.23 1.48-1.53 4.34-5.26 4.34-3.16 0-5.74-2.6-5.74-5.8s2.58-5.8 5.74-5.8c1.8 0 3.01.77 3.7 1.43l2.52-2.44C17.27 3.18 15.4 2.2 12.17 2.2 6.86 2.2 2.6 6.58 2.6 12s4.26 9.8 9.57 9.8c5.52 0 9.17-3.86 9.17-9.5 0-.64-.07-1.12-.0-1.4z" fill="#4285F4"/>
+            <path d="M3.88 7.64l2.9 2.12C7.3 8.2 9.63 6.8 12.17 6.8c1.8 0 3.01.77 3.7 1.43l2.52-2.44C17.27 3.18 15.4 2.2 12.17 2.2 8.3 2.2 5.11 4.4 3.88 7.64z" fill="#34A853"/>
+            <path d="M12.17 21.8c3.23 0 5.1-1 6.33-2.5l-3.06-2.38c-.88.6-1.98.95-3.27.95-3.73 0-5.02-2.86-5.26-4.34l-2.91 2.24C6.43 19.2 8.85 21.8 12.17 21.8z" fill="#FBBC05"/>
+            <path d="M21.35 11.1h-9.18v2.92h5.26c-.23 1.48-1.53 4.34-5.26 4.34-3.16 0-5.74-2.6-5.74-5.8 0-.34.03-.68.08-1L3.88 7.64C3.62 8.28 3.5 8.96 3.5 9.68 3.5 14.1 7.76 18.5 13.07 18.5c3.73 0 6.38-1.76 8.28-4.02.0-.2.0-.37.0-.5z" fill="none"/>
           </svg>
+          <span className="text-sm font-medium text-[#313131]">Continue with Google</span>
         </button>
       </div>
     </>

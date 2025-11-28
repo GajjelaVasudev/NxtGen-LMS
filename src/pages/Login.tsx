@@ -41,6 +41,7 @@ export default function Login() {
     const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [hintsOpen, setHintsOpen] = useState(false);
 
     // carousel state
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -134,110 +135,94 @@ export default function Login() {
     return (
         <div className="min-h-screen bg-white flex">
             {/* Left Side - Login Form */}
-            <div className="w-full lg:w-1/2 px-6 md:px-16 lg:px-26 py-12 flex flex-col">
-                <Logo />
+            <div className="w-full lg:w-1/2 px-6 md:px-12 lg:px-16 py-8 flex flex-col relative">
+                {/* Back arrow top-left */}
+                <div className="absolute top-6 left-6">
+                    <Link to="/" aria-label="Back to landing" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                        <ChevronLeft className="w-5 h-5 text-[#515DEF]" />
+                    </Link>
+                </div>
 
-                <div className="flex-1 flex items-center justify-center max-w-[512px] mx-auto w-full">
-                    <div className="w-full flex flex-col gap-10">
-                        <div className="flex flex-col gap-4">
-                            <h1 className="text-[#313131] font-poppins text-[40px] font-bold leading-normal">
-                                Login
-                            </h1>
-                            <p className="text-[#313131] font-poppins text-base opacity-75">
-                                Login to access your account
-                            </p>
+                <div className="mt-6 w-full max-w-[520px] mx-auto">
+                    <div className="flex items-start gap-6">
+                        <Logo />
+                    </div>
+
+                    <div className="mt-6 bg-white rounded-2xl shadow-sm p-6">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <h1 className="text-2xl font-bold text-[#16161A]">Welcome back</h1>
+                                <p className="text-sm text-gray-600 mt-1">Sign in to continue to NxtGenLMS</p>
+                            </div>
                         </div>
 
-                        {/* Registered Users Information */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <div className="flex items-start gap-2 mb-3">
-                                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <h3 className="text-sm font-semibold text-blue-900 mb-1">
-                                        Registered Users Only
-                                    </h3>
-                                    <p className="text-xs text-blue-700">
-                                        Only pre-registered email addresses can login to this system.
-                                    </p>
-                                </div>
-                            </div>
+                        {/* Collapsible role-specific hints */}
+                        <div className="mt-5">
+                            <button
+                                onClick={() => setHintsOpen((s) => !s)}
+                                className="w-full flex items-center justify-between px-4 py-2 rounded-md bg-gray-50 border border-gray-100"
+                            >
+                                <div className="text-sm text-gray-700">Role-specific email hints</div>
+                                <div className="text-xs text-gray-500">{hintsOpen ? 'Hide' : 'Show'}</div>
+                            </button>
 
-                            {registeredEmails.length > 0 && (
-                                <div className="mt-3 space-y-2">
-                                    <p className="text-xs font-medium text-blue-900">
-                                        Available Accounts:
-                                    </p>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {registeredEmails.map((item, index) => (
-                                            <div
-                                                key={index}
-                                                className="flex items-center justify-between bg-white rounded px-3 py-2 border border-blue-100"
-                                            >
-                                                <span className="text-xs text-gray-700 font-mono">
-                                                    {item.email}
-                                                </span>
-                                                <span
-                                                    className={`text-[10px] px-2 py-1 rounded-full font-medium ${getRoleBadgeColor(
-                                                        item.role
-                                                    )}`}
-                                                >
-                                                    {getRoleLabel(item.role)}
-                                                </span>
+                            {hintsOpen && (
+                                <div className="mt-3 p-3 bg-white border border-gray-100 rounded-lg">
+                                    <div className="space-y-2">
+                                        {registeredEmails.map((item, i) => (
+                                            <div key={i} className="flex items-center justify-between">
+                                                <div className="text-sm text-gray-700 font-medium">{getRoleLabel(item.role)}</div>
+                                                <div className="text-xs text-gray-500 font-mono">{item.email}</div>
                                             </div>
                                         ))}
+                                        <div className="text-xs text-gray-500 mt-2">Password hint: use the role name + <code className="bg-gray-100 px-1 rounded">123</code> for demo accounts.</div>
                                     </div>
-                                    <p className="text-[10px] text-blue-600 mt-2">
-                                        💡 Hint: Password format is [role]123 (e.g.,
-                                        admin123, student123)
-                                    </p>
                                 </div>
                             )}
                         </div>
 
-                        <form onSubmit={handleSubmit} className="flex flex-col gap-10">
-                            <div className="flex flex-col gap-6">
-                                <FormInput
-                                    label="Email"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="Enter registered email"
-                                    required
-                                />
+                        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+                            <FormInput
+                                label="Email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Enter registered email"
+                                required
+                            />
 
-                                <FormInput
-                                    label="Password"
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Enter your password"
-                                    required
-                                />
+                            <FormInput
+                                label="Password"
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Enter your password"
+                                required
+                            />
 
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id="remember"
-                                            checked={rememberMe}
-                                            onCheckedChange={(checked) =>
-                                                setRememberMe(checked as boolean)
-                                            }
-                                            className="w-6 h-6 border-[#313131] border-2"
-                                        />
-                                        <label
-                                            htmlFor="remember"
-                                            className="text-[#313131] font-poppins text-sm font-medium cursor-pointer"
-                                        >
-                                            Remember me
-                                        </label>
-                                    </div>
-                                    <Link
-                                        to="/forgot-password"
-                                        className="text-[#FF8682] text-sm font-medium font-poppins hover:underline"
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="remember"
+                                        checked={rememberMe}
+                                        onCheckedChange={(checked) =>
+                                            setRememberMe(checked as boolean)
+                                        }
+                                        className="w-5 h-5 border-[#313131] border"
+                                    />
+                                    <label
+                                        htmlFor="remember"
+                                        className="text-sm text-gray-700 font-medium cursor-pointer"
                                     >
-                                        Forgot Password
-                                    </Link>
+                                        Remember me
+                                    </label>
                                 </div>
+                                <Link
+                                    to="/forgot-password"
+                                    className="text-[#FF8682] text-sm font-medium hover:underline"
+                                >
+                                    Forgot Password
+                                </Link>
                             </div>
 
                             {error && (
@@ -250,55 +235,50 @@ export default function Login() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-4 bg-gradient-to-r from-[#515DEF] to-[#7B68EE] text-white rounded-lg font-poppins text-base font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full py-3 bg-gradient-to-r from-[#515DEF] to-[#7B68EE] text-white rounded-lg font-medium hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? "Logging in..." : "Login"}
                             </button>
+
+                            <div className="mt-2">
+                                <SocialLogin />
+                            </div>
+
+                            <div className="text-center mt-4">
+                                <span className="text-gray-600 text-sm">Don't have an account? </span>
+                                <Link to="/signup" className="text-[#515DEF] text-sm font-semibold hover:underline">Contact Administrator</Link>
+                            </div>
                         </form>
-
-                        <SocialLogin />
-
-                        <div className="text-center">
-                            <span className="text-[#313131] text-sm">
-                                Don't have an account?{" "}
-                            </span>
-                            <Link
-                                to="/signup"
-                                className="text-[#FF8682] text-sm font-semibold hover:underline"
-                            >
-                                Contact Administrator
-                            </Link>
-                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Right Side - Image Carousel */}
-            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden">
+            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden min-h-screen items-center justify-center">
                 <div className="absolute inset-0">
                     <img
                         src={CAROUSEL_IMAGES[currentImageIndex].url}
                         alt={CAROUSEL_IMAGES[currentImageIndex].title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-center"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                 </div>
 
-                <div className="relative z-10 flex flex-col justify-end p-12 text-white">
-                    <h2 className="text-4xl font-bold mb-4">
+                <div className="relative z-10 flex flex-col items-start p-10 md:p-12 text-white max-w-[520px]">
+                    <h2 className="text-3xl md:text-4xl font-bold mb-3">
                         {CAROUSEL_IMAGES[currentImageIndex].title}
                     </h2>
-                    <p className="text-xl mb-8 text-white/90">
+                    <p className="text-md md:text-lg mb-6 text-white/90">
                         {CAROUSEL_IMAGES[currentImageIndex].description}
                     </p>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 mt-auto">
                         <button
                             onClick={prevImage}
                             className="p-2 bg-white/20 hover:bg-white/30 rounded-full backdrop-blur-sm transition-all"
                             aria-label="Previous image"
                         >
-                            <ChevronLeft className="w-6 h-6" />
+                            <ChevronLeft className="w-5 h-5" />
                         </button>
 
                         <div className="flex gap-2">
@@ -321,7 +301,7 @@ export default function Login() {
                             className="p-2 bg-white/20 hover:bg-white/30 rounded-full backdrop-blur-sm transition-all"
                             aria-label="Next image"
                         >
-                            <ChevronRight className="w-6 h-6" />
+                            <ChevronRight className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
