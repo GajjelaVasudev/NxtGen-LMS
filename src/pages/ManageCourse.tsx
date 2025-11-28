@@ -507,7 +507,7 @@ export function AddCourse() {
           </div>
 
           <div className="mt-6 flex gap-3">
-            <button type="submit" className="px-6 py-3 bg-[#515DEF] text-white rounded">{isEditing ? "Update Course" : "Create Course"}</button>
+            <button type="submit" className="px-6 py-3 bg-brand text-white rounded">{isEditing ? "Update Course" : "Create Course"}</button>
             <button type="button" onClick={() => navigate("/app/managecourse")} className="px-6 py-3 border rounded">Cancel</button>
           </div>
         </form>

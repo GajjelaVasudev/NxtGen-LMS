@@ -215,7 +215,7 @@ export default function CreateAssignment() {
           <div className="flex gap-4">
             <button
               type="submit"
-              className="px-6 py-2 bg-[#515DEF] text-white rounded-md hover:bg-[#515DEF]/90"
+              className="px-6 py-2 bg-brand text-white rounded-md hover:opacity-90"
             >
               {isEditing ? "Update Assignment" : "Create Assignment"}
             </button>

@@ -281,7 +281,7 @@ export default function Assignments() {
             {hasRole && hasRole(["instructor", "admin"]) && (
               <Link
                 to="/app/assignments/create"
-                className="px-4 py-2 bg-[#515DEF] text-white rounded flex items-center gap-2"
+                className="px-4 py-2 bg-brand text-white rounded flex items-center gap-2"
               >
                 <Plus size={18} />
                 Create Assignment
@@ -368,7 +368,7 @@ export default function Assignments() {
                                 ) : (
                                   <button
                                     onClick={() => setSelectedAssignment(assignment)}
-                                    className="px-3 py-1 text-sm bg-[#515DEF] text-white rounded hover:bg-[#515DEF]/90"
+                                    className="px-3 py-1 text-sm bg-brand text-white rounded hover:opacity-90"
                                   >
                                     Submit
                                   </button>

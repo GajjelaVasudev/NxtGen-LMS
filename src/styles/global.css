@@ -59,6 +59,8 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Brand color: rgb(81 93 239 / var(--tw-bg-opacity, 1)) */
+    --brand-color: rgb(81 93 239 / var(--tw-bg-opacity, 1));
   }
 
   .dark {
@@ -208,6 +210,15 @@
 
 @media (max-width: 640px) {
   .petal { width: 14px; height: 18px; }
+}
+
+@layer utilities {
+  .bg-brand { background-color: var(--brand-color) !important; }
+  .text-brand { color: var(--brand-color) !important; }
+  .border-brand { border-color: var(--brand-color) !important; }
+  /* gradient helpers that set Tailwind gradient CSS variables */
+  .from-brand { --tw-gradient-from: var(--brand-color); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(255,255,255,0)); }
+  .to-brand { --tw-gradient-to: var(--brand-color); }
 }
 
 

@@ -209,7 +209,7 @@ export default function AssignmentSubmissions() {
                 ) : (
                   <button
                     onClick={() => handleGrade(submission)}
-                    className="w-full py-2 px-3 bg-[#515DEF] text-white rounded hover:bg-[#515DEF]/90"
+                    className="w-full py-2 px-3 bg-brand text-white rounded hover:opacity-90"
                   >
                     Grade Submission
                   </button>
@@ -254,7 +254,7 @@ export default function AssignmentSubmissions() {
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={submitGrade}
-                  className="flex-1 py-2 px-4 bg-[#515DEF] text-white rounded hover:bg-[#515DEF]/90"
+                  className="flex-1 py-2 px-4 bg-brand text-white rounded hover:opacity-90"
                 >
                   Submit Grade
                 </button>

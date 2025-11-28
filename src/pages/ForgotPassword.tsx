@@ -74,7 +74,7 @@ export default function ForgotPassword(): JSX.Element {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 bg-[#515DEF] rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:bg-[#515DEF]/90 transition-colors disabled:opacity-60"
+                  className="w-full h-12 bg-brand rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-60"
                 >
                   {loading ? 'Sending…' : 'Send reset link'}
                 </button>
@@ -183,7 +183,7 @@ export default function ForgotPassword(): JSX.Element {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 bg-[#515DEF] rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:bg-[#515DEF]/90 transition-colors disabled:opacity-60"
+                  className="w-full h-12 bg-brand rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-60"
                 >
                   {loading ? 'Sending…' : 'Send reset link'}
                 </button>
@@ -336,7 +336,7 @@ export default function ForgotPassword(): JSX.Element {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 bg-[#515DEF] rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:bg-[#515DEF]/90 transition-colors disabled:opacity-60"
+                  className="w-full h-12 bg-brand rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-60"
                 >
                   {loading ? 'Sending…' : 'Send reset link'}
                 </button>

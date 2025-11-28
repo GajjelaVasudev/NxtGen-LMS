@@ -112,7 +112,7 @@ export default function CourseCatalog() {
                     ) : (
                       <Link to={`/app/course-details/${c.id}`} className="text-sm px-3 py-1 border rounded hover:bg-gray-50">Details</Link>
                     )}
-                    <button onClick={() => buyCourse(c.id)} disabled={isPurchased(c.id)} className={`px-4 py-2 rounded ${isPurchased(c.id) ? "bg-gray-200 text-gray-500" : "bg-[#515DEF] text-white"}`}>
+                    <button onClick={() => buyCourse(c.id)} disabled={isPurchased(c.id)} className={`px-4 py-2 rounded ${isPurchased(c.id) ? "bg-gray-200 text-gray-500" : "bg-brand text-white"}`}>
                       {isPurchased(c.id) ? "Enrolled" : "Buy"}
                     </button>
                   </div>

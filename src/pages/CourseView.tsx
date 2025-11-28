@@ -113,6 +113,7 @@ export default function CourseView() {
   const [activeSection, setActiveSection] = useState<'overview' | 'content'>('overview');
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [selectedQuiz, setSelectedQuiz] = useState<QuizItem | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<AssignmentItem | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<any>({});
   const [showQuizResults, setShowQuizResults] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
@@ -328,59 +329,35 @@ export default function CourseView() {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-white">
       <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-gray-800">
-                <ArrowLeft />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold">{course.title}</h1>
-                <p className="text-sm text-gray-500">{course.description}</p>
-              </div>
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-gray-800">
+              <ArrowLeft />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold">{course.title}</h1>
+              <p className="text-sm text-gray-500">{course.description}</p>
             </div>
-            <div className="w-64">
-              <div className="text-xs text-gray-500 mb-1">Progress</div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all"
-                  style={{ width: `${courseProgress()}%` }}
-                />
-              </div>
+          </div>
+          <div className="w-64">
+            <div className="text-xs text-gray-500 mb-1">Progress</div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all" style={{ width: `${courseProgress()}%` }} />
             </div>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveSection('overview')}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              activeSection === 'overview' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveSection('content')}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              activeSection === 'content' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Course Content
-          </button>
+          <button onClick={() => setActiveSection('overview')} className={"px-6 py-3 rounded-lg font-medium transition-colors " + (activeSection === 'overview' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50')}>Overview</button>
+          <button onClick={() => setActiveSection('content')} className={"px-6 py-3 rounded-lg font-medium transition-colors " + (activeSection === 'content' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50')}>Course Content</button>
         </div>
 
-        {/* Content Area */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
           <div className="lg:col-span-2">
             {activeSection === 'overview' ? (
               <div className="bg-white rounded-lg p-6 shadow-sm">
                 <h2 className="text-2xl font-bold mb-4">About This Course</h2>
                 <p className="text-gray-700 mb-6">{course.description || 'No description available.'}</p>
-
-                <h3 className="text-xl font-semibold mb-3">Course Structure</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                     <PlayCircle className="w-8 h-8 text-blue-600 mb-2" />
@@ -401,171 +378,44 @@ export default function CourseView() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Video Player */}
-                {selectedVideo && (
-                  <div className="bg-white rounded-lg p-6 shadow-sm">
-                    <h3 className="text-xl font-bold mb-4">{selectedVideo.title}</h3>
-                        <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center mb-4">
-                          {(() => {
-                            const embedUrl = getEmbeddableVideoUrl(selectedVideo?.url);
-                            if (embedUrl) {
-                              return (
-                                <iframe
-                                  title={selectedVideo?.title || 'video'}
-                                  src={embedUrl}
-                                  className="w-full h-full rounded-lg"
-                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                  allowFullScreen
-                                />
-                              );
-                            }
+                <div className="flex gap-2 mb-4">
+                  <button onClick={() => setActiveContentTab('learn')} className={activeContentTab === 'learn' ? 'px-4 py-2 rounded bg-blue-600 text-white' : 'px-4 py-2 rounded bg-white text-gray-700 hover:bg-gray-50'}>Videos</button>
+                  <button onClick={() => setActiveContentTab('practice')} className={activeContentTab === 'practice' ? 'px-4 py-2 rounded bg-purple-600 text-white' : 'px-4 py-2 rounded bg-white text-gray-700 hover:bg-gray-50'}>Quizzes</button>
+                  <button onClick={() => setActiveContentTab('submit')} className={activeContentTab === 'submit' ? 'px-4 py-2 rounded bg-green-600 text-white' : 'px-4 py-2 rounded bg-white text-gray-700 hover:bg-gray-50'}>Assignments</button>
+                </div>
 
-                            return (
-                              <div className="text-white text-center p-6">
-                                <PlayCircle size={64} className="mx-auto mb-4 opacity-50" />
-                                <div>Invalid or unsupported video URL.</div>
-                                {selectedVideo?.url && (
-                                  <div className="mt-2">
-                                    <a className="underline text-blue-200" href={selectedVideo.url} target="_blank" rel="noreferrer noopener">Open original link</a>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                    {!isVideoCompleted(selectedVideo.id) && (
-                      <button onClick={() => markVideoComplete(selectedVideo.id)} className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">Mark as Complete</button>
-                    )}
-                  </div>
-                )}
-
-                {/* Quiz View */}
-                {selectedQuiz && (
-                  <div className="bg-white rounded-lg p-6 shadow-sm">
-                    <h3 className="text-xl font-bold mb-4">Quiz: {selectedQuiz.type.toUpperCase()}</h3>
-                    {selectedQuiz.type === 'mcq' && !showQuizResults ? (
-                      <div className="space-y-6">
-                        {(selectedQuiz as any).questions.map((question: any, qIdx: number) => (
-                          <div key={question.id} className="border-b pb-4">
-                            <p className="font-medium mb-3">{qIdx + 1}. {question.q}</p>
-                            <div className="space-y-2">
-                              {question.opts.map((opt: string, optIdx: number) => (
-                                <label key={optIdx} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                                  <input type="radio" name={`question-${qIdx}`} value={optIdx} checked={quizAnswers[qIdx] === optIdx} onChange={() => setQuizAnswers({ ...quizAnswers, [qIdx]: optIdx })} className="w-4 h-4" />
-                                  <span>{opt}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-
-                        <button onClick={handleQuizSubmit} disabled={Object.keys(quizAnswers).length < ((selectedQuiz as any).questions || []).length} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium">Submit Quiz</button>
-                      </div>
-                    ) : selectedQuiz.type === 'mcq' && showQuizResults ? (
-                      <div className="text-center">
-                        <div className="mb-6">
-                          <Award className={`w-20 h-20 mx-auto mb-4 ${quizScore >= 70 ? 'text-green-500' : 'text-orange-500'}`} />
-                          <h4 className="text-3xl font-bold mb-2">{quizScore}%</h4>
-                          <p className="text-gray-600">{quizScore >= 90 ? 'Excellent!' : quizScore >= 70 ? 'Good job!' : 'Keep practicing!'}</p>
-                        </div>
-
-                        <button onClick={() => { setSelectedQuiz(null); setShowQuizResults(false); setQuizAnswers({}); }} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Back to Course</button>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <p className="text-gray-600 mb-4">This quiz requires written submission or file upload.</p>
-                        <button onClick={() => setSelectedQuiz(null)} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Back to Course</button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div className="bg-white rounded-lg p-6 shadow-sm">
+                  {activeContentTab === 'learn' && (
+                    <div>{selectedVideo ? <div><h3 className="text-xl font-bold">{selectedVideo.title}</h3></div> : <div className="text-gray-500">Select a video from the curriculum to begin.</div>}</div>
+                  )}
+                  {activeContentTab === 'practice' && (
+                    <div>{selectedQuiz ? <div><h3 className="text-xl font-bold">Quiz: {(selectedQuiz as any).type}</h3></div> : <div className="text-gray-500">Select a quiz from the curriculum to begin.</div>}</div>
+                  )}
+                  {activeContentTab === 'submit' && (
+                    <div>{selectedAssignment ? <div><h3 className="text-xl font-bold">{selectedAssignment.title}</h3></div> : <div className="text-gray-500">Select an assignment from the curriculum to view or submit.</div>}</div>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Sidebar - Course Curriculum */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg p-6 shadow-sm sticky top-6">
-              <h3 className="text-lg font-bold mb-4">Course Curriculum</h3>
-
-              {/* Videos */}
-              <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"><PlayCircle size={16} />Video Lessons</h4>
-                {course.videos && course.videos.length > 0 ? (
-                  <div className="space-y-2">
-                    {course.videos.map((video, idx) => (
-                      <button key={video.id} onClick={() => { setSelectedVideo(video); setSelectedQuiz(null); setShowQuizResults(false); setActiveContentTab('learn'); }} className={`w-full text-left p-3 rounded-lg border transition-all ${selectedVideo?.id === video.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`flex-shrink-0 ${isVideoCompleted(video.id) ? 'text-green-500' : 'text-gray-400'}`}>{isVideoCompleted(video.id) ? <CheckCircle size={20} /> : <PlayCircle size={20} />}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{idx + 1}. {video.title}</div>
-                            {video.duration && <div className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12} />{video.duration}</div>}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">Nothing to complete here yet 👀</div>
-                )}
-              </div>
-
-              {/* Quizzes */}
-              <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"><ClipboardList size={16} />Quizzes</h4>
-                {course.quizzes && course.quizzes.length > 0 ? (
-                  <div className="space-y-2">
-                    {course.quizzes.map((quiz, idx) => {
-                      const unlocked = isQuizUnlocked(idx);
-                      const completed = isQuizCompleted((quiz as any).id);
-                      const score = getQuizScore((quiz as any).id);
-                      return (
-                        <button key={(quiz as any).id} onClick={() => { if (unlocked) { setSelectedQuiz(quiz); setSelectedVideo(null); setShowQuizResults(false); setQuizAnswers({}); setActiveContentTab('practice'); } }} disabled={!unlocked} className={`w-full text-left p-3 rounded-lg border transition-all ${!unlocked ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60' : selectedQuiz?.id === (quiz as any).id ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
-                          <div className="flex items-center gap-3">
-                            <div className={`flex-shrink-0 ${!unlocked ? 'text-gray-400' : completed ? 'text-green-500' : 'text-purple-500'}`}>{!unlocked ? <Lock size={20} /> : completed ? <CheckCircle size={20} /> : <ClipboardList size={20} />}</div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">Quiz {idx + 1}: {(quiz as any).type?.toUpperCase?.() || 'QUIZ'}</div>
-                              {!unlocked && <div className="text-xs text-gray-500">Complete video {idx + 1} to unlock</div>}
-                              {completed && score !== undefined && <div className="text-xs text-green-600 font-medium">Score: {score}%</div>}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">Nothing to complete here yet 👀</div>
-                )}
-              </div>
-
-              {/* Assignments */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"><FileText size={16} />Assignments</h4>
-                {course.assignments && course.assignments.length > 0 ? (
-                  <div className="space-y-2">
-                    {course.assignments.map((assignment) => {
-                      const submitted = progress?.completedAssignments.includes(String(assignment.id));
-                      return (
-                        <div key={assignment.id} className="p-3 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <FileText size={20} className="text-gray-400 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{assignment.title}</div>
-                              <div className="text-xs text-gray-500">{(assignment.files || []).length} file(s)</div>
-                            </div>
-                          </div>
-                          <div>{submitted ? <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">Submitted</span> : <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">Not submitted</span>}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">Nothing to complete here yet 👀</div>
-                )}
+          {activeSection === 'content' && (
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg p-6 shadow-sm sticky top-6">
+                <h3 className="text-lg font-bold mb-4">Course Curriculum</h3>
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2"><PlayCircle size={16} />Video Lessons</h4>
+                  {course.videos && course.videos.length > 0 ? (
+                    <div className="space-y-2">
+                      {course.videos.map((v, i) => (
+                        <button key={v.id} onClick={() => { setSelectedVideo(v); setActiveContentTab('learn'); }} className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50">{i + 1}. {v.title}</button>
+                      ))}
+                    </div>
+                  ) : <div className="text-sm text-gray-500">No videos</div>}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -578,7 +428,8 @@ function getEmbeddableVideoUrl(raw?: string): string | null {
   if (!raw) return null;
   try {
     const trimmed = String(raw).trim();
-    if (!/^https?:\/\//i.test(trimmed)) return null;
+    const lower = trimmed.toLowerCase();
+    if (!(lower.startsWith('http://') || lower.startsWith('https://'))) return null;
     const u = new URL(trimmed);
     const host = u.hostname.replace(/^www\./, '').toLowerCase();
 
@@ -598,13 +449,14 @@ function getEmbeddableVideoUrl(raw?: string): string | null {
       // already embed
       if (u.pathname.startsWith('/embed/')) return trimmed;
 
-      // path-based id like /v/ID
-      const m = u.pathname.match(/\/(?:v|embed)\/([A-Za-z0-9_-]+)/);
-      if (m && m[1]) return `https://www.youtube.com/embed/${m[1]}`;
+      // path-based id like /v/ID or /embed/ID
+      const parts = u.pathname.split('/').filter(Boolean);
+      const vidIndex = parts.findIndex(p => p === 'v' || p === 'embed');
+      if (vidIndex >= 0 && parts[vidIndex + 1]) return `https://www.youtube.com/embed/${parts[vidIndex + 1]}`;
     }
 
     // If it's already an absolute http(s) URL, allow embedding as-is (useful for other providers)
-    return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+    return (lower.startsWith('http://') || lower.startsWith('https://')) ? trimmed : null;
   } catch (e) {
     return null;
   }

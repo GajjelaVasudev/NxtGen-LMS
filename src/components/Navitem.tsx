@@ -15,7 +15,7 @@ export default function NavItem({ icon, label, to, badge }: NavItemProps) {
       className={({ isActive }) =>
         `flex items-center justify-between gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
           isActive
-            ? "bg-[#515DEF] text-white"
+            ? "bg-brand text-white"
             : "text-[#6B7280] hover:bg-[#E5E7EB] hover:text-[#374151]"
         }`
       }

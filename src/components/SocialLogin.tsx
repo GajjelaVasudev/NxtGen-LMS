@@ -83,7 +83,7 @@ export const SocialLogin = ({ text = "Or login using" }: { text?: string }) => {
       <div className="flex items-start w-full mt-3">
         <button
           onClick={() => doSocial()}
-          className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-[#515DEF] rounded-lg hover:bg-gray-50 transition-colors shadow-sm mt-2"
+          className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-brand rounded-lg hover:bg-gray-50 transition-colors shadow-sm mt-2"
           aria-label="Continue with Google"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

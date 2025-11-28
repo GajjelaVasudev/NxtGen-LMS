@@ -139,7 +139,7 @@ export default function Login() {
                 {/* Back arrow top-left */}
                 <div className="absolute top-6 left-6">
                     <Link to="/" aria-label="Back to landing" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                        <ChevronLeft className="w-5 h-5 text-[#515DEF]" />
+                        <ChevronLeft className="w-5 h-5 text-brand" />
                     </Link>
                 </div>
 
@@ -235,7 +235,7 @@ export default function Login() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-3 bg-gradient-to-r from-[#515DEF] to-[#7B68EE] text-white rounded-lg font-medium hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full py-3 bg-gradient-to-r from-brand to-[#7B68EE] text-white rounded-lg font-medium hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? "Logging in..." : "Login"}
                             </button>
@@ -246,7 +246,7 @@ export default function Login() {
 
                             <div className="text-center mt-4">
                                 <span className="text-gray-600 text-sm">Don't have an account? </span>
-                                <Link to="/signup" className="text-[#515DEF] text-sm font-semibold hover:underline">Sign up</Link>
+                                <Link to="/signup" className="text-brand text-sm font-semibold hover:underline">Sign up</Link>
                             </div>
                         </form>
                     </div>
