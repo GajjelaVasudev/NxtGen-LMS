@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { PlayCircle, FileText, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { PlayCircle, FileText, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { getAccessToken } from "@/utils/supabaseBrowser";
 
 type Todo = { id: string; text: string; done: boolean };
@@ -318,16 +318,10 @@ export default function Overview() {
               {enrolledCourses.length > ITEMS_PER_PAGE && (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setCoursePage((p) => Math.max(0, p - 1))}
-                    aria-label="Previous courses"
-                    className="p-2 rounded-md bg-gray-100 hover:bg-gray-200"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
                     onClick={() => setCoursePage((p) => Math.min(Math.ceil(enrolledCourses.length / ITEMS_PER_PAGE) - 1, p + 1))}
                     aria-label="Next courses"
-                    className="p-2 rounded-md bg-gray-100 hover:bg-gray-200"
+                    className={`p-2 rounded-md shadow-sm transition-colors ${coursePage < Math.ceil(enrolledCourses.length / ITEMS_PER_PAGE) - 1 ? 'bg-[#515DEF] text-white hover:opacity-95' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                    disabled={coursePage >= Math.ceil(enrolledCourses.length / ITEMS_PER_PAGE) - 1}
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -352,9 +346,8 @@ export default function Overview() {
                         </div>
                       </div>
                       <div>
-                        <Link to={`/app/courses/${course.id}`} className="px-4 py-2 bg-blue-600 text-white rounded">
-                          <PlayCircle className="w-5 h-5 inline-block mr-1 -mt-1" />
-                          Continue
+                        <Link to={`/app/courses/${course.id}`} aria-label={`Continue ${course.title}`} className="p-3 bg-gradient-to-r from-[#515DEF] to-[#7B68EE] text-white rounded-full inline-flex items-center justify-center shadow">
+                          <PlayCircle className="w-5 h-5" />
                         </Link>
                       </div>
                     </div>
@@ -384,16 +377,10 @@ export default function Overview() {
               {pendingAssignments.length > ITEMS_PER_PAGE && (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setAssignmentPage((p) => Math.max(0, p - 1))}
-                    aria-label="Previous assignments"
-                    className="p-2 rounded-md bg-gray-100 hover:bg-gray-200"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
                     onClick={() => setAssignmentPage((p) => Math.min(Math.ceil(pendingAssignments.length / ITEMS_PER_PAGE) - 1, p + 1))}
                     aria-label="Next assignments"
-                    className="p-2 rounded-md bg-gray-100 hover:bg-gray-200"
+                    className={`p-2 rounded-md shadow-sm transition-colors ${assignmentPage < Math.ceil(pendingAssignments.length / ITEMS_PER_PAGE) - 1 ? 'bg-[#515DEF] text-white hover:opacity-95' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                    disabled={assignmentPage >= Math.ceil(pendingAssignments.length / ITEMS_PER_PAGE) - 1}
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -418,9 +405,8 @@ export default function Overview() {
                         </div>
                       </div>
                       <div>
-                        <Link to={`/app/assignments/submissions/${assignment.id}`} className="px-4 py-2 bg-blue-600 text-white rounded">
-                          <CheckCircle className="w-5 h-5 inline-block mr-1 -mt-1" />
-                          View Assignment
+                        <Link to={`/app/assignments/submissions/${assignment.id}`} aria-label={`View ${assignment.title}`} className="p-3 bg-gradient-to-r from-[#515DEF] to-[#7B68EE] text-white rounded-full inline-flex items-center justify-center shadow">
+                          <Eye className="w-5 h-5" />
                         </Link>
                       </div>
                     </div>
