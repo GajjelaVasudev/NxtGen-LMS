@@ -78,23 +78,23 @@ export default function Landing() {
 
   const testimonials = [
     {
-      name: "Dr. Sarah Johnson",
+      name: "Dr.k.Ramesh kumar",
       role: "University Professor",
-      image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
+      image: "https://cdn-icons-png.flaticon.com/512/847/847969.png",
       rating: 5,
       text: "NxtGen LMS has transformed how I deliver my courses. The intuitive interface and powerful features make online teaching a breeze."
     },
     {
-      name: "Michael Chen",
+      name: "Dr.G.Vasudev",
       role: "Corporate Trainer",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
+      image: "https://cdn-icons-png.flaticon.com/512/847/847969.png",
       rating: 5,
       text: "The analytics and reporting features are outstanding. I can track employee progress and engagement in real-time."
     },
     {
-      name: "Emma Williams",
+      name: "Dr.G.V.S.Hemanth",
       role: "Online Course Creator",
-      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
+     image: "https://cdn-icons-png.flaticon.com/512/847/847969.png",
       rating: 5,
       text: "Creating and managing my courses has never been easier. The platform is reliable, fast, and feature-rich."
     }
