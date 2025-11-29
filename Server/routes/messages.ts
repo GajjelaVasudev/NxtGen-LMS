@@ -121,6 +121,22 @@ export const sendInboxMessage: RequestHandler = async (req, res) => {
       }
     }
 
+    // If senderId found but fromName missing, attempt to derive a display name
+    if (senderId && !fromName) {
+      try {
+        const { data: u } = await supabase.from('users').select('first_name, last_name, email').eq('id', senderId).maybeSingle();
+        if (u) {
+          const parts = [] as string[];
+          if (u.first_name) parts.push(String(u.first_name));
+          if (u.last_name) parts.push(String(u.last_name));
+          if (parts.length) fromName = parts.join(' ');
+          else if (u.email) fromName = String(u.email).split('@')[0];
+        }
+      } catch (ex) {
+        // ignore - we'll fallback to generic label below
+      }
+    }
+
     if (!senderId || !fromName || !subject || !body) {
       return res.status(400).json({ success: false, error: "fromName, subject and content required" });
     }
@@ -131,6 +147,9 @@ export const sendInboxMessage: RequestHandler = async (req, res) => {
 
     const insertRow: any = {
       from_user_id: senderId,
+      from_name: fromName,
+      title: subject,
+      message: body,
       to_user_id: payload.toUserId || payload.to_user_id || null,
       to_role: payload.recipientRole || payload.recipient_role || null,
       course_id: payload.course_id || payload.courseId || null,

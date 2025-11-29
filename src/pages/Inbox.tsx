@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Mail, Star, Trash2, Reply, Forward } from "lucide-react";
 import { Link } from "react-router-dom";
 import { loadInboxMessages, sendInboxMessage, markRead, deleteMessages, starMessage } from "@/utils/inboxHelpers";
+import InboxMessageItem from '@/components/InboxMessageItem';
 
 const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
 
@@ -26,6 +27,7 @@ export default function Inbox() {
 
   const fetchMessages = async () => {
     try {
+      // load messages from server
       const msgs = await loadInboxMessages(user?.id, user?.role);
       // map to the local message shape used by this page
       const mapped = msgs.map(m => ({
@@ -137,35 +139,31 @@ export default function Inbox() {
   });
 
   return (
-    <main className="h-screen flex bg-gray-50">
+    <main className="h-screen flex bg-white">
       <div className="flex-1 min-h-0 flex">
         {/* Message List */}
-        <div className="w-80 card flex flex-col min-h-0">
+        <div className="w-full md:w-80 card flex flex-col min-h-0 bg-white shadow-lg rounded-2xl overflow-hidden">
           <div className="p-4 border-b">
             <div className="flex items-center justify-between mb-3">
-              <h1 className="text-lg font-bold">Inbox</h1>
+              <h1 className="text-lg font-bold text-indigo-600">Inbox</h1>
               {(user && (user.role === 'instructor' || user.role === 'admin')) && (
                 <button onClick={() => setComposeOpen(true)} className="btn-primary px-3 py-1 rounded">Compose</button>
               )}
             </div>
 
             <div className="relative mb-3">
-              <input type="text" value={searchQuery ?? ''} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search messages..." className="w-full pl-3 pr-3 py-2 form-input text-sm" />
+              <input type="text" value={searchQuery ?? ''} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search messages..." className="w-full rounded-full bg-gray-100 px-4 py-2 text-sm" />
             </div>
           </div>
-
           <div className="flex-1 min-h-0 overflow-y-auto">
             {filtered.map(m => (
-              <div key={m.id} onClick={() => openMessage(m)} className={`p-3 border-b cursor-pointer ${selectedMessage?.id === m.id ? "bg-[rgba(27,104,179,0.06)] border-l-4 border-l-brand" : ""}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className={`font-medium ${!m.read ? "text-gray-900" : "text-gray-700"}`}>{m.fromName}</div>
-                    <div className="text-xs text-gray-500 truncate">{m.subject}</div>
-                  </div>
-                  <div className="text-xs text-gray-400">{new Date(m.timestamp).toLocaleDateString()}</div>
-                </div>
-                {m.starred && <div className="mt-2 text-brand-yellow"><Star size={14} /></div>}
-              </div>
+              <InboxMessageItem
+                key={m.id}
+                message={m}
+                selected={selectedMessage?.id === m.id}
+                onClick={(msg) => openMessage(msg)}
+                onToggleStar={(id, starred) => toggleStar(id, starred)}
+              />
             ))}
           </div>
         </div>
@@ -174,14 +172,14 @@ export default function Inbox() {
         <div className="flex-1 min-h-0 flex flex-col">
           {selectedMessage ? (
             <>
-              <div className="p-4 border-b card flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-gray-900">{selectedMessage.subject}</h2>
-                  <div className="text-xs text-gray-500">{selectedMessage.fromName} • {new Date(selectedMessage.timestamp).toLocaleString()}</div>
+              <div className="p-6 border-b card flex items-center justify-between bg-white shadow rounded-2xl">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold text-gray-900 truncate">{selectedMessage.subject}</h2>
+                  <div className="text-sm text-gray-600 mt-1 truncate">{selectedMessage.fromName} • {new Date(selectedMessage.timestamp).toLocaleString()}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => toggleStar(selectedMessage.id, !selectedMessage.starred)} className="p-2 hover:bg-gray-100 rounded">
-                    <Star className={selectedMessage.starred ? "text-brand-yellow" : "text-gray-400"} />
+                    <Star className={selectedMessage.starred ? "text-yellow-400" : "text-gray-400"} />
                   </button>
                   <button onClick={() => deleteSelected([selectedMessage.id])} className="p-2 hover:bg-gray-100 rounded">
                     <Trash2 className="text-gray-400" />
@@ -198,15 +196,15 @@ export default function Inbox() {
                 </div>
               </div>
 
-              <div className="flex-1 p-4 card overflow-auto min-h-0">
+              <div className="flex-1 p-6 card overflow-auto min-h-0 bg-white shadow rounded-2xl">
                 <div className="prose max-w-none">
-                  <p className="text-gray-700 whitespace-pre-wrap">{selectedMessage.content}</p>
+                  <p className="text-base text-gray-700 whitespace-pre-wrap leading-relaxed">{selectedMessage.content}</p>
                 </div>
               </div>
               <div className="p-4 border-t card flex-shrink-0">
                 <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
                   <div className="flex gap-2">
-                      <input value={form?.subject ?? ''} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Reply subject" className="flex-1 form-input" />
+                      <input value={form?.subject ?? ''} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Reply subject" className="flex-1 form-input px-4 py-2 rounded-full bg-gray-100" />
                       <button className="btn-primary px-4 py-2">Reply</button>
                     </div>
                 </form>
@@ -215,10 +213,10 @@ export default function Inbox() {
           ) : (
             <div className="flex-1 flex items-center justify-center bg-gray-50">
               <div className="text-center">
-                <Mail size={48} className="text-brand opacity-40 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No message selected</h3>
-                <p className="text-gray-500">Select a message to view its contents</p>
-              </div>
+                  <Mail size={64} className="text-indigo-400 opacity-30 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No message selected</h3>
+                  <p className="text-gray-500">Select a message to view its contents</p>
+                </div>
             </div>
           )}
         </div>

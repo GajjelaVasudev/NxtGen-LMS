@@ -199,20 +199,20 @@ export default function Signup() {
 						<div className="flex flex-col gap-10">
 							<div className="flex flex-col gap-6">
 								<div className="flex gap-6 flex-col sm:flex-row">
-									<FormInput
-										label="First Name"
-										type="text"
-										value={firstName}
-										onChange={(e) => setFirstName(e.target.value)}
-										className="flex-1"
-									/>
-									<FormInput
-										label="Last Name"
-										type="text"
-										value={lastName}
-										onChange={(e) => setLastName(e.target.value)}
-										className="flex-1"
-									/>
+										<FormInput
+											label="First Name"
+											type="text"
+											value={firstName}
+											onChange={(e) => setFirstName(e.target.value)}
+											className="flex-1 border border-black"
+										/>
+										<FormInput
+											label="Last Name"
+											type="text"
+											value={lastName}
+											onChange={(e) => setLastName(e.target.value)}
+											className="flex-1 border border-black"
+										/>
 								</div>
 
 								<div className="flex gap-6 flex-col sm:flex-row">
@@ -221,14 +221,14 @@ export default function Signup() {
 										type="email"
 										value={email}
 										onChange={(e) => setEmail(e.target.value)}
-										className="flex-1"
+										className="flex-1 border border-black"
 									/>
 									<FormInput
 										label="Phone Number"
 										type="tel"
 										value={phoneNumber}
 										onChange={(e) => setPhoneNumber(e.target.value)}
-										className="flex-1"
+										className="flex-1 border border-black"
 									/>
 								</div>
 
@@ -237,6 +237,7 @@ export default function Signup() {
 									type="password"
 									value={password}
 									onChange={(e) => setPassword(e.target.value)}
+									className="border border-black"
 								/>
 
 								<FormInput
@@ -244,6 +245,7 @@ export default function Signup() {
 									type="password"
 									value={confirmPassword}
 									onChange={(e) => setConfirmPassword(e.target.value)}
+									className="border border-black"
 								/>
 
 																{/* Role selection removed — new signups are students by default */}
@@ -279,7 +281,7 @@ export default function Signup() {
 								<button
 									type="submit"
 									disabled={loading}
-									className="w-full h-12 bg-[#515DEF] rounded flex items-center justify-center text-[#F3F3F3] font-poppins text-sm font-bold hover:bg-[#515DEF]/90 transition-colors disabled:opacity-60"
+									className="w-full h-12 btn-primary rounded flex items-center justify-center text-white font-poppins text-sm font-bold disabled:opacity-60"
 								>
 									{loading ? "Creating..." : "Create account"}
 								</button>

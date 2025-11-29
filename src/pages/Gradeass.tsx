@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast, Toaster } from 'sonner';
+import { sendInboxMessage } from '@/utils/inboxHelpers';
 
 export default function Gradeass() {
   const { user } = useAuth();
@@ -58,12 +59,11 @@ export default function Gradeass() {
       toast.error('Please enter a valid grade (0-100)');
       return;
     }
-      try {
-        const headers = { 'Content-Type': 'application/json' } as Record<string,string>;
-
+    try {
+        setSaving(prev => ({ ...prev, [submissionId]: true }));
         const res = await fetch(`${API}/submissions/${submissionId}/grade`, {
           method: 'PATCH',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ submissionId, grade, feedback: payload.feedback, graderId: user?.id })
         });
       const json = await res.json();
@@ -73,28 +73,22 @@ export default function Gradeass() {
       setSubmissions(prev => prev.map(s => s.submissionId === submissionId ? { ...s, grade, feedback: payload.feedback } : s));
       setEditing(prev => { const copy = { ...prev }; delete copy[submissionId]; return copy; });
 
-      // notify student via inbox
+      // notify student via inbox (use helper so auth header/fallback is handled)
       try {
-          try {
-            await fetch(`${API}/inbox/send`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                fromUserId: user?.id || '',
-                fromName: user?.name || user?.email || 'Instructor',
-                toUserId: (json.data && json.data.user_id) || undefined,
-                subject: 'Assignment Graded',
-                content: `Your assignment \"${json.data && json.data.assignment_title ? json.data.assignment_title : ''}\" has been graded: ${grade}/100. ${payload.feedback || ''}`
-              })
-            });
-          } catch (e) {
-            // ignore notify errors
-          }
+        await sendInboxMessage({
+          subject: 'Assignment Graded',
+          content: `Your assignment "${json.data && json.data.assignment_title ? json.data.assignment_title : ''}" has been graded: ${grade}/100. ${payload.feedback || ''}`,
+          assignmentId: json.data && json.data.assignment_id ? json.data.assignment_id : undefined,
+          toUserId: (json.data && json.data.user_id) || undefined,
+        }, user?.id);
       } catch (e) {
-        // ignore notify errors
+        // ignore notify errors for demo but log
+        console.warn('Failed to send grade notification', e);
       }
     } catch (err) {
       toast.error('Failed to save grade');
+    } finally {
+      setSaving(prev => ({ ...prev, [submissionId]: false }));
     }
   };
 
@@ -152,7 +146,12 @@ export default function Gradeass() {
                     </>
                   ) : (
                     <div className="flex gap-2">
-                      <button onClick={() => handleEdit(s)} className="px-3 py-1 border rounded text-brand">Edit</button>
+                      {(() => {
+                        const isUngraded = s.grade === null || s.grade === undefined || s.grade === '';
+                        return (
+                          <button onClick={() => handleEdit(s)} className="px-3 py-1 border rounded text-brand">{isUngraded ? 'Grade' : 'Edit'}</button>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

@@ -135,11 +135,11 @@ export default function Login() {
     return (
         <div className="min-h-screen bg-white flex">
             {/* Left Side - Login Form */}
-            <div className="w-full lg:w-1/2 px-6 md:px-12 lg:px-16 py-8 flex flex-col relative">
+            <div className="w-full lg:w-3/5 px-6 md:px-12 lg:px-16 py-8 flex flex-col relative">
                 {/* Back arrow top-left */}
                 <div className="absolute top-6 left-6">
-                    <Link to="/" aria-label="Back to landing" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                        <ChevronLeft className="w-5 h-5 text-brand" />
+                    <Link to="/" aria-label="Back to landing" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white shadow-md border border-gray-100 hover:shadow-lg transition-shadow">
+                        <ChevronLeft className="w-5 h-5 text-indigo-600" />
                     </Link>
                 </div>
 
@@ -148,10 +148,10 @@ export default function Login() {
                         <Logo />
                     </div>
 
-                    <div className="mt-6 bg-white rounded-2xl shadow-sm p-6">
+                    <div className="mt-6 bg-white rounded-2xl shadow-md p-6">
                         <div className="flex items-start justify-between">
                             <div>
-                                <h1 className="text-2xl font-bold text-[#16161A]">Welcome back</h1>
+                                <h1 className="text-2xl font-bold text-black">Welcome back</h1>
                                 <p className="text-sm text-gray-600 mt-1">Sign in to continue to NxtGenLMS</p>
                             </div>
                         </div>
@@ -160,7 +160,7 @@ export default function Login() {
                         <div className="mt-5">
                             <button
                                 onClick={() => setHintsOpen((s) => !s)}
-                                className="w-full flex items-center justify-between px-4 py-2 rounded-md bg-gray-50 border border-gray-100"
+                                className="w-full flex items-center justify-between px-4 py-2 rounded-md bg-gray-50 border border-gray-100 hover:bg-gray-100 transition"
                             >
                                 <div className="text-sm text-gray-700">Role-specific email hints</div>
                                 <div className="text-xs text-gray-500">{hintsOpen ? 'Hide' : 'Show'}</div>
@@ -189,6 +189,7 @@ export default function Login() {
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="Enter registered email"
                                 required
+                                className="border border-black"
                             />
 
                             <FormInput
@@ -198,6 +199,7 @@ export default function Login() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="Enter your password"
                                 required
+                                className="border border-black"
                             />
 
                             <div className="flex items-center justify-between">
@@ -219,7 +221,7 @@ export default function Login() {
                                 </div>
                                 <Link
                                     to="/forgot-password"
-                                    className="text-[#FF8682] text-sm font-medium hover:underline"
+                                    className="text-indigo-600 text-sm font-medium hover:underline hover:text-indigo-700 transition"
                                 >
                                     Forgot Password
                                 </Link>
@@ -235,7 +237,7 @@ export default function Login() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-3 bg-gradient-to-r from-brand to-[#7B68EE] text-white rounded-lg font-medium hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full py-3 btn-primary rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? "Logging in..." : "Login"}
                             </button>
@@ -246,7 +248,7 @@ export default function Login() {
 
                             <div className="text-center mt-4">
                                 <span className="text-gray-600 text-sm">Don't have an account? </span>
-                                <Link to="/signup" className="text-brand text-sm font-semibold hover:underline">Sign up</Link>
+                                <Link to="/signup" className="text-indigo-600 text-sm font-semibold hover:underline hover:text-indigo-700 transition">Sign up</Link>
                             </div>
                         </form>
                     </div>
@@ -254,14 +256,14 @@ export default function Login() {
             </div>
 
             {/* Right Side - Image Carousel */}
-            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden min-h-screen items-end justify-start">
+            <div className="hidden lg:flex lg:w-2/5 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden min-h-screen items-end justify-start">
                 <div className="absolute inset-0">
                     <img
                         src={CAROUSEL_IMAGES[currentImageIndex].url}
                         alt={CAROUSEL_IMAGES[currentImageIndex].title}
                         className="w-full h-full object-cover object-center"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
                 </div>
 
                 <div className="relative z-10 flex flex-col items-start p-8 md:p-12 text-white max-w-[520px] mb-12">

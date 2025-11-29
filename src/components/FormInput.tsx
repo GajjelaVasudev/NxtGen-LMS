@@ -1,34 +1,45 @@
-import * as React from "react";
+import React, { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import clsx from "clsx";
 
-interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label: string;
+export function cn(...args: any[]) {
+  return clsx(...args);
+}
+
+export interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
 }
 
 export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
-  ({ className, label, type, ...props }, ref) => {
-    const [showPassword, setShowPassword] = React.useState(false);
+  ({ label, type = "text", className, ...props }, ref) => {
     const isPassword = type === "password";
-    const inputType = isPassword && showPassword ? "text" : type;
+    const [showPassword, setShowPassword] = useState(false);
+    const inputType = isPassword ? (showPassword ? "text" : "password") : type;
 
     return (
-      <div className="relative w-full">
-        <div className={cn(
-          "relative flex flex-col border border-[#79747E] rounded bg-white",
-          className
-        )}>
+      <div className="w-full">
+        {label && (
+          <label className="block mb-2 text-sm text-[#313131] font-poppins">
+            {label}
+          </label>
+        )}
+
+        <div
+          className={cn(
+            "relative flex flex-col rounded bg-gray-50 focus-within:ring-2 focus-within:ring-indigo-200 transition",
+            className
+          )}
+        >
           <div className="flex items-center px-4 py-2 h-14">
-            <div className="flex-1 flex flex-col justify-center h-10">
+            <div className="flex-1 flex items-center h-10">
               <input
+                ref={ref}
                 type={inputType}
                 className="w-full bg-transparent outline-none text-[#1C1B1F] font-poppins text-base"
-                ref={ref}
                 {...props}
               />
-              <label className="absolute -top-2 left-3 px-1 bg-white text-[#313131] font-poppins text-sm">
-                {label}
-              </label>
             </div>
+
             {isPassword && (
               <button
                 type="button"
@@ -51,12 +62,4 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
 
 FormInput.displayName = "FormInput";
 
-import clsx from "clsx";
-
-/**
- * Small helper to merge class names (used across components).
- * Exported as `cn` so imports like `import { cn } from "@/lib/utils"` work.
- */
-export function cn(...args: any[]) {
-  return clsx(...args);
-}
+export default FormInput;
