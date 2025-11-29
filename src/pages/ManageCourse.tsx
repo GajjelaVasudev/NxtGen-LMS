@@ -221,7 +221,10 @@ export function AddCourse() {
       if (isEditing && id) {
         res = await apiUpdateCourse(id, { ...form, title: form.title.trim(), price: Number(form.price || 0) });
       } else {
-        res = await apiCreateCourse({ ...form, title: form.title.trim(), price: Number(form.price || 0) }, user?.id);
+        // In development, allow a demo fallback owner so local testing can create courses
+        const devFallbackOwner = import.meta.env.DEV ? 'instructor@gmail.com' : undefined;
+        const ownerArg = (user && user.id) ? user.id : devFallbackOwner;
+        res = await apiCreateCourse({ ...form, title: form.title.trim(), price: Number(form.price || 0) }, ownerArg);
       }
       // Show server-side errors when present
       if (!res || (res.error && res.error.length !== 0) || res.success === false) {

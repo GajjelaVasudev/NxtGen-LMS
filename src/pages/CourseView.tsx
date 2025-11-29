@@ -386,7 +386,63 @@ export default function CourseView() {
 
                 <div className="bg-white rounded-lg p-6 shadow-sm">
                   {activeContentTab === 'learn' && (
-                    <div>{selectedVideo ? <div><h3 className="text-xl font-bold">{selectedVideo.title}</h3></div> : <div className="text-gray-500">Select a video from the curriculum to begin.</div>}</div>
+                    <div>
+                      {selectedVideo ? (
+                        <div>
+                          <h3 className="text-xl font-bold">{selectedVideo.title}</h3>
+                          <div className="mt-4">
+                            {(() => {
+                              const emb = getEmbeddableVideoUrl(selectedVideo.url);
+                              if (emb) {
+                                return (
+                                  <div className="w-full aspect-video rounded overflow-hidden">
+                                    <iframe
+                                      title={selectedVideo.title}
+                                      src={emb}
+                                      className="w-full h-full"
+                                      frameBorder={0}
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                      allowFullScreen
+                                    />
+                                  </div>
+                                );
+                              }
+
+                              // fallback to HTML5 video for direct URLs or data: URLs
+                              if (selectedVideo.url) {
+                                return (
+                                  <div className="w-full">
+                                    <video
+                                      controls
+                                      src={selectedVideo.url}
+                                      className="w-full rounded-md bg-black"
+                                      onEnded={() => markVideoComplete(selectedVideo.id)}
+                                    />
+                                  </div>
+                                );
+                              }
+
+                              return <div className="text-gray-500">No playable source available for this video.</div>;
+                            })()}
+                          </div>
+
+                          <div className="mt-3 flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => { if (selectedVideo) markVideoComplete(selectedVideo.id); }}
+                              className="px-3 py-1 bg-blue-600 text-white rounded"
+                            >
+                              Mark Complete
+                            </button>
+                            {selectedVideo && isVideoCompleted(selectedVideo.id) && (
+                              <div className="text-sm text-green-600 flex items-center gap-1"><CheckCircle size={16} /> Completed</div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500">Select a video from the curriculum to begin.</div>
+                      )}
+                    </div>
                   )}
                   {activeContentTab === 'practice' && (
                     <div>{selectedQuiz ? <div><h3 className="text-xl font-bold">Quiz: {(selectedQuiz as any).type}</h3></div> : <div className="text-gray-500">Select a quiz from the curriculum to begin.</div>}</div>
