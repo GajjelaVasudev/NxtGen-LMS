@@ -213,18 +213,97 @@ export function AddCourse() {
     });
   }
 
+  // helper: convert a data URL string to a File-like Blob object
+  function dataUrlToBlob(dataUrl: string): { blob: Blob; name: string } | null {
+    try {
+      const matches = dataUrl.match(/^data:(.+?);base64,(.+)$/);
+      if (!matches) return null;
+      const mime = matches[1];
+      const b64 = matches[2];
+      const binary = atob(b64);
+      const len = binary.length;
+      const u8 = new Uint8Array(len);
+      for (let i = 0; i < len; i++) u8[i] = binary.charCodeAt(i);
+      const blob = new Blob([u8], { type: mime });
+      const ext = mime.split('/')[1] || 'bin';
+      const name = `upload-${Date.now()}.${ext}`;
+      return { blob, name };
+    } catch (e) {
+      return null;
+    }
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title || form.title.trim() === "") { alert("Course title is required"); return; }
     try {
+      // Before sending, upload any embedded data: URLs (videos or assignment files)
+      const prepared = { ...form } as any;
+
+      // If thumbnail is still an embedded data URL (e.g., user pasted a data: URL), upload it first
+      if (typeof prepared.thumbnail === 'string' && prepared.thumbnail.startsWith('data:')) {
+        const convThumb = dataUrlToBlob(prepared.thumbnail);
+        if (!convThumb) throw new Error('Failed to parse embedded thumbnail data URL');
+        const thumbFd = new FormData();
+        thumbFd.append('file', convThumb.blob, convThumb.name);
+        const thumbUp = await fetch(`${API}/upload`, { method: 'POST', body: thumbFd });
+        if (!thumbUp.ok) throw new Error('Failed to upload embedded thumbnail');
+        const thumbBody = await thumbUp.json().catch(() => null);
+        if (!thumbBody || !thumbBody.success || !thumbBody.url) throw new Error('Thumbnail upload returned invalid response');
+        prepared.thumbnail = thumbBody.url;
+      }
+
+      // process videos: if url is a data: URL, upload it and replace
+      if (Array.isArray(prepared.videos)) {
+        for (let i = 0; i < prepared.videos.length; i++) {
+          const v = prepared.videos[i];
+          if (v && typeof v.url === 'string' && v.url.startsWith('data:')) {
+            const conv = dataUrlToBlob(v.url);
+            if (!conv) throw new Error('Failed to parse embedded video data URL');
+            const fd = new FormData();
+            fd.append('file', conv.blob, conv.name);
+            const up = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+            if (!up.ok) throw new Error('Failed to upload embedded video');
+            const upb = await up.json().catch(() => null);
+            if (!upb || !upb.success || !upb.url) throw new Error('Upload returned invalid response');
+            prepared.videos[i] = { ...v, url: upb.url };
+          }
+        }
+      }
+
+      // process assignments files: if files contain dataUrl, upload and replace with url
+      if (Array.isArray(prepared.assignments)) {
+        for (let ai = 0; ai < prepared.assignments.length; ai++) {
+          const a = prepared.assignments[ai];
+          if (a && Array.isArray(a.files)) {
+            for (let fi = 0; fi < a.files.length; fi++) {
+              const fileObj = a.files[fi];
+              const dataUrl = fileObj?.dataUrl || fileObj?.url;
+              if (typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+                const conv = dataUrlToBlob(dataUrl);
+                if (!conv) throw new Error('Failed to parse embedded assignment file data URL');
+                const fd = new FormData();
+                fd.append('file', conv.blob, conv.name);
+                const up = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+                if (!up.ok) throw new Error('Failed to upload embedded assignment file');
+                const upb = await up.json().catch(() => null);
+                if (!upb || !upb.success || !upb.url) throw new Error('Upload returned invalid response');
+                // replace file object with normalized { fileName, url }
+                prepared.assignments[ai].files[fi] = { fileName: fileObj.fileName || conv.name, url: upb.url };
+              }
+            }
+          }
+        }
+      }
+
       let res: any = null;
       if (isEditing && id) {
-        res = await apiUpdateCourse(id, { ...form, title: form.title.trim(), price: Number(form.price || 0) });
+        res = await apiUpdateCourse(id, { ...prepared, title: prepared.title.trim(), price: Number(prepared.price || 0) });
       } else {
         // In development, allow a demo fallback owner so local testing can create courses
         const devFallbackOwner = import.meta.env.DEV ? 'instructor@gmail.com' : undefined;
         const ownerArg = (user && user.id) ? user.id : devFallbackOwner;
-        res = await apiCreateCourse({ ...form, title: form.title.trim(), price: Number(form.price || 0) }, ownerArg);
+        res = await apiCreateCourse({ ...prepared, title: prepared.title.trim(), price: Number(prepared.price || 0) }, ownerArg);
       }
       // Show server-side errors when present
       if (!res || (res.error && res.error.length !== 0) || res.success === false) {
@@ -276,12 +355,32 @@ export function AddCourse() {
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 if (!f) return;
+                const MAX_THUMB_BYTES = 5 * 1024 * 1024; // 5MB
+                if (f.size > MAX_THUMB_BYTES) {
+                  alert('Selected image is too large. Please choose an image smaller than 5MB or optimize it before uploading.');
+                  return;
+                }
                 try {
-                  const dataUrl = await fileToDataUrl(f);
-                  updateField('thumbnail', dataUrl);
+                  // Upload to server which stores in Supabase Storage and returns a public URL
+                  const formData = new FormData();
+                  formData.append('file', f, f.name);
+                  const uploadRes = await fetch(`${API}/upload`, { method: 'POST', body: formData });
+                  if (!uploadRes.ok) {
+                    const txt = await uploadRes.text().catch(() => '');
+                    console.error('Upload failed', uploadRes.status, txt);
+                    alert('Failed to upload image');
+                    return;
+                  }
+                  const body = await uploadRes.json().catch(() => null);
+                  if (!body || !body.success || !body.url) {
+                    console.error('Upload response invalid', body);
+                    alert('Failed to upload image');
+                    return;
+                  }
+                  updateField('thumbnail', body.url);
                 } catch (err) {
-                  console.error('Failed to read thumbnail file', err);
-                  alert('Failed to read image file');
+                  console.error('Failed to upload thumbnail', err);
+                  alert('Failed to upload image');
                 }
               }}
               className="w-full"

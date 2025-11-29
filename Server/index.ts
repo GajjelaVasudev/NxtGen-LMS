@@ -23,6 +23,7 @@ import {
   listEnrollments,
   enrollCourse,
 } from "./routes/courses.js";
+import { uploadMiddleware, handleUpload } from "./routes/upload.js";
 import {
   getInbox,
   sendInboxMessage,
@@ -316,6 +317,9 @@ export function createServer() {
   app.post("/api/courses", createCourse);
   app.put("/api/courses/:id", updateCourse);
   app.delete("/api/courses/:id", deleteCourse);
+
+  // file upload endpoint (accepts multipart/form-data with field 'file')
+  app.post('/api/upload', uploadMiddleware, handleUpload);
 
   app.get("/api/enrollments", listEnrollments);
   app.post("/api/courses/:id/enroll", enrollCourse);

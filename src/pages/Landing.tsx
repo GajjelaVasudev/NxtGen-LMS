@@ -6,39 +6,7 @@ import "../styles/landing.css";
 export default function Landing() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
-  const [logoClicks, setLogoClicks] = useState(0);
-  const clickTimerRef = useRef<number | null>(null);
-
-  function handleLogoClick() {
-    // Increment click count and reset if no clicks for 3 seconds
-    setLogoClicks((prev) => {
-      const next = prev + 1;
-
-      // clear existing timer
-      if (clickTimerRef.current) {
-        window.clearTimeout(clickTimerRef.current);
-      }
-
-      // set/reset timer to clear clicks after 3s of inactivity
-      clickTimerRef.current = window.setTimeout(() => {
-        setLogoClicks(0);
-        clickTimerRef.current = null;
-      }, 3000) as unknown as number;
-
-      if (next >= 5) {
-        // unlock: navigate and auto-unlock
-        setLogoClicks(0);
-        if (clickTimerRef.current) {
-          window.clearTimeout(clickTimerRef.current);
-          clickTimerRef.current = null;
-        }
-        navigate('/surprise', { state: { autoUnlock: true } });
-        return 0;
-      }
-
-      return next;
-    });
-  }
+  // Logo surprise removed: keep logo static and non-secret
 
   function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -191,7 +159,7 @@ export default function Landing() {
       {/* Header */}
       <header className="px-4 md:px-16 lg:px-20 py-6 sticky top-0 bg-white/95 backdrop-blur-sm z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="text-4xl md:text-5xl font-bold" onClick={handleLogoClick}>
+          <div className="text-4xl md:text-5xl font-bold">
             <span className="text-brand-blue">Nxt</span>
             <span className="text-brand-yellow">Gen</span>
           </div>
@@ -426,21 +394,6 @@ export default function Landing() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="max-w-7xl mx-auto px-4 mt-32">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-xl text-gray-600">Choose the plan that's right for you</p>
-        </div>
-
-        <div className="max-w-3xl mx-auto bg-white border rounded-2xl p-8 text-center">
-          <h3 className="text-xl font-bold mb-2">Lowest Pricing</h3>
-          <p className="text-gray-700">We offer competitively priced courses — priced lower than other LMS platforms for the same quality of content. For enterprise or large-scale pricing, contact our sales team.</p>
         </div>
       </section>
 

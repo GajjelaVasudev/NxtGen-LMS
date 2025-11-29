@@ -12,14 +12,13 @@ import ForgotPassword from "./pages/ForgotPasswordClean";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyCode from "./pages/VerifyCode";
 import SetPassword from "./pages/SetPassword";
-import Surprise from "./pages/Surprise";
 
 import DashboardLayout from "./layouts/DashboardLayout";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import RequireAuth from "@/components/RequireAuth";
 
-/* --- New Policy Pages (Import them) --- */
+/* --- New Policy Pages --- */
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import CookiePolicy from "./pages/CookiePolicy";
@@ -37,14 +36,13 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/request-instructor" element={<RequestInstructor />} />
-              <Route path="/surprise" element={<Surprise />} />
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/verify-code" element={<VerifyCode />} />
               <Route path="/set-password" element={<SetPassword />} />
 
-              {/* New Footer Pages */}
+              {/* Footer Policy Pages */}
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/cookie-policy" element={<CookiePolicy />} />
@@ -59,7 +57,7 @@ export default function App() {
                 }
               />
 
-              {/* Redirect unknown routes */}
+              {/* Unknown Routes Redirect */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </ThemeProvider>

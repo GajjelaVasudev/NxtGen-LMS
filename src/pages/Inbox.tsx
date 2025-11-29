@@ -41,16 +41,43 @@ export default function Inbox() {
         starred: (m as any).is_starred || false,
       }));
       setMessages(mapped.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+      return true;
     } catch (err) {
       console.warn("Inbox fetch error", err);
       setMessages([]);
+      return false;
     }
   };
 
   useEffect(() => {
-    fetchMessages();
-    const iv = setInterval(fetchMessages, 3000);
-    return () => clearInterval(iv);
+    let cancelled = false;
+    let intervalMs = 3000;
+    let timer: any = null;
+
+    async function poll() {
+      if (cancelled) return;
+      try {
+        const ok = await fetchMessages();
+        if (ok) {
+          // reset back to fast polling on success
+          intervalMs = 3000;
+        } else {
+          // backend likely down - back off
+          intervalMs = Math.min(30000, intervalMs * 2);
+        }
+      } catch (e) {
+        intervalMs = Math.min(30000, intervalMs * 2);
+      }
+      if (cancelled) return;
+      timer = setTimeout(poll, intervalMs);
+    }
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [user]);
 
   const openMessage = (m: any) => {
@@ -123,7 +150,7 @@ export default function Inbox() {
             </div>
 
             <div className="relative mb-3">
-              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search messages..." className="w-full pl-3 pr-3 py-2 border rounded text-sm" />
+              <input type="text" value={searchQuery ?? ''} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search messages..." className="w-full pl-3 pr-3 py-2 border rounded text-sm" />
             </div>
           </div>
 
@@ -179,7 +206,7 @@ export default function Inbox() {
               <div className="p-4 border-t bg-white flex-shrink-0">
                 <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
                   <div className="flex gap-2">
-                    <input value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Reply subject" className="flex-1 border px-3 py-2 rounded" />
+                    <input value={form?.subject ?? ''} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Reply subject" className="flex-1 border px-3 py-2 rounded" />
                     <button className="px-4 py-2 bg-blue-600 text-white rounded">Reply</button>
                   </div>
                 </form>
@@ -204,7 +231,7 @@ export default function Inbox() {
             <h3 className="text-lg font-semibold mb-3">Compose Message</h3>
             <form onSubmit={sendMessage} className="space-y-3">
               <div className="grid grid-cols-3 gap-2">
-                <input value={studentSearchId} onChange={(e) => setStudentSearchId(e.target.value)} placeholder="Search student by ID" className="col-span-2 border px-3 py-2 rounded" />
+                <input value={studentSearchId ?? ''} onChange={(e) => setStudentSearchId(e.target.value)} placeholder="Search student by ID" className="col-span-2 border px-3 py-2 rounded" />
                 <button type="button" onClick={async () => {
                   if (!studentSearchId) return;
                   setSearchingStudent(true);
@@ -233,9 +260,9 @@ export default function Inbox() {
                 </div>
               )}
 
-              <input value={form.toName} onChange={(e) => setForm(f => ({ ...f, toName: e.target.value }))} placeholder="To (leave empty for role/system)" className="w-full border px-3 py-2 rounded" />
-              <input value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Subject" className="w-full border px-3 py-2 rounded" />
-              <textarea value={form.content} onChange={(e) => setForm(f => ({ ...f, content: e.target.value }))} rows={6} className="w-full border px-3 py-2 rounded" placeholder="Write your message..." />
+              <input value={form?.toName ?? ''} onChange={(e) => setForm(f => ({ ...f, toName: e.target.value }))} placeholder="To (leave empty for role/system)" className="w-full border px-3 py-2 rounded" />
+              <input value={form?.subject ?? ''} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Subject" className="w-full border px-3 py-2 rounded" />
+              <textarea value={form?.content ?? ''} onChange={(e) => setForm(f => ({ ...f, content: e.target.value }))} rows={6} className="w-full border px-3 py-2 rounded" placeholder="Write your message..." />
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-500">You are sending as: {user?.name || user?.email}</div>
                 <div className="flex gap-2">
