@@ -257,13 +257,9 @@ export default function Signup() {
 										className="text-sm font-poppins cursor-pointer"
 									>
 										<span className="text-[#313131]">I agree to all the </span>
-										<span className="text-[#FF8682] font-bold">
-											Terms
-										</span>
+										<Link to="/terms-of-service" className="text-[#FF8682] font-bold hover:underline">Terms</Link>
 										<span className="text-[#313131]"> and </span>
-										<span className="text-[#FF8682] font-bold">
-											Privacy Policies
-										</span>
+										<Link to="/privacy-policy" className="text-[#FF8682] font-bold hover:underline">Privacy Policies</Link>
 									</label>
 								</div>
 							</div>
