@@ -4,6 +4,7 @@
 
 /* Scope all landing variables and base styles under .landing-root */
 .landing-root {
+    
   --background: 0 0% 100%;
   --foreground: 0 0% 0%;
 
@@ -28,6 +29,8 @@
 
 /* Basic resets / base styles scoped to landing */
 .landing-root {
+  position: relative;      /* Required for blob positioning */
+  overflow: hidden;        /* Prevent blobs from escaping */
   font-family: "Inter", -apple-system, Roboto, Helvetica, sans-serif;
   color: hsl(var(--foreground));
   background: hsl(var(--background));
@@ -154,3 +157,24 @@
 
 /* Optional utility to preserve original .rounded usage in markup */
 .landing-root .rounded { border-radius: 0.25rem; }
+
+
+/*Animated CSS Addition*/
+/* ---- Animated Background Blobs ---- */
+.landing-root .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(140px);
+  opacity: 0.35;
+  animation: blobMove 18s infinite ease-in-out;
+  pointer-events: none; /* prevent clicks getting blocked */
+  z-index: -1; /* behind content */
+}
+
+@keyframes blobMove {
+  0% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(120px, -60px) scale(1.25); }
+  50% { transform: translate(-100px, 40px) scale(0.9); }
+  75% { transform: translate(60px, 90px) scale(1.15); }
+  100% { transform: translate(0, 0) scale(1); }
+}
