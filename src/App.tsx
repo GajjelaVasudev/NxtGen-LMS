@@ -23,6 +23,17 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import CookiePolicy from "./pages/CookiePolicy";
 
+/* --- New Company & Support Pages --- */
+import AboutUs from "./pages/AboutUs";
+import Careers from "./pages/Careers";
+import Blog from "./pages/Blog";
+import Contact from "./pages/Contact";
+import HelpCenter from "./pages/HelpCenter";
+import Documentation from "./pages/Documentation";
+import APIReference from "./pages/APIReference";
+import StatusPage from "./pages/StatusPage";
+
+
 const queryClient = new QueryClient();
 
 export default function App() {
@@ -46,6 +57,18 @@ export default function App() {
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/cookie-policy" element={<CookiePolicy />} />
+
+              {/* Company Pages */}
+              <Route path="/about-us" element={<AboutUs />} />
+              <Route path="/careers" element={<Careers />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/contact" element={<Contact />} />
+
+              {/* Support Pages */}
+              <Route path="/help-center" element={<HelpCenter />} />
+              <Route path="/documentation" element={<Documentation />} />
+              <Route path="/api-reference" element={<APIReference />} />
+              <Route path="/status" element={<StatusPage />} />
 
               {/* Protected Routes */}
               <Route
