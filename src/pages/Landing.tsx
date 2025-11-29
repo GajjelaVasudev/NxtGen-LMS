@@ -420,21 +420,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="max-w-7xl mx-auto px-4 mt-32">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-xl text-gray-600">Choose the plan that's right for you</p>
-        </div>
-
-        <div className="max-w-3xl mx-auto bg-white border rounded-2xl p-8 text-center">
-          <h3 className="text-xl font-bold mb-2">Lowest Pricing</h3>
-          <p className="text-gray-700">We offer competitively priced courses — priced lower than other LMS platforms for the same quality of content. For enterprise or large-scale pricing, contact our sales team.</p>
-        </div>
-      </section>
-
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4 mt-32 mb-20">
         <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl p-12 md:p-20 text-center text-white">
