@@ -254,7 +254,7 @@ export default function Login() {
             </div>
 
             {/* Right Side - Image Carousel */}
-            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden min-h-screen items-start justify-start pt-16">
+            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden min-h-screen items-end justify-start">
                 <div className="absolute inset-0">
                     <img
                         src={CAROUSEL_IMAGES[currentImageIndex].url}
@@ -264,7 +264,7 @@ export default function Login() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                 </div>
 
-                <div className="relative z-10 flex flex-col items-start p-10 md:p-12 text-white max-w-[520px]">
+                <div className="relative z-10 flex flex-col items-start p-8 md:p-12 text-white max-w-[520px] mb-12">
                     <h2 className="text-3xl md:text-4xl font-bold mb-3">
                         {CAROUSEL_IMAGES[currentImageIndex].title}
                     </h2>

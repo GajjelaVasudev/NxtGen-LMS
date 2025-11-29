@@ -11,7 +11,6 @@ import ForgotPassword from "./pages/ForgotPasswordClean";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyCode from "./pages/VerifyCode";
 import SetPassword from "./pages/SetPassword";
-import Surprise from "./pages/Surprise";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -31,7 +30,6 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/request-instructor" element={<RequestInstructor />} />
-              <Route path="/surprise" element={<Surprise />} />
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
