@@ -240,6 +240,19 @@ export function AddCourse() {
       // Before sending, upload any embedded data: URLs (videos or assignment files)
       const prepared = { ...form } as any;
 
+      // If thumbnail is still an embedded data URL (e.g., user pasted a data: URL), upload it first
+      if (typeof prepared.thumbnail === 'string' && prepared.thumbnail.startsWith('data:')) {
+        const convThumb = dataUrlToBlob(prepared.thumbnail);
+        if (!convThumb) throw new Error('Failed to parse embedded thumbnail data URL');
+        const thumbFd = new FormData();
+        thumbFd.append('file', convThumb.blob, convThumb.name);
+        const thumbUp = await fetch(`${API}/upload`, { method: 'POST', body: thumbFd });
+        if (!thumbUp.ok) throw new Error('Failed to upload embedded thumbnail');
+        const thumbBody = await thumbUp.json().catch(() => null);
+        if (!thumbBody || !thumbBody.success || !thumbBody.url) throw new Error('Thumbnail upload returned invalid response');
+        prepared.thumbnail = thumbBody.url;
+      }
+
       // process videos: if url is a data: URL, upload it and replace
       if (Array.isArray(prepared.videos)) {
         for (let i = 0; i < prepared.videos.length; i++) {
