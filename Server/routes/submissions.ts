@@ -306,11 +306,11 @@ export const getSubmissionFile: RequestHandler = async (req, res) => {
     const path = await import('path');
     const fs = await import('fs');
     const root = path.join(process.cwd(), 'public');
-    const filePath = path.join(root, url as string);
-    // ensure filePath is within root
-    if (!filePath.startsWith(root)) return res.status(400).json({ success: false, error: 'Invalid file path' });
-    if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'File not found on server' });
-    return res.sendFile(filePath);
+    const localPath = path.join(root, url as string);
+    // ensure localPath is within root
+    if (!localPath.startsWith(root)) return res.status(400).json({ success: false, error: 'Invalid file path' });
+    if (!fs.existsSync(localPath)) return res.status(404).json({ success: false, error: 'File not found on server' });
+    return res.sendFile(localPath);
   } catch (err: any) {
     console.error('[submission/file] unexpected error', err);
     return res.status(500).json({ success: false, error: 'Unexpected server error' });
