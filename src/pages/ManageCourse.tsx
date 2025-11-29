@@ -213,18 +213,84 @@ export function AddCourse() {
     });
   }
 
+  // helper: convert a data URL string to a File-like Blob object
+  function dataUrlToBlob(dataUrl: string): { blob: Blob; name: string } | null {
+    try {
+      const matches = dataUrl.match(/^data:(.+?);base64,(.+)$/);
+      if (!matches) return null;
+      const mime = matches[1];
+      const b64 = matches[2];
+      const binary = atob(b64);
+      const len = binary.length;
+      const u8 = new Uint8Array(len);
+      for (let i = 0; i < len; i++) u8[i] = binary.charCodeAt(i);
+      const blob = new Blob([u8], { type: mime });
+      const ext = mime.split('/')[1] || 'bin';
+      const name = `upload-${Date.now()}.${ext}`;
+      return { blob, name };
+    } catch (e) {
+      return null;
+    }
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title || form.title.trim() === "") { alert("Course title is required"); return; }
     try {
+      // Before sending, upload any embedded data: URLs (videos or assignment files)
+      const prepared = { ...form } as any;
+
+      // process videos: if url is a data: URL, upload it and replace
+      if (Array.isArray(prepared.videos)) {
+        for (let i = 0; i < prepared.videos.length; i++) {
+          const v = prepared.videos[i];
+          if (v && typeof v.url === 'string' && v.url.startsWith('data:')) {
+            const conv = dataUrlToBlob(v.url);
+            if (!conv) throw new Error('Failed to parse embedded video data URL');
+            const fd = new FormData();
+            fd.append('file', conv.blob, conv.name);
+            const up = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+            if (!up.ok) throw new Error('Failed to upload embedded video');
+            const upb = await up.json().catch(() => null);
+            if (!upb || !upb.success || !upb.url) throw new Error('Upload returned invalid response');
+            prepared.videos[i] = { ...v, url: upb.url };
+          }
+        }
+      }
+
+      // process assignments files: if files contain dataUrl, upload and replace with url
+      if (Array.isArray(prepared.assignments)) {
+        for (let ai = 0; ai < prepared.assignments.length; ai++) {
+          const a = prepared.assignments[ai];
+          if (a && Array.isArray(a.files)) {
+            for (let fi = 0; fi < a.files.length; fi++) {
+              const fileObj = a.files[fi];
+              const dataUrl = fileObj?.dataUrl || fileObj?.url;
+              if (typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+                const conv = dataUrlToBlob(dataUrl);
+                if (!conv) throw new Error('Failed to parse embedded assignment file data URL');
+                const fd = new FormData();
+                fd.append('file', conv.blob, conv.name);
+                const up = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+                if (!up.ok) throw new Error('Failed to upload embedded assignment file');
+                const upb = await up.json().catch(() => null);
+                if (!upb || !upb.success || !upb.url) throw new Error('Upload returned invalid response');
+                // replace file object with normalized { fileName, url }
+                prepared.assignments[ai].files[fi] = { fileName: fileObj.fileName || conv.name, url: upb.url };
+              }
+            }
+          }
+        }
+      }
+
       let res: any = null;
       if (isEditing && id) {
-        res = await apiUpdateCourse(id, { ...form, title: form.title.trim(), price: Number(form.price || 0) });
+        res = await apiUpdateCourse(id, { ...prepared, title: prepared.title.trim(), price: Number(prepared.price || 0) });
       } else {
         // In development, allow a demo fallback owner so local testing can create courses
         const devFallbackOwner = import.meta.env.DEV ? 'instructor@gmail.com' : undefined;
         const ownerArg = (user && user.id) ? user.id : devFallbackOwner;
-        res = await apiCreateCourse({ ...form, title: form.title.trim(), price: Number(form.price || 0) }, ownerArg);
+        res = await apiCreateCourse({ ...prepared, title: prepared.title.trim(), price: Number(prepared.price || 0) }, ownerArg);
       }
       // Show server-side errors when present
       if (!res || (res.error && res.error.length !== 0) || res.success === false) {
