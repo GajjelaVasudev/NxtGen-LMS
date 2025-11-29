@@ -74,29 +74,35 @@ export default function Landing() {
     }
   ];
 
-  const testimonials = [
-    {
-      name: "Dr. Sarah Johnson",
-      role: "University Professor",
-      image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-      rating: 5,
-      text: "NxtGen LMS has transformed how I deliver my courses. The intuitive interface and powerful features make online teaching a breeze."
-    },
-    {
-      name: "Michael Chen",
-      role: "Corporate Trainer",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-      rating: 5,
-      text: "The analytics and reporting features are outstanding. I can track employee progress and engagement in real-time."
-    },
-    {
-      name: "Emma Williams",
-      role: "Online Course Creator",
-      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
-      rating: 5,
-      text: "Creating and managing my courses has never been easier. The platform is reliable, fast, and feature-rich."
-    }
-  ];
+  const anonymousAvatar = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+const testimonials = [
+  {
+    name: "Anonymous Instructor",
+    role: "Senior Faculty",
+    image: anonymousAvatar,
+    rating: 5,
+    text:
+      "NxtGen LMS has completely improved the way I deliver my classes. The interface is smooth and the features are powerful.",
+  },
+  {
+    name: "Anonymous Corporate Trainer",
+    role: "Corporate Trainer",
+    image: anonymousAvatar,
+    rating: 5,
+    text:
+      "The analytics and tracking tools help me monitor employee learning progress in real-time. Very effective platform.",
+  },
+  {
+    name: "Anonymous Course Creator",
+    role: "Online Course Creator",
+    image: anonymousAvatar,
+    rating: 5,
+    text:
+      "Creating and managing courses became super easy. The platform is fast, reliable, and extremely feature-rich.",
+  },
+];
+
 
   const stats = [
     { number: "50K+", label: "Active Students" },
