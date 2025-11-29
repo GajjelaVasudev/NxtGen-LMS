@@ -183,7 +183,11 @@ export default function Landing() {
   ];
 
   return (
-    <div className="landing-root min-h-screen bg-white">
+    <div className="landing-root relative min-h-screen bg-white overflow-hidden">
+
+      {/* Animated Background Blobs */}
+
+
       {/* Header */}
       <header className="px-4 md:px-16 lg:px-20 py-6 sticky top-0 bg-white/95 backdrop-blur-sm z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -216,8 +220,13 @@ export default function Landing() {
         </div>
       </header>
 
+
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 mt-20 md:mt-32">
+      <section className="relative max-w-7xl mx-auto px-4 mt-20 md:mt-32 overflow-hidden">
+
+       {/* Animated Background Blobs */}
+  <div className="blob w-96 h-96 bg-[#1B68B3] top-10 -left-20"></div>
+  <div className="blob w-96 h-96 bg-[#FFCC00] bottom-10 -right-20"></div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Left Content */}
           <div className="space-y-8">
@@ -455,98 +464,109 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="bg-gray-900 text-white py-16">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-              {/* Brand */}
-              <div className="space-y-4">
-                <div className="text-4xl font-bold">
-                  <span className="text-[#1B68B3]">Nxt</span>
-                  <span className="text-[#FFCC00]">Gen</span>
-                </div>
-                <p className="text-gray-400">
-                  Empowering education through innovative technology and seamless learning experiences.
-                </p>
-                <div className="flex gap-4">
-
-  <a 
-    href="https://www.instagram.com/vasudev_gajjela_31/?utm_source=ig_web_button_share_sheet"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
-  >
-    <Instagram size={20} />
-  </a>
-
-  <a 
-    href="https://x.com/Rameshkumar1013"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
-  >
-    <span className="text-xl font-bold">X</span>
-  </a>
-
-  <a 
-    href="https://www.linkedin.com/in/hemanth-gvs-500006348/"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
-  >
-    <Linkedin size={20} />
-  </a>
-
-</div>
-
-            </div>
-
-            {/* Product */}
-            <div>
-              <h3 className="text-lg font-bold mb-4">Product</h3>
-              <ul className="space-y-3 text-gray-400">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Integrations</a></li>
-              </ul>
-            </div>
-
-            {/* Company */}
-            <div>
-              <h3 className="text-lg font-bold mb-4">Company</h3>
-              <ul className="space-y-3 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-              </ul>
-            </div>
-
-            {/* Support */}
-            <div>
-              <h3 className="text-lg font-bold mb-4">Support</h3>
-              <ul className="space-y-3 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Reference</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-gray-400 text-sm">
-              © 2025 NxtGen LMS. All rights reserved.
-            </p>
-            <div className="flex gap-6 text-sm text-gray-400">
-              <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-white transition-colors">Cookie Policy</a>
-            </div>
-          </div>
+       {/* Footer */}
+<footer className="bg-gray-900 text-white py-16">
+  <div className="max-w-7xl mx-auto px-4">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+      {/* Brand */}
+      <div className="space-y-4">
+        <div className="text-4xl font-bold">
+          <span className="text-[#1B68B3]">Nxt</span>
+          <span className="text-[#FFCC00]">Gen</span>
         </div>
-      </footer>
+        <p className="text-gray-400">
+          Empowering education through innovative technology and seamless learning experiences.
+        </p>
+        <div className="flex gap-4">
+
+          <a 
+            href="https://www.instagram.com/vasudev_gajjela_31/?utm_source=ig_web_button_share_sheet"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
+          >
+            <Instagram size={20} />
+          </a>
+
+          <a 
+            href="https://x.com/Rameshkumar1013"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
+          >
+            <span className="text-xl font-bold">X</span>
+          </a>
+
+          <a 
+            href="https://www.linkedin.com/in/hemanth-gvs-500006348/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
+          >
+            <Linkedin size={20} />
+          </a>
+
+        </div>
+      </div>
+
+      {/* Product */}
+      <div>
+        <h3 className="text-lg font-bold mb-4">Product</h3>
+        <ul className="space-y-3 text-gray-400">
+          <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+          <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
+          <li><a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a></li>
+          <li><a href="#" className="hover:text-white transition-colors">Integrations</a></li>
+        </ul>
+      </div>
+
+      {/* Company */}
+      <div>
+        <h3 className="text-lg font-bold mb-4">Company</h3>
+        <ul className="space-y-3 text-gray-400">
+          <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
+          <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
+          <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
+          <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+        </ul>
+      </div>
+
+      {/* Support */}
+      <div>
+        <h3 className="text-lg font-bold mb-4">Support</h3>
+        <ul className="space-y-3 text-gray-400">
+          <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
+          <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
+          <li><a href="#" className="hover:text-white transition-colors">API Reference</a></li>
+          <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
+        </ul>
+      </div>
+    </div>
+
+    {/* Bottom Section */}
+    <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+      <p className="text-gray-400 text-sm">
+        © 2025 NxtGen LMS. All rights reserved.
+      </p>
+
+      {/* Updated Navigation Links */}
+      <div className="flex gap-6 text-sm text-gray-400">
+        <Link to="/privacy-policy" className="hover:text-white transition-colors">
+          Privacy Policy
+        </Link>
+
+        <Link to="/terms-of-service" className="hover:text-white transition-colors">
+          Terms of Service
+        </Link>
+
+        <Link to="/cookie-policy" className="hover:text-white transition-colors">
+          Cookie Policy
+        </Link>
+      </div>
+    </div>
+  </div>
+</footer>
+
     </div>
   );
 }
