@@ -111,68 +111,75 @@ function sendOtpEmail(to: string, code: string) {
 }
 
 export const login: RequestHandler = async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
-  }
-
-  // Find user in registered users
-  const user = REGISTERED_USERS.find((u) => u.email === email && u.password === password);
-
-  if (!user) {
-    return res.status(401).json({ error: "Invalid credentials. Please use registered email/password." });
-  }
-
-  if (user.approved === false) {
-    return res.status(403).json({ error: "Account pending approval by administrator" });
-  }
-
-  const { password: _, ...userWithoutPassword } = user;
-
-  // Try to ensure this demo user exists in Supabase and return the canonical DB row (id as UUID)
   try {
-    const { data: found, error: findErr } = await supabase.from('users').select('id, email, role, first_name, last_name').ilike('email', user.email).single();
-    if (found && !findErr) {
-      // attempt to ensure an auth session exists for the user (create+signin using anon key)
-      try {
-        // signUp (may return error if already exists) — ignore duplicate errors
-        await (supabase as any).auth.signUp?.({ email: user.email, password: password }).catch(() => null);
-      } catch (_) {}
-      // sign in to obtain a session for the browser
-      try {
-        const signIn = await (supabase as any).auth.signInWithPassword?.({ email: user.email, password });
-        const session = signIn?.data?.session || null;
-        return res.json({ success: true, user: found, message: 'Login successful (DB user)', session });
-      } catch (_) {
-        return res.json({ success: true, user: found, message: 'Login successful (DB user)' });
-      }
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
     }
 
-    // Create the user in DB
-    const insertRow = { email: user.email, role: user.role };
-    const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role, first_name, last_name').single();
-    if (created && !createErr) {
-      console.log('[auth] Created DB user during login', { email: user.email, id: created.id });
-      // attempt to ensure auth user exists and sign in to obtain session
-      try {
-        await (supabase as any).auth.signUp?.({ email: user.email, password }).catch(() => null);
-      } catch (_) {}
-      try {
-        const signIn = await (supabase as any).auth.signInWithPassword?.({ email: user.email, password });
-        const session = signIn?.data?.session || null;
-        return res.json({ success: true, user: created, message: 'Login successful (created DB user)', session });
-      } catch (_) {
-        return res.json({ success: true, user: created, message: 'Login successful (created DB user)' });
-      }
+    // Find user in registered users
+    const user = REGISTERED_USERS.find((u) => u.email === email && u.password === password);
+
+    if (!user) {
+      return res.status(401).json({ error: "Invalid credentials. Please use registered email/password." });
     }
-    console.warn('[auth] Could not create/find DB user during login, falling back to demo user', { findErr, createErr });
-  } catch (ex) {
-    console.error('[auth] Exception ensuring DB user during login', ex);
+
+    if (user.approved === false) {
+      return res.status(403).json({ error: "Account pending approval by administrator" });
+    }
+
+    const { password: _, ...userWithoutPassword } = user;
+
+    // Try to ensure this demo user exists in Supabase and return the canonical DB row (id as UUID)
+    try {
+      const { data: found, error: findErr } = await supabase.from('users').select('id, email, role, first_name, last_name').ilike('email', user.email).single();
+      if (found && !findErr) {
+        // attempt to ensure an auth session exists for the user (create+signin using anon key)
+        try {
+          // signUp (may return error if already exists) — ignore duplicate errors
+          await (supabase as any).auth.signUp?.({ email: user.email, password: password }).catch(() => null);
+        } catch (_) {}
+        // sign in to obtain a session for the browser
+        try {
+          const signIn = await (supabase as any).auth.signInWithPassword?.({ email: user.email, password });
+          const session = signIn?.data?.session || null;
+          return res.json({ success: true, user: found, message: 'Login successful (DB user)', session });
+        } catch (_) {
+          return res.json({ success: true, user: found, message: 'Login successful (DB user)' });
+        }
+      }
+
+      // Create the user in DB
+      const insertRow = { email: user.email, role: user.role };
+      const { data: created, error: createErr } = await supabase.from('users').insert([insertRow]).select('id, email, role, first_name, last_name').single();
+      if (created && !createErr) {
+        console.log('[auth] Created DB user during login', { email: user.email, id: created.id });
+        // attempt to ensure auth user exists and sign in to obtain session
+        try {
+          await (supabase as any).auth.signUp?.({ email: user.email, password }).catch(() => null);
+        } catch (_) {}
+        try {
+          const signIn = await (supabase as any).auth.signInWithPassword?.({ email: user.email, password });
+          const session = signIn?.data?.session || null;
+          return res.json({ success: true, user: created, message: 'Login successful (created DB user)', session });
+        } catch (_) {
+          return res.json({ success: true, user: created, message: 'Login successful (created DB user)' });
+        }
+      }
+      console.warn('[auth] Could not create/find DB user during login, falling back to demo user', { findErr, createErr });
+    } catch (ex) {
+      console.error('[auth] Exception ensuring DB user during login', ex);
+    }
+
+    // As a final fallback, return demo user (no session)
+    return res.json({ success: true, user: userWithoutPassword, message: 'Login successful (demo user fallback)' });
+  } catch (ex: any) {
+    console.error('[auth/login] unexpected error', ex);
+    // Return a clearer error in development to aid debugging. In production keep minimal message.
+    const msg = process.env.NODE_ENV === 'production' ? 'Internal Server Error' : (ex?.message || String(ex));
+    return res.status(500).json({ error: msg });
   }
-
-  // As a final fallback, return demo user (no session)
-  return res.json({ success: true, user: userWithoutPassword, message: 'Login successful (demo user fallback)' });
 };
 
 export const register: RequestHandler = async (_req, res) => {

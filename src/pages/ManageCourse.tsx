@@ -90,7 +90,7 @@ export default function ManageCourse() {
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Manage Courses</h1>
             <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/app/managecourse/add')} className="px-4 py-2 bg-blue-600 text-white rounded">Create Course</button>
+              <button onClick={() => navigate('/app/managecourse/add')} className="btn-primary px-4 py-2 rounded">Create Course</button>
             </div>
           </div>
 
@@ -99,12 +99,12 @@ export default function ManageCourse() {
           ) : courses.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-600 mb-4">No courses yet.</p>
-              <button onClick={() => navigate('/app/managecourse/add')} className="px-4 py-2 bg-blue-600 text-white rounded">Add your first course</button>
+              <button onClick={() => navigate('/app/managecourse/add')} className="btn-primary px-4 py-2 rounded">Add your first course</button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {courses.map((c) => (
-                <div key={c.id} className="p-4 border rounded bg-gray-50 flex items-start gap-4">
+                <div key={c.id} className="card p-4 flex items-start gap-4">
                   {c.thumbnail && <img src={c.thumbnail} alt={c.title} className="w-28 h-20 object-cover rounded" />}
                   <div className="flex-1">
                     <div className="flex items-start justify-between">
@@ -113,7 +113,7 @@ export default function ManageCourse() {
                         <div className="text-xs text-gray-500">{c.description}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Link to={`/app/managecourse/edit/${c.id}`} className="text-blue-600">Edit</Link>
+                        <Link to={`/app/managecourse/edit/${c.id}`} className="text-brand">Edit</Link>
                         <button onClick={() => onDelete(c.id)} className="text-red-600">Delete</button>
                       </div>
                     </div>
@@ -124,9 +124,9 @@ export default function ManageCourse() {
           )}
         </div>
       </div>
-      {toast && (
+        {toast && (
         <div className="fixed bottom-6 right-6 z-50">
-          <div className={`px-4 py-2 rounded shadow-lg ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+          <div className={`px-4 py-2 rounded shadow-lg ${toast.type === 'success' ? 'bg-brand text-white' : 'bg-red-600 text-white'}`}>
             {toast.message}
           </div>
         </div>
@@ -433,7 +433,7 @@ export function AddCourse() {
                       <button 
                         type="button" 
                         onClick={() => startEditingVideo(v)} 
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        className="p-2 text-brand hover:bg-gray-50 rounded"
                         title="Edit video name"
                       >
                         <Edit2 size={16} />
@@ -483,7 +483,7 @@ export function AddCourse() {
                     }
                   }
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded cursor-pointer hover:bg-blue-700 transition-colors"
+                className="btn-primary px-4 py-2 rounded cursor-pointer"
               >
                 Add Video
               </button>
@@ -516,7 +516,7 @@ export function AddCourse() {
                         <button 
                           type="button" 
                           onClick={() => addMcqQuestion((q as any).id)} 
-                          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                          className="btn-primary px-3 py-1 rounded text-sm"
                         >
                           Add Question
                         </button>
@@ -588,7 +588,7 @@ export function AddCourse() {
             <button 
               type="button" 
               onClick={addMcqQuiz} 
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+              className="btn-primary px-4 py-2 rounded"
             >
               Add MCQ Quiz
             </button>
@@ -622,7 +622,7 @@ export function AddCourse() {
           </div>
 
           <div className="mt-6 flex gap-3">
-            <button type="submit" className="px-6 py-3 bg-brand text-white rounded">{isEditing ? "Update Course" : "Create Course"}</button>
+            <button type="submit" className="btn-primary px-6 py-3 rounded">{isEditing ? "Update Course" : "Create Course"}</button>
             <button type="button" onClick={() => navigate("/app/managecourse")} className="px-6 py-3 border rounded">Cancel</button>
           </div>
         </form>

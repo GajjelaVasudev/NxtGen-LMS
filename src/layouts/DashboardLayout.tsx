@@ -32,8 +32,9 @@ export default function DashboardLayout() {
         <Header />
 
         {/* Central content area: allow content scrolling while header/sidebar stay fixed */}
-        <div className="flex-1 min-h-0 overflow-auto">
-          <div className="min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto bg-transparent">
+          <div className="min-h-0 p-6">
+            <div className="card p-6">
             <Routes>
               <Route index element={<Overview />} />
 
@@ -69,6 +70,7 @@ export default function DashboardLayout() {
               <Route path="gradeass" element={<Gradeass />} />
               <Route path="user-management" element={<RoleGuard roles="admin"><UserManagement /></RoleGuard>} />
             </Routes>
+            </div>
           </div>
         </div>
       </div>

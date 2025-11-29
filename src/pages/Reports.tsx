@@ -60,12 +60,12 @@ const generateActivityData = () => [
 ];
 
 const generateCourseDistribution = () => [
-  { name: "In Progress", value: 5, color: "#515DEF" },
+  { name: "In Progress", value: 5, color: "#1B68B3" },
   { name: "Completed", value: 3, color: "#10B981" },
-  { name: "Not Started", value: 2, color: "#F59E0B" },
+  { name: "Not Started", value: 2, color: "#FFCC00" },
 ];
 
-const COLORS = ["#515DEF", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+const COLORS = ["#1B68B3", "#10B981", "#FFCC00", "#EF4444", "#8B5CF6"];
 
 // Student Reports Component
 function StudentReports() {
@@ -99,15 +99,15 @@ function StudentReports() {
     <div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <BookOpen className="w-8 h-8 text-blue-500" />
+            <BookOpen className="w-8 h-8 text-brand" />
             <span className="text-2xl font-bold">{stats.totalCourses}</span>
           </div>
           <p className="text-sm text-gray-600">Total Courses</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <CheckCircle className="w-8 h-8 text-green-500" />
             <span className="text-2xl font-bold">{stats.completed}</span>
@@ -115,7 +115,7 @@ function StudentReports() {
           <p className="text-sm text-gray-600">Completed</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <Target className="w-8 h-8 text-purple-500" />
             <span className="text-2xl font-bold">{stats.averageGrade}%</span>
@@ -123,7 +123,7 @@ function StudentReports() {
           <p className="text-sm text-gray-600">Average Grade</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <Clock className="w-8 h-8 text-orange-500" />
             <span className="text-2xl font-bold">{stats.totalHours}h</span>
@@ -135,7 +135,7 @@ function StudentReports() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Progress Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <h3 className="text-lg font-semibold mb-4">Learning Progress & Grades</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={progressData}>
@@ -144,14 +144,14 @@ function StudentReports() {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="progress" stroke="#515DEF" strokeWidth={2} />
+              <Line type="monotone" dataKey="progress" stroke="#1B68B3" strokeWidth={2} />
               <Line type="monotone" dataKey="grade" stroke="#10B981" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         {/* Activity Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <h3 className="text-lg font-semibold mb-4">Weekly Activity (Hours)</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={activityData}>
@@ -159,7 +159,7 @@ function StudentReports() {
               <XAxis dataKey="day" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="hours" fill="#515DEF" />
+              <Bar dataKey="hours" fill="#1B68B3" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -168,7 +168,7 @@ function StudentReports() {
       {/* Course Distribution & Achievements */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Course Distribution Pie Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <h3 className="text-lg font-semibold mb-4">Course Distribution</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
@@ -192,14 +192,14 @@ function StudentReports() {
         </div>
 
         {/* Achievements */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Achievements</h3>
-            <Award className="w-6 h-6 text-yellow-500" />
+            <Award className="w-6 h-6 text-brand-yellow" />
           </div>
           <div className="space-y-3">
             {achievements.map((achievement) => (
-              <div key={achievement.id} className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div key={achievement.id} className="flex items-center gap-3 p-3 bg-[rgba(255,204,0,0.06)] rounded-lg border border-yellow-200">
                 <span className="text-3xl">{achievement.icon}</span>
                 <div className="flex-1">
                   <h4 className="font-medium text-sm">{achievement.title}</h4>
@@ -213,12 +213,12 @@ function StudentReports() {
       </div>
 
       {/* Recent Grades Table */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Recent Grades</h3>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+          <button className="btn-primary">
             <Download size={16} />
-            Export
+            <span className="ml-2">Export</span>
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -237,7 +237,7 @@ function StudentReports() {
                   <td className="px-4 py-3 text-sm">{grade.course}</td>
                   <td className="px-4 py-3 text-sm">{grade.assignment}</td>
                   <td className="px-4 py-3 text-sm">
-                    <span className={`font-semibold ${grade.grade >= 90 ? 'text-green-600' : grade.grade >= 80 ? 'text-blue-600' : 'text-orange-600'}`}>
+                    <span className={`font-semibold ${grade.grade >= 90 ? 'text-green-600' : grade.grade >= 80 ? 'text-brand' : 'text-orange-600'}`}>
                       {grade.grade}%
                     </span>
                   </td>
@@ -246,6 +246,28 @@ function StudentReports() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Activity Logs */}
+      <div className="card p-6">
+        <h3 className="text-lg font-semibold mb-4">Student Activity Logs</h3>
+        <div className="space-y-3">
+          {[
+            { student: "John Doe", action: "Submitted Assignment 3", time: "2 hours ago", type: "submission" },
+            { student: "Jane Smith", action: "Completed Quiz 5", time: "4 hours ago", type: "quiz" },
+            { student: "Bob Johnson", action: "Watched Lecture 12", time: "6 hours ago", type: "video" },
+            { student: "Alice Brown", action: "Posted in Discussion", time: "8 hours ago", type: "discussion" },
+          ].map((activity, index) => (
+            <div key={index} className="flex items-center gap-3 p-3 border-l-4 border-l-brand bg-[rgba(27,104,179,0.06)] rounded">
+              <Activity className="w-5 h-5 text-brand" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">{activity.student}</p>
+                <p className="text-xs text-gray-600">{activity.action}</p>
+              </div>
+              <span className="text-xs text-gray-500">{activity.time}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -283,15 +305,15 @@ function InstructorReports() {
     <div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <Users className="w-8 h-8 text-blue-500" />
+            <Users className="w-8 h-8 text-brand" />
             <span className="text-2xl font-bold">42</span>
           </div>
           <p className="text-sm text-gray-600">Total Students</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <FileText className="w-8 h-8 text-green-500" />
             <span className="text-2xl font-bold">{assignmentStats.totalAssignments}</span>
@@ -299,7 +321,7 @@ function InstructorReports() {
           <p className="text-sm text-gray-600">Assignments</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <Clock className="w-8 h-8 text-orange-500" />
             <span className="text-2xl font-bold">{assignmentStats.pendingGrade}</span>
@@ -307,7 +329,7 @@ function InstructorReports() {
           <p className="text-sm text-gray-600">Pending Grade</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <TrendingUp className="w-8 h-8 text-purple-500" />
             <span className="text-2xl font-bold">{assignmentStats.completionRate}%</span>
@@ -317,12 +339,12 @@ function InstructorReports() {
       </div>
 
       {/* Engagement Analytics */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Course Engagement Analytics</h3>
-          <button onClick={exportReport} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+          <button onClick={exportReport} className="btn-primary">
             <Download size={16} />
-            Export
+            <span className="ml-2">Export</span>
           </button>
         </div>
         <ResponsiveContainer width="100%" height={350}>
@@ -332,15 +354,15 @@ function InstructorReports() {
             <YAxis />
             <Tooltip />
             <Legend />
-            <Area type="monotone" dataKey="views" stackId="1" stroke="#515DEF" fill="#515DEF" fillOpacity={0.6} />
+            <Area type="monotone" dataKey="views" stackId="1" stroke="#1B68B3" fill="#1B68B3" fillOpacity={0.6} />
             <Area type="monotone" dataKey="submissions" stackId="2" stroke="#10B981" fill="#10B981" fillOpacity={0.6} />
-            <Area type="monotone" dataKey="interactions" stackId="3" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.6} />
+            <Area type="monotone" dataKey="interactions" stackId="3" stroke="#FFCC00" fill="#FFCC00" fillOpacity={0.6} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
       {/* Student Performance Table */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <h3 className="text-lg font-semibold mb-4">Student Performance Overview</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -358,7 +380,7 @@ function InstructorReports() {
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-medium">{student.name}</td>
                   <td className="px-4 py-3 text-sm">
-                    <span className={`font-semibold ${student.avgGrade >= 90 ? 'text-green-600' : student.avgGrade >= 80 ? 'text-blue-600' : 'text-orange-600'}`}>
+                    <span className={`font-semibold ${student.avgGrade >= 90 ? 'text-green-600' : student.avgGrade >= 80 ? 'text-brand' : 'text-orange-600'}`}>
                       {student.avgGrade}%
                     </span>
                   </td>
@@ -377,7 +399,7 @@ function InstructorReports() {
       </div>
 
       {/* Activity Logs */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <h3 className="text-lg font-semibold mb-4">Student Activity Logs</h3>
         <div className="space-y-3">
           {[
@@ -386,8 +408,8 @@ function InstructorReports() {
             { student: "Bob Johnson", action: "Watched Lecture 12", time: "6 hours ago", type: "video" },
             { student: "Alice Brown", action: "Posted in Discussion", time: "8 hours ago", type: "discussion" },
           ].map((activity, index) => (
-            <div key={index} className="flex items-center gap-3 p-3 border-l-4 border-l-blue-500 bg-blue-50 rounded">
-              <Activity className="w-5 h-5 text-blue-600" />
+                <div key={index} className="flex items-center gap-3 p-3 border-l-4 border-l-brand bg-[rgba(27,104,179,0.06)] rounded">
+              <Activity className="w-5 h-5 text-brand" />
               <div className="flex-1">
                 <p className="text-sm font-medium">{activity.student}</p>
                 <p className="text-xs text-gray-600">{activity.action}</p>
@@ -428,23 +450,23 @@ function ContentCreatorReports() {
     <div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <Eye className="w-8 h-8 text-blue-500" />
+            <Eye className="w-8 h-8 text-brand" />
             <span className="text-2xl font-bold">8.2K</span>
           </div>
           <p className="text-sm text-gray-600">Total Views</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <Star className="w-8 h-8 text-yellow-500" />
+            <Star className="w-8 h-8 text-brand-yellow" />
             <span className="text-2xl font-bold">{qualityMetrics.overallQuality}</span>
           </div>
           <p className="text-sm text-gray-600">Avg Rating</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <CheckCircle className="w-8 h-8 text-green-500" />
             <span className="text-2xl font-bold">{qualityMetrics.contentAccuracy}%</span>
@@ -452,7 +474,7 @@ function ContentCreatorReports() {
           <p className="text-sm text-gray-600">Content Accuracy</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <TrendingUp className="w-8 h-8 text-purple-500" />
             <span className="text-2xl font-bold">{qualityMetrics.studentSatisfaction}%</span>
@@ -462,7 +484,7 @@ function ContentCreatorReports() {
       </div>
 
       {/* Content Usage Trends */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <h3 className="text-lg font-semibold mb-4">Content Usage & Engagement Trends</h3>
         <ResponsiveContainer width="100%" height={350}>
           <LineChart data={contentUsageData}>
@@ -472,15 +494,15 @@ function ContentCreatorReports() {
             <YAxis yAxisId="right" orientation="right" />
             <Tooltip />
             <Legend />
-            <Line yAxisId="left" type="monotone" dataKey="views" stroke="#515DEF" strokeWidth={2} name="Views" />
+            <Line yAxisId="left" type="monotone" dataKey="views" stroke="#1B68B3" strokeWidth={2} name="Views" />
             <Line yAxisId="left" type="monotone" dataKey="completions" stroke="#10B981" strokeWidth={2} name="Completions" />
-            <Line yAxisId="right" type="monotone" dataKey="ratings" stroke="#F59E0B" strokeWidth={2} name="Avg Rating" />
+            <Line yAxisId="right" type="monotone" dataKey="ratings" stroke="#FFCC00" strokeWidth={2} name="Avg Rating" />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       {/* Content Ratings Table */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <h3 className="text-lg font-semibold mb-4">Content Ratings & Feedback</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -499,19 +521,19 @@ function ContentCreatorReports() {
                   <td className="px-4 py-3 text-sm font-medium">{content.course}</td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                            <Star className="w-4 h-4 text-brand-yellow" />
                       <span className="font-semibold">{content.rating}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm">{content.reviews}</td>
                   <td className="px-4 py-3 text-sm">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${content.engagement}%` }}></div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-[var(--brand-color)] h-2 rounded-full" style={{ width: `${content.engagement}%` }}></div>
                     </div>
                     <span className="text-xs text-gray-600">{content.engagement}%</span>
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    <button className="text-blue-600 hover:text-blue-800 text-xs">View Details</button>
+                    <button className="text-brand hover:text-[var(--brand-color)] text-xs">View Details</button>
                   </td>
                 </tr>
               ))}
@@ -521,7 +543,7 @@ function ContentCreatorReports() {
       </div>
 
       {/* Recent Feedback */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <h3 className="text-lg font-semibold mb-4">Recent Student Feedback</h3>
         <div className="space-y-3">
           {[
@@ -529,15 +551,15 @@ function ContentCreatorReports() {
             { student: "Jane Smith", course: "React Complete Guide", rating: 4, comment: "Good course, would love more examples.", time: "3 days ago" },
             { student: "Bob Johnson", course: "CSS Advanced", rating: 5, comment: "Best CSS course I've taken!", time: "5 days ago" },
           ].map((feedback, index) => (
-            <div key={index} className="p-4 border rounded-lg">
+              <div key={index} className="p-4 border rounded-lg">
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <p className="text-sm font-medium">{feedback.student}</p>
                   <p className="text-xs text-gray-600">{feedback.course}</p>
                 </div>
                 <div className="flex items-center gap-1">
-                  {[...Array(feedback.rating)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                    {[...Array(feedback.rating)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 text-brand-yellow" />
                   ))}
                 </div>
               </div>
@@ -584,15 +606,15 @@ function AdminReports() {
     <div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <Users className="w-8 h-8 text-blue-500" />
+              <Users className="w-8 h-8 text-brand" />
             <span className="text-2xl font-bold">{systemStats.totalUsers}</span>
           </div>
           <p className="text-sm text-gray-600">Total Users</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <BookOpen className="w-8 h-8 text-green-500" />
             <span className="text-2xl font-bold">{systemStats.activeCourses}</span>
@@ -600,15 +622,15 @@ function AdminReports() {
           <p className="text-sm text-gray-600">Active Courses</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <DollarSign className="w-8 h-8 text-yellow-500" />
+            <DollarSign className="w-8 h-8 text-brand-yellow" />
             <span className="text-2xl font-bold">{systemStats.totalRevenue}</span>
           </div>
           <p className="text-sm text-gray-600">Total Revenue</p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <Activity className="w-8 h-8 text-purple-500" />
             <span className="text-2xl font-bold">{systemStats.systemUptime}</span>
@@ -619,7 +641,7 @@ function AdminReports() {
 
       {/* User Growth & Revenue */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <h3 className="text-lg font-semibold mb-4">User Growth Analytics</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={userStatsData}>
@@ -628,14 +650,14 @@ function AdminReports() {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="students" fill="#515DEF" />
+              <Bar dataKey="students" fill="#1B68B3" />
               <Bar dataKey="instructors" fill="#10B981" />
-              <Bar dataKey="creators" fill="#F59E0B" />
+              <Bar dataKey="creators" fill="#FFCC00" />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="card p-6">
           <h3 className="text-lg font-semibold mb-4">Revenue Analytics</h3>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={revenueData}>
@@ -651,7 +673,7 @@ function AdminReports() {
       </div>
 
       {/* System Logs & Errors */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">System Issues & Error Logs</h3>
           <AlertCircle className="w-6 h-6 text-red-500" />
@@ -685,11 +707,11 @@ function AdminReports() {
       </div>
 
       {/* Data Management */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <h3 className="text-lg font-semibold mb-4">Data Management & Exports</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <button className="flex flex-col items-center gap-2 p-4 border rounded-lg hover:bg-gray-50">
-            <Download className="w-6 h-6 text-blue-500" />
+            <Download className="w-6 h-6 text-brand" />
             <span className="text-sm font-medium">Export Users</span>
           </button>
           <button className="flex flex-col items-center gap-2 p-4 border rounded-lg hover:bg-gray-50">
@@ -708,7 +730,7 @@ function AdminReports() {
       </div>
 
       {/* Course Analytics */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="card p-6">
         <h3 className="text-lg font-semibold mb-4">Top Performing Courses</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -734,7 +756,7 @@ function AdminReports() {
                   <td className="px-4 py-3 text-sm font-semibold text-green-600">{course.revenue}</td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                      <Star className="w-4 h-4 text-brand-yellow" />
                       <span>{course.rating}</span>
                     </div>
                   </td>

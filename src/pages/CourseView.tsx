@@ -295,7 +295,7 @@ export default function CourseView() {
       <div className="flex-1 min-h-0 overflow-y-auto bg-white">
         <div className="max-w-7xl mx-auto p-6 text-center">
           <p className="text-red-600 mb-4">{serverError}</p>
-          <Link to="/app/courses" className="text-blue-600 hover:underline">Back to My Courses</Link>
+          <Link to="/app/courses" className="text-brand hover:underline">Back to My Courses</Link>
         </div>
       </div>
     );
@@ -306,7 +306,7 @@ export default function CourseView() {
       <div className="flex-1 min-h-0 overflow-y-auto bg-white">
         <div className="max-w-7xl mx-auto p-6 text-center">
           <p className="text-gray-500 mb-4">Course not found</p>
-          <Link to="/app/courses" className="text-blue-600 hover:underline">Back to My Courses</Link>
+          <Link to="/app/courses" className="text-brand hover:underline">Back to My Courses</Link>
         </div>
       </div>
     );
@@ -320,7 +320,7 @@ export default function CourseView() {
         <div className="max-w-7xl mx-auto p-6 text-center">
           <h2 className="text-xl font-semibold mb-4">Access Denied</h2>
           <p className="text-gray-600 mb-6">You do not own this course. Purchase or enroll to access the content.</p>
-          <Link to="/app/courses" className="px-4 py-2 bg-blue-600 text-white rounded">Back to Courses</Link>
+          <Link to="/app/courses" className="btn-primary px-4 py-2 rounded">Back to Courses</Link>
         </div>
       </div>
     );
@@ -342,36 +342,36 @@ export default function CourseView() {
           <div className="w-64">
             <div className="text-xs text-gray-500 mb-1">Progress</div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all" style={{ width: `${courseProgress()}%` }} />
+              <div className="bg-gradient-to-r from-[var(--brand-color)] to-[var(--brand-yellow)] h-2 rounded-full transition-all" style={{ width: `${courseProgress()}%` }} />
             </div>
           </div>
         </div>
 
         <div className="flex gap-2 mb-6">
-          <button onClick={() => setActiveSection('overview')} className={"px-6 py-3 rounded-lg font-medium transition-colors " + (activeSection === 'overview' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50')}>Overview</button>
-          <button onClick={() => setActiveSection('content')} className={"px-6 py-3 rounded-lg font-medium transition-colors " + (activeSection === 'content' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50')}>Course Content</button>
+          <button onClick={() => setActiveSection('overview')} className={"px-6 py-3 rounded-lg font-medium transition-colors " + (activeSection === 'overview' ? 'btn-primary' : 'bg-white text-gray-700 hover:bg-gray-50')}>Overview</button>
+          <button onClick={() => setActiveSection('content')} className={"px-6 py-3 rounded-lg font-medium transition-colors " + (activeSection === 'content' ? 'btn-primary' : 'bg-white text-gray-700 hover:bg-gray-50')}>Course Content</button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             {activeSection === 'overview' ? (
-              <div className="bg-white rounded-lg p-6 shadow-sm">
+              <div className="card p-6">
                 <h2 className="text-2xl font-bold mb-4">About This Course</h2>
                 <p className="text-gray-700 mb-6">{course.description || 'No description available.'}</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <PlayCircle className="w-8 h-8 text-blue-600 mb-2" />
-                    <div className="text-2xl font-bold text-blue-600">{course.videos?.length || 0}</div>
+                  <div className="card p-4">
+                    <PlayCircle className="w-8 h-8 text-brand mb-2" />
+                    <div className="text-2xl font-bold text-brand">{course.videos?.length || 0}</div>
                     <div className="text-sm text-gray-600">Video Lessons</div>
                   </div>
-                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                    <ClipboardList className="w-8 h-8 text-purple-600 mb-2" />
-                    <div className="text-2xl font-bold text-purple-600">{course.quizzes?.length || 0}</div>
+                  <div className="card p-4">
+                    <ClipboardList className="w-8 h-8 text-brand mb-2" />
+                    <div className="text-2xl font-bold text-brand">{course.quizzes?.length || 0}</div>
                     <div className="text-sm text-gray-600">Quizzes</div>
                   </div>
-                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                    <FileText className="w-8 h-8 text-green-600 mb-2" />
-                    <div className="text-2xl font-bold text-green-600">{course.assignments?.length || 0}</div>
+                  <div className="card p-4">
+                    <FileText className="w-8 h-8 text-brand mb-2" />
+                    <div className="text-2xl font-bold text-brand">{course.assignments?.length || 0}</div>
                     <div className="text-sm text-gray-600">Assignments</div>
                   </div>
                 </div>
@@ -379,9 +379,9 @@ export default function CourseView() {
             ) : (
               <div className="space-y-4">
                 <div className="flex gap-2 mb-4">
-                  <button onClick={() => setActiveContentTab('learn')} className={activeContentTab === 'learn' ? 'px-4 py-2 rounded bg-blue-600 text-white' : 'px-4 py-2 rounded bg-white text-gray-700 hover:bg-gray-50'}>Videos</button>
-                  <button onClick={() => setActiveContentTab('practice')} className={activeContentTab === 'practice' ? 'px-4 py-2 rounded bg-purple-600 text-white' : 'px-4 py-2 rounded bg-white text-gray-700 hover:bg-gray-50'}>Quizzes</button>
-                  <button onClick={() => setActiveContentTab('submit')} className={activeContentTab === 'submit' ? 'px-4 py-2 rounded bg-green-600 text-white' : 'px-4 py-2 rounded bg-white text-gray-700 hover:bg-gray-50'}>Assignments</button>
+                  <button onClick={() => setActiveContentTab('learn')} className={activeContentTab === 'learn' ? 'btn-primary px-4 py-2 rounded' : 'px-4 py-2 rounded bg-white text-gray-700 hover:bg-gray-50'}>Videos</button>
+                  <button onClick={() => setActiveContentTab('practice')} className={activeContentTab === 'practice' ? 'btn-primary px-4 py-2 rounded' : 'px-4 py-2 rounded bg-white text-gray-700 hover:bg-gray-50'}>Quizzes</button>
+                  <button onClick={() => setActiveContentTab('submit')} className={activeContentTab === 'submit' ? 'btn-primary px-4 py-2 rounded' : 'px-4 py-2 rounded bg-white text-gray-700 hover:bg-gray-50'}>Assignments</button>
                 </div>
 
                 <div className="bg-white rounded-lg p-6 shadow-sm">
@@ -430,7 +430,7 @@ export default function CourseView() {
                             <button
                               type="button"
                               onClick={() => { if (selectedVideo) markVideoComplete(selectedVideo.id); }}
-                              className="px-3 py-1 bg-blue-600 text-white rounded"
+                              className="btn-primary px-3 py-1 rounded"
                             >
                               Mark Complete
                             </button>
@@ -461,10 +461,15 @@ export default function CourseView() {
                 <h3 className="text-lg font-bold mb-4">Course Curriculum</h3>
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2"><PlayCircle size={16} />Video Lessons</h4>
-                  {course.videos && course.videos.length > 0 ? (
+                      {course.videos && course.videos.length > 0 ? (
                     <div className="space-y-2">
                       {course.videos.map((v, i) => (
-                        <button key={v.id} onClick={() => { setSelectedVideo(v); setActiveContentTab('learn'); }} className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50">{i + 1}. {v.title}</button>
+                        <button
+                          key={v.id}
+                          onClick={() => { setSelectedVideo(v); setActiveContentTab('learn'); }}
+                          className={`w-full text-left p-3 rounded-lg border border-gray-200 transition-colors ${selectedVideo?.id === v.id ? 'btn-primary' : 'hover:bg-gray-50'}`}>
+                          {i + 1}. {v.title}
+                        </button>
                       ))}
                     </div>
                   ) : <div className="text-sm text-gray-500">No videos</div>}

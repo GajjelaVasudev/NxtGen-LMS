@@ -239,7 +239,7 @@ export default function Settings() {
     <button
       onClick={onToggle}
       className={`relative w-12 h-6 rounded-full transition-colors ${
-        isOn ? "bg-blue-600" : "bg-gray-300"
+        isOn ? "bg-brand" : "bg-gray-300"
       }`}
     >
       <span
@@ -283,7 +283,7 @@ export default function Settings() {
                   onClick={() => setCurrentSection(tab.key)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                     currentSection === tab.key
-                      ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md"
+                      ? "bg-gradient-to-r from-[var(--brand-color)] to-[var(--brand-yellow)] text-white shadow-md"
                       : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                   }`}
                 >
@@ -307,16 +307,16 @@ export default function Settings() {
                   </div>
 
                   {/* Avatar Upload */}
-                  <div className="flex items-center gap-6 p-6 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg">
+                  <div className="flex items-center gap-6 p-6 bg-gradient-to-r from-[var(--brand-color)]/10 to-[var(--brand-yellow)]/10 dark:from-[var(--brand-color)]/20 dark:to-[var(--brand-yellow)]/20 rounded-lg">
                     <div className="relative">
-                      <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-4xl font-bold overflow-hidden ring-4 ring-white dark:ring-gray-700 shadow-lg">
+                      <div className="w-28 h-28 rounded-full bg-gradient-to-br from-[var(--brand-color)] to-[var(--brand-yellow)] flex items-center justify-center text-white text-4xl font-bold overflow-hidden ring-4 ring-white dark:ring-gray-700 shadow-lg">
                         {avatarPreview ? (
                           <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                         ) : (
                           user?.name?.charAt(0).toUpperCase() || "U"
                         )}
                       </div>
-                      <label className="absolute bottom-0 right-0 bg-blue-600 rounded-full p-2.5 shadow-lg cursor-pointer hover:bg-blue-700 transition-colors">
+                      <label className="absolute bottom-0 right-0 bg-brand rounded-full p-2.5 shadow-lg cursor-pointer hover:opacity-90 transition-colors">
                         <Camera size={18} className="text-white" />
                         <input
                           type="file"
@@ -329,7 +329,7 @@ export default function Settings() {
                     <div>
                       <h3 className="text-xl font-bold dark:text-white mb-1">{user?.name || "User Name"}</h3>
                       <p className="text-gray-600 dark:text-gray-400 mb-2">{user?.email}</p>
-                      <span className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium capitalize">
+                      <span className="inline-block px-3 py-1 bg-[var(--brand-color)]/10 dark:bg-[var(--brand-color)]/20 text-brand rounded-full text-sm font-medium capitalize">
                         {user?.role === "contentCreator" ? "Content Creator" : user?.role || "User"}
                       </span>
                     </div>
@@ -349,7 +349,7 @@ export default function Settings() {
                           ...prev,
                           profileInfo: { ...prev.profileInfo, displayName: e.target.value }
                         }))}
-                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         placeholder="John Doe"
                       />
                     </div>
@@ -366,7 +366,7 @@ export default function Settings() {
                           ...prev,
                           profileInfo: { ...prev.profileInfo, emailAddress: e.target.value }
                         }))}
-                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         placeholder="john@example.com"
                       />
                     </div>
@@ -383,7 +383,7 @@ export default function Settings() {
                           ...prev,
                           profileInfo: { ...prev.profileInfo, phoneNumber: e.target.value }
                         }))}
-                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         placeholder="+1 (555) 000-0000"
                       />
                     </div>
@@ -400,7 +400,7 @@ export default function Settings() {
                           ...prev,
                           profileInfo: { ...prev.profileInfo, userLocation: e.target.value }
                         }))}
-                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         placeholder="New York, USA"
                       />
                     </div>
@@ -417,7 +417,7 @@ export default function Settings() {
                           ...prev,
                           profileInfo: { ...prev.profileInfo, personalWebsite: e.target.value }
                         }))}
-                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         placeholder="https://yourwebsite.com"
                       />
                     </div>
@@ -435,7 +435,7 @@ export default function Settings() {
                         }))}
                         rows={5}
                         maxLength={500}
-                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] transition-all resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         placeholder="Share something about yourself..."
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-right">
@@ -509,9 +509,9 @@ export default function Settings() {
                             privacySettings: { ...prev.privacySettings, profileVisibility: option.value }
                           }))}
                           className={`p-4 border-2 rounded-lg text-left transition-all ${
-                            userSettings.privacySettings.profileVisibility === option.value
-                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                              : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
+                              userSettings.privacySettings.profileVisibility === option.value
+                                ? "border-[var(--brand-color)] bg-[var(--brand-color)]/10 dark:bg-[var(--brand-color)]/20 text-brand"
+                                : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
                           }`}
                         >
                           <div className="font-semibold dark:text-white mb-1">{option.label}</div>
@@ -572,7 +572,7 @@ export default function Settings() {
                           onClick={() => handleThemeChange(themeOption.value)}
                           className={`flex items-center gap-3 p-4 border-2 rounded-lg transition-all ${
                             theme === themeOption.value
-                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                              ? "border-[var(--brand-color)] bg-[var(--brand-color)]/10 dark:bg-[var(--brand-color)]/20 text-brand dark:text-brand"
                               : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300"
                           }`}
                         >
@@ -598,7 +598,7 @@ export default function Settings() {
                           ...prev,
                           appPreferences: { ...prev.appPreferences, languageCode: e.target.value }
                         }))}
-                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       >
                         <option value="en-US">English (US)</option>
                         <option value="es-ES">Spanish</option>
@@ -618,7 +618,7 @@ export default function Settings() {
                           ...prev,
                           appPreferences: { ...prev.appPreferences, timezoneOffset: e.target.value }
                         }))}
-                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       >
                         <option value="UTC">UTC</option>
                         <option value="America/New_York">Eastern Time</option>
@@ -638,7 +638,7 @@ export default function Settings() {
                           ...prev,
                           appPreferences: { ...prev.appPreferences, dateDisplayFormat: e.target.value }
                         }))}
-                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       >
                         <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                         <option value="DD/MM/YYYY">DD/MM/YYYY</option>
@@ -657,8 +657,8 @@ export default function Settings() {
                     <p className="text-gray-600 dark:text-gray-400">Update your password and manage account access</p>
                   </div>
 
-                  <div className="p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                    <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-4">Change Password</h3>
+                  <div className="p-6 bg-[var(--brand-color)]/10 dark:bg-[var(--brand-color)]/20 border border-[var(--brand-color)]/20 rounded-lg">
+                    <h3 className="font-semibold text-brand dark:text-white mb-4">Change Password</h3>
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -668,7 +668,7 @@ export default function Settings() {
                           type="password"
                           value={passwordData.oldPassword}
                           onChange={(e) => setPasswordData(prev => ({ ...prev, oldPassword: e.target.value }))}
-                          className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                           placeholder="Enter current password"
                         />
                       </div>
@@ -681,7 +681,7 @@ export default function Settings() {
                           type="password"
                           value={passwordData.newPassword}
                           onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                          className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                           placeholder="Enter new password"
                         />
                       </div>
@@ -694,14 +694,14 @@ export default function Settings() {
                           type="password"
                           value={passwordData.verifyPassword}
                           onChange={(e) => setPasswordData(prev => ({ ...prev, verifyPassword: e.target.value }))}
-                          className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-3 border-2 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                           placeholder="Confirm new password"
                         />
                       </div>
 
                       <button
                         onClick={updatePassword}
-                        className="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                        className="btn-primary w-full px-6 py-3 rounded"
                       >
                         Update Password
                       </button>
@@ -728,7 +728,7 @@ export default function Settings() {
               <div className="mt-8 flex justify-end">
                 <button
                   onClick={saveCurrentSettings}
-                  className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 shadow-lg transition-all"
+                  className="flex items-center gap-2 px-8 py-3 btn-primary font-semibold rounded-lg shadow-lg transition-all"
                 >
                   <Save size={20} />
                   Save Changes

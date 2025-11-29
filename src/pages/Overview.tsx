@@ -177,11 +177,6 @@ export default function Overview() {
     !submissions.some((s: any) => s.assignmentId === a.id && s.userId === user?.id)
   );
 
-  const recentAssignments = assignments
-    .filter(a => enrolledCourseIds.includes(a.courseId))
-    .sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0))
-    .slice(0, 5);
-
   const displayName = user?.name || (user?.email?.split?.("@")?.[0]) || "Student";
   const [coursePage, setCoursePage] = useState(0);
   const [assignmentPage, setAssignmentPage] = useState(0);
@@ -212,30 +207,30 @@ export default function Overview() {
             {/* If instructor show instructor KPIs else student summary */}
             {user?.role === 'instructor' && instructorSummary ? (
               <>
-                <div className="text-right">
+                <div className="card p-3 text-right">
                   <div className="text-sm text-gray-500">Active Courses</div>
                   <div className="text-xl font-semibold">{instructorSummary.activeCourses}</div>
                 </div>
-                <div className="text-right">
+                <div className="card p-3 text-right">
                   <div className="text-sm text-gray-500">Total Students</div>
                   <div className="text-xl font-semibold">{instructorSummary.totalEnrolled}</div>
                 </div>
-                <div className="text-right">
+                <div className="card p-3 text-right">
                   <div className="text-sm text-gray-500">Pending Grading</div>
                   <div className="text-xl font-semibold">{instructorSummary.pendingSubmissions}</div>
                 </div>
-                <div className="text-right">
+                <div className="card p-3 text-right">
                   <div className="text-sm text-gray-500">Avg Rating</div>
                   <div className="text-xl font-semibold">{instructorSummary.avgRating ? instructorSummary.avgRating.toFixed(2) : '-'}</div>
                 </div>
               </>
             ) : (
               <>
-                <div className="text-right">
+                <div className="card p-3 text-right">
                   <div className="text-sm text-gray-500">Ongoing Courses</div>
                   <div className="text-xl font-semibold">{enrolledCourses.length}</div>
                 </div>
-                <div className="text-right">
+                <div className="card p-3 text-right">
                   <div className="text-sm text-gray-500">Pending Assignments</div>
                   <div className="text-xl font-semibold">{pendingAssignments.length}</div>
                 </div>
@@ -249,13 +244,13 @@ export default function Overview() {
         {user?.role === 'instructor' && (
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-3">
-              <button onClick={() => navigate('/app/courses/create')} className="px-3 py-2 bg-green-600 text-white rounded">Create Course</button>
-              <button onClick={() => navigate('/app/assignments/create')} className="px-3 py-2 bg-blue-600 text-white rounded">Add Assignment</button>
-              <button onClick={() => navigate('/app/reports?scope=course')} className="px-3 py-2 bg-indigo-600 text-white rounded">View Analytics</button>
-              <button onClick={() => navigate('/app/announcements')} className="px-3 py-2 bg-yellow-600 text-white rounded">Send Announcement</button>
+              <button onClick={() => navigate('/app/courses/create')} className="btn-primary">Create Course</button>
+              <button onClick={() => navigate('/app/assignments/create')} className="btn-primary">Add Assignment</button>
+              <button onClick={() => navigate('/app/reports?scope=course')} className="btn-primary">View Analytics</button>
+              <button onClick={() => navigate('/app/announcements')} className="btn-accent">Send Announcement</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white border rounded-lg p-4">
+              <div className="card p-4">
                 <h3 className="font-semibold mb-2">Pending Grading</h3>
                 {pendingForGrading.length === 0 ? (
                   <div className="text-gray-500">No submissions pending grading.</div>
@@ -268,7 +263,7 @@ export default function Overview() {
                           <div className="text-sm text-gray-500">{p.studentName || p.studentEmail || p.user_id}</div>
                         </div>
                         <div>
-                          <Link to={`/app/assignments/submissions/${p.assignmentId}`} className="px-3 py-1 bg-blue-600 text-white rounded">View</Link>
+                          <Link to={`/app/assignments/submissions/${p.assignmentId}`} className="btn-primary">View</Link>
                         </div>
                       </div>
                     ))}
@@ -279,7 +274,7 @@ export default function Overview() {
           </div>
         )}
         <div className="grid grid-cols-1 gap-6 mb-8">
-          <section className="bg-white border rounded-lg p-6">
+          <section className="card p-6">
             <h2 className="text-lg font-semibold mb-4">To-Do List</h2>
 
             <div className="flex gap-2 mb-4">
@@ -287,13 +282,13 @@ export default function Overview() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') addTodo(); }}
-                className="flex-1 border px-3 py-2 rounded"
+                className="flex-1 form-input"
                 placeholder="Add a new task..."
               />
-              <button onClick={addTodo} className="px-4 py-2 bg-blue-600 text-white rounded">Add</button>
+              <button onClick={addTodo} className="btn-primary">Add</button>
             </div>
 
-            <div className="space-y-2">
+                <div className="space-y-2">
               {todos.length === 0 && <div className="text-gray-500">No tasks yet — add one above.</div>}
               {todos.map(t => (
                 <div key={t.id} className="flex items-center justify-between p-3 border rounded">
@@ -312,7 +307,7 @@ export default function Overview() {
 
         {/* Course & assignment insights */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <section className="bg-white border rounded-lg p-6 col-span-2">
+          <section className="card p-6 col-span-2">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold mb-4">Your Courses</h2>
               {enrolledCourses.length > ITEMS_PER_PAGE && (
@@ -344,7 +339,7 @@ export default function Overview() {
               <>
                 <div className="space-y-4">
                   {enrolledCourses.slice(coursePage * ITEMS_PER_PAGE, (coursePage + 1) * ITEMS_PER_PAGE).map(course => (
-                    <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={course.id} className="card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         {course.thumbnail && (
                           <img src={course.thumbnail} alt={course.title} className="w-16 h-16 rounded object-cover" />
@@ -355,7 +350,7 @@ export default function Overview() {
                         </div>
                       </div>
                       <div>
-                        <Link to={`/app/courses/${course.id}`} aria-label={`Continue ${course.title}`} className="p-3 bg-gradient-to-r from-brand to-[#7B68EE] text-white rounded-full inline-flex items-center justify-center shadow">
+                        <Link to={`/app/courses/${course.id}`} aria-label={`Continue ${course.title}`} className="btn-primary rounded-full p-3 inline-flex items-center justify-center shadow">
                           <PlayCircle className="w-5 h-5" />
                         </Link>
                       </div>
@@ -380,7 +375,7 @@ export default function Overview() {
             )}
           </section>
 
-          <section className="bg-white border rounded-lg p-6">
+          <section className="card p-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold mb-4">Pending Assignments</h2>
               {pendingAssignments.length > ITEMS_PER_PAGE && (
@@ -412,10 +407,10 @@ export default function Overview() {
               <>
                 <div className="space-y-4">
                   {pendingAssignments.slice(assignmentPage * ITEMS_PER_PAGE, (assignmentPage + 1) * ITEMS_PER_PAGE).map(assignment => (
-                    <div key={assignment.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={assignment.id} className="card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 flex items-center justify-center rounded bg-blue-100">
-                          <FileText className="w-6 h-6 text-blue-600" />
+                        <div className="btn-accent w-12 h-12 flex items-center justify-center rounded-full">
+                          <FileText className="w-6 h-6 text-[#0f172a]" />
                         </div>
                         <div>
                           <div className="text-md font-semibold">{assignment.title}</div>
@@ -423,7 +418,7 @@ export default function Overview() {
                         </div>
                       </div>
                       <div>
-                        <Link to={`/app/assignments/submissions/${assignment.id}`} aria-label={`View ${assignment.title}`} className="p-3 bg-gradient-to-r from-brand to-[#7B68EE] text-white rounded-full inline-flex items-center justify-center shadow">
+                        <Link to={`/app/assignments/submissions/${assignment.id}`} aria-label={`View ${assignment.title}`} className="btn-primary rounded-full p-3 inline-flex items-center justify-center shadow">
                           <Eye className="w-5 h-5" />
                         </Link>
                       </div>

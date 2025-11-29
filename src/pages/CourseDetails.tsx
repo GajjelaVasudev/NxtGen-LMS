@@ -61,7 +61,7 @@ export default function CourseDetails() {
       <div className="flex-1 min-h-0 overflow-y-auto bg-gray-50">
         <div className="max-w-5xl mx-auto p-6 text-center">
           <p className="text-gray-500">Course not found.</p>
-          <Link to="/app/course-catalog" className="text-blue-600 hover:underline mt-4 inline-block">Back to Catalog</Link>
+          <Link to="/app/course-catalog" className="text-brand hover:underline mt-4 inline-block">Back to Catalog</Link>
         </div>
       </div>
     );
@@ -75,14 +75,13 @@ export default function CourseDetails() {
           {/* left info */}
           {/* right CTA */}
           <aside>
-            <div className="bg-white p-6 rounded-lg shadow-sm border text-center">
+            <div className="card p-6 text-center">
               <div className="text-sm text-gray-500">Students enrolled</div>
               <div className="text-2xl font-bold mt-2">{/* show via enrollments count */}</div>
               <div className="text-sm text-gray-400 mt-1">Updated live</div>
             </div>
-
-            <div className="bg-gradient-to-br from-blue-600 to-purple-600 text-white p-6 rounded-lg shadow-lg mt-4">
-              <button onClick={buyCourse} disabled={enrolled} className={`mt-4 w-full px-4 py-2 rounded-md font-semibold ${enrolled ? "bg-white/20" : "bg-white text-blue-600"}`}>
+            <div className="bg-gradient-to-br from-[var(--brand-color)] to-[var(--brand-yellow)] text-white p-6 rounded-lg shadow-lg mt-4">
+              <button onClick={buyCourse} disabled={enrolled} className={`mt-4 w-full px-4 py-2 rounded-md font-semibold ${enrolled ? "bg-white/20" : "bg-white text-brand"}`}>
                 {enrolled ? "Enrolled" : user ? "Enroll Now" : "Sign in to Enroll"}
               </button>
             </div>

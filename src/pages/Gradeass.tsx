@@ -110,7 +110,7 @@ export default function Gradeass() {
             </div>
           </div>
         )}
-        <h1 className="text-2xl font-bold text-nxtgen-text-primary mb-6">Grade Assignments</h1>
+        <h1 className="text-2xl font-bold text-brand mb-6">Grade Assignments</h1>
 
         {loading ? (
           <div className="text-center py-12">Loading submissions...</div>
@@ -119,19 +119,19 @@ export default function Gradeass() {
         ) : (
           <div className="grid grid-cols-1 gap-4">
             {submissions.map(s => (
-              <div key={s.submissionId} className="p-4 border rounded bg-white flex flex-col md:flex-row md:items-center md:justify-between">
+              <div key={s.submissionId} className="card p-4 flex flex-col md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="font-semibold">{s.studentName}</div>
                   <div className="text-sm text-gray-600">{s.studentEmail}</div>
                   <div className="text-sm text-gray-800 mt-2">{s.assignmentTitle}</div>
                   {s.raw && s.raw.content && (s.raw.content.filePath || s.raw.content.fileUrl || s.raw.content.imageUrl) && (
                     <div className="mt-2">
-                      {s.raw.content.filePath ? (
-                        <a href={`${API}/submissions/${s.submissionId}/file`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Download uploaded file</a>
+                        {s.raw.content.filePath ? (
+                        <a href={`${API}/submissions/${s.submissionId}/file`} target="_blank" rel="noreferrer" className="text-brand hover:underline">Download uploaded file</a>
                       ) : s.raw.content.fileUrl && typeof s.raw.content.fileUrl === 'string' ? (
-                        <a href={s.raw.content.fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">View uploaded file</a>
+                        <a href={s.raw.content.fileUrl} target="_blank" rel="noreferrer" className="text-brand hover:underline">View uploaded file</a>
                       ) : (
-                        <a href={`${API}/submissions/${s.submissionId}/file`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">View uploaded file</a>
+                        <a href={`${API}/submissions/${s.submissionId}/file`} target="_blank" rel="noreferrer" className="text-brand hover:underline">View uploaded file</a>
                       )}
                     </div>
                   )}
@@ -142,17 +142,17 @@ export default function Gradeass() {
                   {editing[s.submissionId] ? (
                     <>
                       <div className="flex items-center gap-2">
-                        <input type="number" min={0} max={100} placeholder="Grade" value={editing[s.submissionId]?.grade || ''} onChange={(e) => setEditing(prev => ({ ...prev, [s.submissionId]: { ...(prev[s.submissionId] || {}), grade: e.target.value } }))} className="w-24 border rounded p-1" />
-                        <input type="text" placeholder="Feedback" value={editing[s.submissionId]?.feedback || ''} onChange={(e) => setEditing(prev => ({ ...prev, [s.submissionId]: { ...(prev[s.submissionId] || {}), feedback: e.target.value } }))} className="border rounded p-1" />
+                        <input type="number" min={0} max={100} placeholder="Grade" value={editing[s.submissionId]?.grade || ''} onChange={(e) => setEditing(prev => ({ ...prev, [s.submissionId]: { ...(prev[s.submissionId] || {}), grade: e.target.value } }))} className="w-24 border rounded p-1 focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)]" />
+                        <input type="text" placeholder="Feedback" value={editing[s.submissionId]?.feedback || ''} onChange={(e) => setEditing(prev => ({ ...prev, [s.submissionId]: { ...(prev[s.submissionId] || {}), feedback: e.target.value } }))} className="border rounded p-1 focus:ring-2 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)]" />
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => { setEditing(prev => { const copy = { ...prev }; delete copy[s.submissionId]; return copy; }); }} disabled={!!saving[s.submissionId]} className="px-3 py-1 border rounded">Cancel</button>
-                        <button onClick={() => saveGrade(s.submissionId)} disabled={!!saving[s.submissionId]} className={`px-3 py-1 ${saving[s.submissionId] ? 'bg-gray-400' : 'bg-blue-600'} text-white rounded`}>{saving[s.submissionId] ? 'Saving...' : 'Save'}</button>
+                        <button onClick={() => { setEditing(prev => { const copy = { ...prev }; delete copy[s.submissionId]; return copy; }); }} disabled={!!saving[s.submissionId]} className="px-3 py-1 border rounded text-brand">Cancel</button>
+                        <button onClick={() => saveGrade(s.submissionId)} disabled={!!saving[s.submissionId]} className={`${saving[s.submissionId] ? 'px-3 py-1 bg-gray-400 text-white rounded' : 'px-3 py-1 btn-primary rounded'}`}>{saving[s.submissionId] ? 'Saving...' : 'Save'}</button>
                       </div>
                     </>
                   ) : (
                     <div className="flex gap-2">
-                      <button onClick={() => handleEdit(s)} className="px-3 py-1 border rounded">Edit</button>
+                      <button onClick={() => handleEdit(s)} className="px-3 py-1 border rounded text-brand">Edit</button>
                     </div>
                   )}
                 </div>

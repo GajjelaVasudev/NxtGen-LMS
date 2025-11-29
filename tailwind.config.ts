@@ -14,7 +14,13 @@ export default {
     },
     extend: {
       fontFamily: {
+        inter: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial"],
         abeezee: ["ABeeZee", "Inter", "sans-serif"],
+      },
+      fontSize: {
+        'h1': ['1.875rem', { lineHeight: '1.1', fontWeight: '800' }],
+        'h2': ['1.5rem', { lineHeight: '1.15', fontWeight: '700' }],
+        'h3': ['1.125rem', { lineHeight: '1.2', fontWeight: '600' }],
       },
       colors: {
         border: "hsl(var(--border))",

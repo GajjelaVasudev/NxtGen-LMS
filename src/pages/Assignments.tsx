@@ -281,7 +281,7 @@ export default function Assignments() {
             {hasRole && hasRole(["instructor", "admin"]) && (
               <Link
                 to="/app/assignments/create"
-                className="px-4 py-2 bg-brand text-white rounded flex items-center gap-2"
+                className="btn-primary flex items-center gap-2"
               >
                 <Plus size={18} />
                 Create Assignment
@@ -291,12 +291,12 @@ export default function Assignments() {
         </div>
 
         {/* Assignment List */}
-        <div className="bg-white border rounded-lg">
+        <div className="card p-4">
           {filteredAssignments.length === 0 ? (
             <div className="text-center text-gray-500 py-12">
               <p className="text-lg mb-2">No assignments found</p>
               {hasRole && hasRole(["instructor", "admin"]) && (
-                <Link to="/app/assignments/create" className="text-blue-600 hover:underline">
+                <Link to="/app/assignments/create" className="btn-primary inline-flex items-center justify-center">
                   Create your first assignment
                 </Link>
               )}
@@ -349,7 +349,7 @@ export default function Assignments() {
                                 </Link>
                                 <Link
                                   to={`/app/assignments/submissions/${assignment.id}`}
-                                  className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                  className="btn-primary text-sm inline-flex items-center gap-2"
                                 >
                                   View Submissions ({assignmentSubmissions.length})
                                 </Link>
@@ -378,7 +378,7 @@ export default function Assignments() {
                                 ) : (
                                   <button
                                     onClick={() => setSelectedAssignment(assignment)}
-                                    className="px-3 py-1 text-sm bg-brand text-white rounded hover:opacity-90"
+                                    className="btn-primary text-sm"
                                   >
                                     Submit
                                   </button>
@@ -399,7 +399,7 @@ export default function Assignments() {
         {/* Submission Modal */}
         {selectedAssignment && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="card p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold mb-4">Submit Assignment</h3>
               <p className="text-gray-600 mb-4">{selectedAssignment.title}</p>
               
@@ -414,7 +414,7 @@ export default function Assignments() {
                       submitAssignment(selectedAssignment.id, file);
                     }
                   }}
-                  className="w-full border rounded p-2"
+                  className="w-full form-input"
                 />
               </div>
 

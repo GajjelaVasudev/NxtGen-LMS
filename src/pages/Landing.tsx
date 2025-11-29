@@ -18,25 +18,25 @@ export default function Landing() {
 
   const features = [
     {
-      icon: <BookOpen className="w-12 h-12 text-[#1B68B3]" />,
+      icon: <BookOpen className="w-12 h-12 text-brand" />,
       title: "Course Management",
       description: "Create, organize, and deliver engaging courses with multimedia content, quizzes, and assignments all in one place.",
       image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=500&h=300&fit=crop"
     },
     {
-      icon: <Users className="w-12 h-12 text-[#1B68B3]" />,
+      icon: <Users className="w-12 h-12 text-brand" />,
       title: "Student Tracking",
       description: "Monitor student progress, track completion rates, and provide personalized feedback to enhance learning outcomes.",
       image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=500&h=300&fit=crop"
     },
     {
-      icon: <BarChart3 className="w-12 h-12 text-[#1B68B3]" />,
+      icon: <BarChart3 className="w-12 h-12 text-brand" />,
       title: "Analytics & Reports",
       description: "Get detailed insights into student performance, course effectiveness, and platform engagement with comprehensive analytics.",
       image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&h=300&fit=crop"
     },
     {
-      icon: <MessageCircle className="w-12 h-12 text-[#1B68B3]" />,
+      icon: <MessageCircle className="w-12 h-12 text-brand" />,
       title: "Interactive Learning",
       description: "Foster collaboration with discussion forums, real-time notifications, and integrated communication tools.",
       image: "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=500&h=300&fit=crop"
@@ -160,22 +160,19 @@ export default function Landing() {
   return (
     <div className="landing-root relative min-h-screen bg-white overflow-hidden">
 
-      {/* Animated Background Blobs */}
-
-
       {/* Header */}
       <header className="px-4 md:px-16 lg:px-20 py-6 sticky top-0 bg-white/95 backdrop-blur-sm z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="text-4xl md:text-5xl font-bold">
-            <span className="text-brand-blue">Nxt</span>
-            <span className="text-brand-yellow">Gen</span>
+            <span className="text-brand-blue text-nxtgen-blue">Nxt</span>
+            <span className="text-brand-yellow text-nxtgen-yellow text-[#FFCC00]">Gen</span>
           </div>
 
           <nav className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-gray-700 hover:text-[#1B68B3] transition-colors">Features</a>
-            <a href="#benefits" className="text-gray-700 hover:text-[#1B68B3] transition-colors">Benefits</a>
-            <a href="#testimonials" className="text-gray-700 hover:text-[#1B68B3] transition-colors">Testimonials</a>
-            <a href="#how-it-works" className="text-gray-700 hover:text-[#1B68B3] transition-colors">Working</a>
+            <a href="#features" className="text-gray-700 hover:text-brand transition-colors">Features</a>
+            <a href="#benefits" className="text-gray-700 hover:text-brand transition-colors">Benefits</a>
+            <a href="#testimonials" className="text-gray-700 hover:text-brand transition-colors">Testimonials</a>
+            <a href="#how-it-works" className="text-gray-700 hover:text-brand transition-colors">Working</a>
           </nav>
 
           <div className="flex items-center gap-4">
@@ -200,13 +197,13 @@ export default function Landing() {
       <section className="relative max-w-7xl mx-auto px-4 mt-20 md:mt-32 overflow-hidden">
 
        {/* Animated Background Blobs */}
-  <div className="blob w-96 h-96 bg-[#1B68B3] top-10 -left-20"></div>
-  <div className="blob w-96 h-96 bg-[#FFCC00] bottom-10 -right-20"></div>
+  <div className="blob w-96 h-96 bg-brand top-10 -left-20"></div>
+  <div className="blob w-96 h-96 bg-brand-yellow bottom-10 -right-20"></div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Left Content */}
           <div className="space-y-8">
             <div className="inline-block px-4 py-2 bg-blue-50 rounded-full">
-              <span className="text-[#1B68B3] font-semibold">🎓 #1 Learning Management System</span>
+              <span className="text-brand font-semibold">🎓 #1 Learning Management System</span>
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
@@ -223,12 +220,12 @@ export default function Landing() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="flex-1 px-6 py-4 border-2 border-gray-200 rounded-2xl text-lg focus:border-[#1B68B3] focus:outline-none"
+                  className="flex-1 px-6 py-4 border-2 border-gray-200 rounded-2xl text-lg focus:border-brand focus:outline-none"
                 required
               />
               <button 
                 type="submit" 
-                className="px-8 py-4 bg-[#1B68B3] text-white rounded-2xl hover:bg-[#1B68B3]/90 transition-colors font-semibold text-lg flex items-center justify-center gap-2"
+                  className="px-8 py-4 bg-brand text-white rounded-2xl hover:opacity-95 transition-colors font-semibold text-lg flex items-center justify-center gap-2"
               >
                 Browse Courses - Lowest Prices
                 <ArrowRight className="w-5 h-5" />
@@ -242,7 +239,7 @@ export default function Landing() {
             <div className="grid grid-cols-4 gap-4 pt-8">
               {stats.map((stat, index) => (
                 <div key={index} className="text-center">
-                  <div className="text-2xl md:text-3xl font-bold text-[#1B68B3]">{stat.number}</div>
+                    <div className="text-2xl md:text-3xl font-bold text-brand">{stat.number}</div>
                   <div className="text-sm text-gray-600">{stat.label}</div>
                 </div>
               ))}
@@ -251,8 +248,8 @@ export default function Landing() {
 
           {/* Right Image */}
           <div className="relative">
-            <div className="absolute -left-10 -top-10 w-72 h-72 bg-[#1B68B3] rounded-full opacity-10 blur-3xl"></div>
-            <div className="absolute -right-10 -bottom-10 w-72 h-72 bg-[#FFCC00] rounded-full opacity-10 blur-3xl"></div>
+            <div className="absolute -left-10 -top-10 w-72 h-72 bg-brand rounded-full opacity-10 blur-3xl"></div>
+            <div className="absolute -right-10 -bottom-10 w-72 h-72 bg-brand-yellow rounded-full opacity-10 blur-3xl"></div>
             <img
               src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&h=600&fit=crop"
               alt="Students learning"
@@ -288,8 +285,8 @@ export default function Landing() {
           {features.map((feature, index) => (
             <div 
               key={index} 
-              className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-[#1B68B3] hover:shadow-xl transition-all duration-300 cursor-pointer"
-            >
+              className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-brand hover:shadow-xl transition-all duration-300 cursor-pointer"
+              >
               <div className="mb-6 transform group-hover:scale-110 transition-transform">
                 {feature.icon}
               </div>
@@ -315,8 +312,8 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {benefits.map((benefit, index) => (
               <div key={index} className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow">
-                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-[#1B68B3] mb-4">
-                  {benefit.icon}
+                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-brand mb-4">
+                    {benefit.icon}
                 </div>
                 <h3 className="text-lg font-bold mb-2">{benefit.title}</h3>
                 <p className="text-gray-600">{benefit.description}</p>
@@ -358,7 +355,7 @@ export default function Landing() {
           ].map((item, index) => (
             <div key={index} className="text-center">
               <div className="inline-block p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-3xl mb-6">
-                <div className="text-[#1B68B3]">{item.icon}</div>
+                  <div className="text-brand">{item.icon}</div>
               </div>
               <div className="text-4xl font-bold text-gray-200 mb-4">{item.step}</div>
               <h3 className="text-2xl font-bold mb-3">{item.title}</h3>
@@ -416,7 +413,7 @@ export default function Landing() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
               to="/signup"
-              className="px-8 py-4 bg-white text-[#1B68B3] rounded-2xl hover:bg-gray-100 transition-colors font-semibold text-lg inline-flex items-center justify-center gap-2"
+              className="px-8 py-4 bg-white text-brand rounded-2xl hover:bg-gray-100 transition-colors font-semibold text-lg inline-flex items-center justify-center gap-2"
             >
               Browse Courses
             </Link>
@@ -432,8 +429,8 @@ export default function Landing() {
       {/* Brand */}
       <div className="space-y-4">
         <div className="text-4xl font-bold">
-          <span className="text-[#1B68B3]">Nxt</span>
-          <span className="text-[#FFCC00]">Gen</span>
+          <span className="text-brand-blue text-nxtgen-blue">Nxt</span>
+          <span className="text-brand-yellow text-nxtgen-yellow text-[#FFCC00]">Gen</span>
         </div>
         <p className="text-gray-400">
           Empowering education through innovative technology and seamless learning experiences.
@@ -444,7 +441,7 @@ export default function Landing() {
             href="https://www.instagram.com/vasudev_gajjela_31/?utm_source=ig_web_button_share_sheet"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
+            className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand transition-colors"
           >
             <Instagram size={20} />
           </a>
@@ -453,7 +450,7 @@ export default function Landing() {
             href="https://x.com/Rameshkumar1013"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
+            className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand transition-colors"
           >
             <span className="text-xl font-bold">X</span>
           </a>
@@ -462,7 +459,7 @@ export default function Landing() {
             href="https://www.linkedin.com/in/hemanth-gvs-500006348/"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
+            className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand transition-colors"
           >
             <Linkedin size={20} />
           </a>

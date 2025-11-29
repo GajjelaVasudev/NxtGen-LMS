@@ -62,18 +62,22 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-[280px] h-full flex flex-col" style={{ backgroundColor: "#F5F7F9" }}>
-      <div className="flex justify-center items-center h-[105px] px-[29px]">
-        <Logo />
-      </div>
+    <aside className="w-[280px] h-full flex flex-col p-4">
+      <div className="mb-4">
+        <div className="w-full card p-4 flex flex-col items-center">
+          <div className="p-1 rounded-md bg-white/60">
+            <Logo />
+          </div>
 
-      <nav className="px-[24px] pt-[24px] flex-1">
-        <div className="flex flex-col gap-4">
-          {navItems.map(({ icon, label, to, badge }) => (
-            <NavItem key={to} icon={icon} label={label} to={to} badge={badge} />
-          ))}
+          <nav className="w-full mt-4">
+            <div className="flex flex-col gap-2">
+              {navItems.map(({ icon, label, to, badge }) => (
+                <NavItem key={to} icon={icon} label={label} to={to} badge={badge} />
+              ))}
+            </div>
+          </nav>
         </div>
-      </nav>
+      </div>
     </aside>
   );
 }

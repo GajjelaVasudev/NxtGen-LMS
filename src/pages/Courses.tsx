@@ -54,7 +54,7 @@ export default function Courses() {
     return (
       <div className="p-6">
         <p>Please sign in to see your courses.</p>
-        <Link to="/login" className="text-blue-600 hover:underline">Sign in</Link>
+        <Link to="/login" className="text-brand hover:underline">Sign in</Link>
       </div>
     );
   }
@@ -69,7 +69,7 @@ export default function Courses() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((c: any) => (
-              <div key={c.id} className="bg-white border rounded-lg p-4 shadow-sm flex flex-col">
+              <div key={c.id} className="card p-4 flex flex-col">
                 <div className="h-40 bg-gray-100 rounded-md mb-4 overflow-hidden">
                   {c.thumbnail ? <img src={c.thumbnail} alt={c.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400">No thumbnail</div>}
                 </div>
@@ -79,7 +79,7 @@ export default function Courses() {
                 </div>
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-gray-500">Price: ₹{c.price ?? 0}</div>
-                  <Link to={`/app/courses/${c.id}`} className="text-sm px-3 py-1 border rounded hover:bg-gray-50">Open</Link>
+                  <Link to={`/app/courses/${c.id}`} className="text-sm px-3 py-1 border rounded text-brand">Open</Link>
                 </div>
               </div>
             ))}

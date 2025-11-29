@@ -140,23 +140,23 @@ export default function Inbox() {
     <main className="h-screen flex bg-gray-50">
       <div className="flex-1 min-h-0 flex">
         {/* Message List */}
-        <div className="w-80 bg-white border-r flex flex-col min-h-0">
+        <div className="w-80 card flex flex-col min-h-0">
           <div className="p-4 border-b">
             <div className="flex items-center justify-between mb-3">
               <h1 className="text-lg font-bold">Inbox</h1>
               {(user && (user.role === 'instructor' || user.role === 'admin')) && (
-                <button onClick={() => setComposeOpen(true)} className="px-3 py-1 bg-blue-600 text-white rounded">Compose</button>
+                <button onClick={() => setComposeOpen(true)} className="btn-primary px-3 py-1 rounded">Compose</button>
               )}
             </div>
 
             <div className="relative mb-3">
-              <input type="text" value={searchQuery ?? ''} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search messages..." className="w-full pl-3 pr-3 py-2 border rounded text-sm" />
+              <input type="text" value={searchQuery ?? ''} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search messages..." className="w-full pl-3 pr-3 py-2 form-input text-sm" />
             </div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto">
             {filtered.map(m => (
-              <div key={m.id} onClick={() => openMessage(m)} className={`p-3 border-b cursor-pointer ${selectedMessage?.id === m.id ? "bg-blue-50 border-l-4 border-l-blue-600" : ""}`}>
+              <div key={m.id} onClick={() => openMessage(m)} className={`p-3 border-b cursor-pointer ${selectedMessage?.id === m.id ? "bg-[rgba(27,104,179,0.06)] border-l-4 border-l-brand" : ""}`}>
                 <div className="flex items-center justify-between">
                   <div>
                     <div className={`font-medium ${!m.read ? "text-gray-900" : "text-gray-700"}`}>{m.fromName}</div>
@@ -164,7 +164,7 @@ export default function Inbox() {
                   </div>
                   <div className="text-xs text-gray-400">{new Date(m.timestamp).toLocaleDateString()}</div>
                 </div>
-                {m.starred && <div className="mt-2 text-yellow-500"><Star size={14} /></div>}
+                {m.starred && <div className="mt-2 text-brand-yellow"><Star size={14} /></div>}
               </div>
             ))}
           </div>
@@ -174,14 +174,14 @@ export default function Inbox() {
         <div className="flex-1 min-h-0 flex flex-col">
           {selectedMessage ? (
             <>
-              <div className="p-4 border-b bg-white flex items-center justify-between">
+              <div className="p-4 border-b card flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold text-gray-900">{selectedMessage.subject}</h2>
                   <div className="text-xs text-gray-500">{selectedMessage.fromName} • {new Date(selectedMessage.timestamp).toLocaleString()}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => toggleStar(selectedMessage.id, !selectedMessage.starred)} className="p-2 hover:bg-gray-100 rounded">
-                    <Star className={selectedMessage.starred ? "text-yellow-500" : "text-gray-400"} />
+                    <Star className={selectedMessage.starred ? "text-brand-yellow" : "text-gray-400"} />
                   </button>
                   <button onClick={() => deleteSelected([selectedMessage.id])} className="p-2 hover:bg-gray-100 rounded">
                     <Trash2 className="text-gray-400" />
@@ -198,24 +198,24 @@ export default function Inbox() {
                 </div>
               </div>
 
-              <div className="flex-1 p-4 bg-white overflow-auto min-h-0">
+              <div className="flex-1 p-4 card overflow-auto min-h-0">
                 <div className="prose max-w-none">
                   <p className="text-gray-700 whitespace-pre-wrap">{selectedMessage.content}</p>
                 </div>
               </div>
-              <div className="p-4 border-t bg-white flex-shrink-0">
+              <div className="p-4 border-t card flex-shrink-0">
                 <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
                   <div className="flex gap-2">
-                    <input value={form?.subject ?? ''} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Reply subject" className="flex-1 border px-3 py-2 rounded" />
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded">Reply</button>
-                  </div>
+                      <input value={form?.subject ?? ''} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Reply subject" className="flex-1 form-input" />
+                      <button className="btn-primary px-4 py-2">Reply</button>
+                    </div>
                 </form>
               </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-gray-50">
               <div className="text-center">
-                <Mail size={48} className="text-gray-400 mx-auto mb-4" />
+                <Mail size={48} className="text-brand opacity-40 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No message selected</h3>
                 <p className="text-gray-500">Select a message to view its contents</p>
               </div>
@@ -227,11 +227,11 @@ export default function Inbox() {
       {/* Compose modal (simple inline panel) */}
       {composeOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
-          <div className="bg-white w-full max-w-xl p-6 rounded shadow-lg">
+          <div className="w-full max-w-xl card p-6 rounded shadow-lg">
             <h3 className="text-lg font-semibold mb-3">Compose Message</h3>
             <form onSubmit={sendMessage} className="space-y-3">
               <div className="grid grid-cols-3 gap-2">
-                <input value={studentSearchId ?? ''} onChange={(e) => setStudentSearchId(e.target.value)} placeholder="Search student by ID" className="col-span-2 border px-3 py-2 rounded" />
+                <input value={studentSearchId ?? ''} onChange={(e) => setStudentSearchId(e.target.value)} placeholder="Search student by ID" className="col-span-2 form-input" />
                 <button type="button" onClick={async () => {
                   if (!studentSearchId) return;
                   setSearchingStudent(true);
@@ -260,14 +260,14 @@ export default function Inbox() {
                 </div>
               )}
 
-              <input value={form?.toName ?? ''} onChange={(e) => setForm(f => ({ ...f, toName: e.target.value }))} placeholder="To (leave empty for role/system)" className="w-full border px-3 py-2 rounded" />
-              <input value={form?.subject ?? ''} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Subject" className="w-full border px-3 py-2 rounded" />
-              <textarea value={form?.content ?? ''} onChange={(e) => setForm(f => ({ ...f, content: e.target.value }))} rows={6} className="w-full border px-3 py-2 rounded" placeholder="Write your message..." />
+              <input value={form?.toName ?? ''} onChange={(e) => setForm(f => ({ ...f, toName: e.target.value }))} placeholder="To (leave empty for role/system)" className="w-full form-input" />
+              <input value={form?.subject ?? ''} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Subject" className="w-full form-input" />
+              <textarea value={form?.content ?? ''} onChange={(e) => setForm(f => ({ ...f, content: e.target.value }))} rows={6} className="w-full form-input" placeholder="Write your message..." />
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-500">You are sending as: {user?.name || user?.email}</div>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setComposeOpen(false)} className="px-4 py-2 border rounded">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Send</button>
+                  <button type="submit" className="btn-primary px-4 py-2">Send</button>
                 </div>
               </div>
             </form>
