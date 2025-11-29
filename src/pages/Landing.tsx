@@ -196,7 +196,6 @@ export default function Landing() {
             <a href="#features" className="text-gray-700 hover:text-[#1B68B3] transition-colors">Features</a>
             <a href="#benefits" className="text-gray-700 hover:text-[#1B68B3] transition-colors">Benefits</a>
             <a href="#testimonials" className="text-gray-700 hover:text-[#1B68B3] transition-colors">Testimonials</a>
-            <a href="#pricing" className="text-gray-700 hover:text-[#1B68B3] transition-colors">Pricing</a>
           </nav>
 
           <div className="flex items-center gap-4">
