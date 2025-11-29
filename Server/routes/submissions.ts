@@ -249,8 +249,11 @@ export const getSubmissionFile: RequestHandler = async (req, res) => {
     if (!submission) return res.status(404).json({ success: false, error: 'Submission not found' });
 
     const content = (submission as any).content || {};
+    // prefer explicit public/absolute URL fields
     const url = content.imageUrl || content.fileUrl || content.file_url || content.url || null;
-    if (!url) return res.status(404).json({ success: false, error: 'No file attached to submission' });
+    // If no explicit public URL, but we have an internal storage path (filePath), attempt to generate a signed URL
+    const filePath = content.filePath || content.file_path || null;
+    if (!url && !filePath) return res.status(404).json({ success: false, error: 'No file attached to submission' });
 
     // If the url is a data URL (base64), return it as a download
     if (typeof url === 'string' && url.startsWith('data:')) {
@@ -267,9 +270,36 @@ export const getSubmissionFile: RequestHandler = async (req, res) => {
       return res.send(buf);
     }
 
-    // If the url is an absolute http(s) URL, redirect
-    if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+    // If we have an explicit absolute URL, redirect immediately
+    if (url && typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
       return res.redirect(url);
+    }
+
+    // If we have an internal storage path, try to create a signed URL from Supabase Storage
+    if (!url && filePath) {
+      try {
+        const bucket = process.env.SUPABASE_SUBMISSIONS_BUCKET || 'submissions';
+        // create a short-lived signed URL (60s)
+        const signedTtl = Number(process.env.SUBMISSION_SIGNED_URL_TTL || '60');
+        const { data: signedData, error: signedErr } = await supabase.storage.from(bucket).createSignedUrl(filePath, signedTtl);
+        if (signedErr) {
+          console.error('[submission/file] createSignedUrl error', signedErr);
+        } else if (signedData && (signedData.signedURL || signedData.signedUrl || signedData.signed_url)) {
+          const signedUrl = (signedData.signedURL || signedData.signedUrl || signedData.signed_url);
+          return res.redirect(signedUrl);
+        }
+        // Fallback to getPublicUrl if createSignedUrl not available or failed
+        const { data: pubData, error: pubErr } = await supabase.storage.from(bucket).getPublicUrl(filePath);
+        if (pubErr) {
+          console.error('[submission/file] getPublicUrl error', pubErr);
+        } else if (pubData && (pubData.publicUrl || pubData.public_url)) {
+          const pubUrl = (pubData.publicUrl || pubData.public_url);
+          return res.redirect(pubUrl);
+        }
+      } catch (e: any) {
+        console.error('[submission/file] error generating storage URL', e);
+      }
+      // If we reach here, continue to other handlers which may attempt to serve file locally
     }
 
     // Otherwise, treat as relative path under public/ or uploads/ - attempt to serve

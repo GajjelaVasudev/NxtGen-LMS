@@ -358,9 +358,19 @@ export default function Assignments() {
                               // Student View
                               <>
                                 {userSubmission ? (
-                                  <span className="text-sm text-green-600 font-medium">
-                                    ✓ Submitted
-                                  </span>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-sm text-green-600 font-medium">✓ Submitted</span>
+                                    <button
+                                      onClick={() => {
+                                        // Open the server endpoint that will serve or redirect to the submitted file
+                                        const win = window.open(`${API}/submissions/${userSubmission.id}/file`, "_blank");
+                                        if (!win) alert('Pop-up blocked. Please allow pop-ups to view the submission file.');
+                                      }}
+                                      className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                    >
+                                      View File
+                                    </button>
+                                  </div>
                                 ) : overdue ? (
                                   <span className="text-sm text-red-500 font-medium">
                                     Submission Closed
