@@ -451,34 +451,54 @@ export default function Landing() {
             >
               Browse Courses
             </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-            {/* Brand */}
-            <div className="space-y-4">
-              <div className="text-4xl font-bold">
-                <span className="text-[#1B68B3]">Nxt</span>
-                <span className="text-[#FFCC00]">Gen</span>
-              </div>
-              <p className="text-gray-400">
-                Empowering education through innovative technology and seamless learning experiences.
-              </p>
-              <div className="flex gap-4">
-                <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors">
-                  <Instagram size={20} />
-                </a>
-                <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors">
-                  <Twitter size={20} />
-                </a>
-                <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors">
-                  <Linkedin size={20} />
-                </a>
-              </div>
+        {/* Footer */}
+        <footer className="bg-gray-900 text-white py-16">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+              {/* Brand */}
+              <div className="space-y-4">
+                <div className="text-4xl font-bold">
+                  <span className="text-[#1B68B3]">Nxt</span>
+                  <span className="text-[#FFCC00]">Gen</span>
+                </div>
+                <p className="text-gray-400">
+                  Empowering education through innovative technology and seamless learning experiences.
+                </p>
+                <div className="flex gap-4">
+
+  <a 
+    href="https://www.instagram.com/vasudev_gajjela_31/?utm_source=ig_web_button_share_sheet"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
+  >
+    <Instagram size={20} />
+  </a>
+
+  <a 
+    href="https://x.com/Rameshkumar1013"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
+  >
+    <span className="text-xl font-bold">X</span>
+  </a>
+
+  <a 
+    href="https://www.linkedin.com/in/hemanth-gvs-500006348/"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#1B68B3] transition-colors"
+  >
+    <Linkedin size={20} />
+  </a>
+
+</div>
+
             </div>
 
             {/* Product */}
@@ -517,7 +537,7 @@ export default function Landing() {
 
           <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm">
-              © 2024 NxtGen LMS. All rights reserved.
+              © 2025 NxtGen LMS. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm text-gray-400">
               <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
