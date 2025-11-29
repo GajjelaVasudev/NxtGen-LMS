@@ -276,12 +276,32 @@ export function AddCourse() {
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 if (!f) return;
+                const MAX_THUMB_BYTES = 5 * 1024 * 1024; // 5MB
+                if (f.size > MAX_THUMB_BYTES) {
+                  alert('Selected image is too large. Please choose an image smaller than 5MB or optimize it before uploading.');
+                  return;
+                }
                 try {
-                  const dataUrl = await fileToDataUrl(f);
-                  updateField('thumbnail', dataUrl);
+                  // Upload to server which stores in Supabase Storage and returns a public URL
+                  const formData = new FormData();
+                  formData.append('file', f, f.name);
+                  const uploadRes = await fetch(`${API}/upload`, { method: 'POST', body: formData });
+                  if (!uploadRes.ok) {
+                    const txt = await uploadRes.text().catch(() => '');
+                    console.error('Upload failed', uploadRes.status, txt);
+                    alert('Failed to upload image');
+                    return;
+                  }
+                  const body = await uploadRes.json().catch(() => null);
+                  if (!body || !body.success || !body.url) {
+                    console.error('Upload response invalid', body);
+                    alert('Failed to upload image');
+                    return;
+                  }
+                  updateField('thumbnail', body.url);
                 } catch (err) {
-                  console.error('Failed to read thumbnail file', err);
-                  alert('Failed to read image file');
+                  console.error('Failed to upload thumbnail', err);
+                  alert('Failed to upload image');
                 }
               }}
               className="w-full"
