@@ -1,7 +1,9 @@
 import { useState, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
 import { Instagram, Twitter, Linkedin, BookOpen, Users, Award, Video, FileText, MessageCircle, BarChart3, CheckCircle, Star, ArrowRight, Play, Globe, Clock, Shield } from "lucide-react";
 import "../styles/landing.css";
+import { useNavigate, Link } from "react-router-dom";
+
+
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -421,6 +423,7 @@ export default function Landing() {
 <footer className="bg-gray-900 text-white py-16">
   <div className="max-w-7xl mx-auto px-4">
     <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+
       {/* Brand */}
       <div className="space-y-4">
         <div className="text-4xl font-bold">
@@ -430,8 +433,8 @@ export default function Landing() {
         <p className="text-gray-400">
           Empowering education through innovative technology and seamless learning experiences.
         </p>
-        <div className="flex gap-4">
 
+        <div className="flex gap-4">
           <a 
             href="https://www.instagram.com/vasudev_gajjela_31/?utm_source=ig_web_button_share_sheet"
             target="_blank"
@@ -458,7 +461,6 @@ export default function Landing() {
           >
             <Linkedin size={20} />
           </a>
-
         </div>
       </div>
 
@@ -477,10 +479,10 @@ export default function Landing() {
       <div>
         <h3 className="text-lg font-bold mb-4">Company</h3>
         <ul className="space-y-3 text-gray-400">
-          <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-          <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-          <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-          <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+          <li><Link to="/about-us" className="hover:text-white transition-colors">About Us</Link></li>
+          <li><Link to="/careers" className="hover:text-white transition-colors">Careers</Link></li>
+          <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+          <li><Link to="/contact" className="hover:text-white transition-colors">Contact</Link></li>
         </ul>
       </div>
 
@@ -488,37 +490,29 @@ export default function Landing() {
       <div>
         <h3 className="text-lg font-bold mb-4">Support</h3>
         <ul className="space-y-3 text-gray-400">
-          <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-          <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
-          <li><a href="#" className="hover:text-white transition-colors">API Reference</a></li>
-          <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
+          <li><Link to="/help-center" className="hover:text-white transition-colors">Help Center</Link></li>
+          <li><Link to="/documentation" className="hover:text-white transition-colors">Documentation</Link></li>
+          <li><Link to="/api-reference" className="hover:text-white transition-colors">API Reference</Link></li>
+          <li><Link to="/status" className="hover:text-white transition-colors">Status</Link></li>
         </ul>
       </div>
+
     </div>
 
-    {/* Bottom Section */}
+    {/* Bottom Bar */}
     <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-      <p className="text-gray-400 text-sm">
-        © 2025 NxtGen LMS. All rights reserved.
-      </p>
+      <p className="text-gray-400 text-sm">© 2025 NxtGen LMS. All rights reserved.</p>
 
-      {/* Updated Navigation Links */}
       <div className="flex gap-6 text-sm text-gray-400">
-        <Link to="/privacy-policy" className="hover:text-white transition-colors">
-          Privacy Policy
-        </Link>
-
-        <Link to="/terms-of-service" className="hover:text-white transition-colors">
-          Terms of Service
-        </Link>
-
-        <Link to="/cookie-policy" className="hover:text-white transition-colors">
-          Cookie Policy
-        </Link>
+        <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
+        <Link to="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link>
+        <Link to="/cookie-policy" className="hover:text-white transition-colors">Cookie Policy</Link>
       </div>
     </div>
+
   </div>
 </footer>
+
 
     </div>
   );
