@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Instagram, Twitter, Linkedin, BookOpen, Users, Award, Video, FileText, MessageCircle, BarChart3, CheckCircle, Star, ArrowRight, Play, Globe, Clock, Shield } from "lucide-react";
 import "../styles/landing.css";
 import { useNavigate, Link } from "react-router-dom";
+import { Logo } from "@/components/Logo";
 
 
 
@@ -163,9 +164,8 @@ export default function Landing() {
       {/* Header */}
       <header className="px-4 md:px-16 lg:px-20 py-6 sticky top-0 bg-white/95 backdrop-blur-sm z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="text-4xl md:text-5xl font-bold">
-            <span className="text-brand-blue text-nxtgen-blue">Nxt</span>
-            <span className="text-brand-yellow text-nxtgen-yellow text-[#FFCC00]">gen</span>
+          <div>
+            <Logo />
           </div>
 
           <nav className="hidden md:flex items-center gap-8">
@@ -428,9 +428,8 @@ export default function Landing() {
 
       {/* Brand */}
       <div className="space-y-4">
-        <div className="text-4xl font-bold">
-          <span className="text-brand-blue text-nxtgen-blue">Nxt</span>
-          <span className="text-brand-yellow text-nxtgen-yellow text-[#FFCC00]">gen</span>
+        <div>
+          <Logo />
         </div>
         <p className="text-gray-400">
           Empowering education through innovative technology and seamless learning experiences.

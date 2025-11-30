@@ -4,7 +4,7 @@ export const Logo = ({ className = "" }: { className?: string }) => {
   return (
     <div className={`text-4xl md:text-5xl lg:text-6xl font-bold ${className}`}>
       <span className="text-brand-blue text-nxtgen-blue">Nxt</span>
-      <span className="text-brand-yellow text-nxtgen-yellow">Gen</span>
+      <span className="text-brand-yellow text-nxtgen-yellow text-[#FFCC00]">Gen</span>
     </div>
   );
 };
