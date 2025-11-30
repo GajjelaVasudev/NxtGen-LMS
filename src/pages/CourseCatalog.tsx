@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PlayCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import MockPaymentGateway from "@/components/MockPaymentGateway";
 
 type Course = { id: string; title: string; thumbnail?: string; description?: string; price?: number; creator?: string; createdAt: number; };
 
@@ -35,33 +36,38 @@ export default function CourseCatalog() {
   }, [user]);
 
   const isPurchased = (id: string) => enrollments.some((e) => e.courseId === id);
+  // client-side mock purchase flow: open MockPaymentGateway modal
+  const [showGateway, setShowGateway] = React.useState(false);
+  const [selectedCourse, setSelectedCourse] = React.useState<Course | null>(null);
 
-  const buyCourse = async (id: string) => {
+  const buyCourse = (id: string) => {
     if (!user?.id) return alert("Please sign in to enroll");
     if (isPurchased(id)) return;
+    const course = courses.find((c) => c.id === id) || null;
+    setSelectedCourse(course);
+    setShowGateway(true);
+  };
+
+  const handleMockSuccess = () => {
+    if (!selectedCourse) return;
+    const id = selectedCourse.id;
+    // persist mock purchase
     try {
-      const res = await fetch(`${API}/courses/${id}/enroll`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: user.email }),
-      });
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        console.error('Enroll failed', { status: res.status, body });
-        return alert("Failed to enroll");
-      }
-      // treat both success and alreadyEnrolled as success
-      if (!body || body.success !== true) {
-        console.error('Enroll failed - unexpected body', { status: res.status, body });
-        return alert('Failed to enroll');
-      }
-      const eJson = await fetch(`${API}/enrollments?userId=${user.id}`).then((r) => r.json()).catch(() => ({ enrollments: [] }));
-      const raw = eJson.enrollments || [];
-      setEnrollments(raw.map((row: any) => ({ ...row, courseId: row.course_id || row.courseId, userId: row.user_id || row.userId })));
-    } catch (err) {
-      console.error('Enroll exception', err);
-      alert('Failed to enroll');
-    }
+      const purchasesRaw = localStorage.getItem("nxt_purchases") || "{}";
+      const purchases = JSON.parse(purchasesRaw || "{}");
+      purchases[id] = { purchasedAt: new Date().toISOString(), title: selectedCourse.title };
+      localStorage.setItem("nxt_purchases", JSON.stringify(purchases));
+    } catch (e) { console.warn(e); }
+
+    // update enrollments in UI
+    setEnrollments((prev) => [...prev, { courseId: id, userId: user?.id }]);
+    setShowGateway(false);
+    setSelectedCourse(null);
+  };
+
+  const handleGatewayCancel = () => {
+    setShowGateway(false);
+    setSelectedCourse(null);
   };
 
   const filtered = courses.filter((c) => !query || c.title.toLowerCase().includes(query.toLowerCase())).sort((a,b) => b.createdAt - a.createdAt);
@@ -122,6 +128,16 @@ export default function CourseCatalog() {
           )}
         </div>
       </div>
+      {showGateway && selectedCourse && (
+        <MockPaymentGateway
+          courseId={selectedCourse.id}
+          courseTitle={selectedCourse.title}
+          amount={selectedCourse.price || 0}
+          onCancel={handleGatewayCancel}
+          onSuccess={handleMockSuccess}
+          fullScreen={true}
+        />
+      )}
     </main>
   );
 }

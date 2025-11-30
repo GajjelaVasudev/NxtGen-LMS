@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import MockPaymentGateway from "@/components/MockPaymentGateway";
 import { useParams, Link } from "react-router-dom";
 import { PlayCircle, CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,32 +29,26 @@ export default function CourseDetails() {
 
   useEffect(() => setEnrolled(enrollments.some(e => e.courseId === courseId)), [enrollments, courseId]);
 
-  const buyCourse = async () => {
+  // local mock purchase/enroll flow (client-only)
+  const [showGateway, setShowGateway] = useState(false);
+  const buyCourse = () => {
     if (enrolled) return;
     if (!user?.id) return alert("Please sign in to enroll");
+    setShowGateway(true);
+  };
+
+  const handleMockSuccess = () => {
+    // mark enrolled client-side and persist to localStorage as a mock purchase
     try {
-      const res = await fetch(`${API}/courses/${courseId}/enroll`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: user.email }),
-      });
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        console.error('Enroll failed', { status: res.status, body });
-        return alert('Enroll failed');
-      }
-      if (!body || body.success !== true) {
-        console.error('Enroll failed - unexpected body', { status: res.status, body });
-        return alert('Enroll failed');
-      }
-      const e = await fetch(`${API}/enrollments?userId=${user.id}`).then(r => r.json()).catch(() => ({ enrollments: [] }));
-      const raw = e.enrollments || [];
-      setEnrollments(raw.map((row: any) => ({ ...row, courseId: row.course_id || row.courseId, userId: row.user_id || row.userId })));
-      setEnrolled(true);
-    } catch (err) {
-      console.error('Enroll exception', err);
-      alert('Enroll failed');
-    }
+      const purchasesRaw = localStorage.getItem("nxt_purchases") || "{}";
+      const purchases = JSON.parse(purchasesRaw || "{}");
+      purchases[courseId || ""] = { purchasedAt: new Date().toISOString(), title: course?.title || "" };
+      localStorage.setItem("nxt_purchases", JSON.stringify(purchases));
+    } catch (e) { }
+    setEnrolled(true);
+    setShowGateway(false);
+    // Also add a simple local enrollment record so UI reflects state
+    setEnrollments(prev => [...prev, { courseId, userId: user?.id } as any]);
   };
 
   if (!course) {
@@ -82,9 +77,18 @@ export default function CourseDetails() {
             </div>
             <div className="bg-gradient-to-br from-[var(--brand-color)] to-[var(--brand-yellow)] text-white p-6 rounded-lg shadow-lg mt-4">
               <button onClick={buyCourse} disabled={enrolled} className={`mt-4 w-full px-4 py-2 rounded-md font-semibold ${enrolled ? "bg-white/20" : "bg-white text-brand"}`}>
-                {enrolled ? "Enrolled" : user ? "Enroll Now" : "Sign in to Enroll"}
+                {enrolled ? "Enrolled" : user ? "Buy Now" : "Sign in to Enroll"}
               </button>
             </div>
+            {showGateway && (
+              <MockPaymentGateway
+                courseId={courseId || ""}
+                courseTitle={course?.title}
+                amount={course?.price || 0}
+                onCancel={() => setShowGateway(false)}
+                onSuccess={handleMockSuccess}
+              />
+            )}
           </aside>
         </div>
       </div>
