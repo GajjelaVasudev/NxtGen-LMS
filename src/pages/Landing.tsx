@@ -165,7 +165,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="text-4xl md:text-5xl font-bold">
             <span className="text-brand-blue text-nxtgen-blue">Nxt</span>
-            <span className="text-brand-yellow text-nxtgen-yellow text-[#FFCC00]">Gen</span>
+            <span className="text-brand-yellow text-nxtgen-yellow text-[#FFCC00]">gen</span>
           </div>
 
           <nav className="hidden md:flex items-center gap-8">
@@ -430,7 +430,7 @@ export default function Landing() {
       <div className="space-y-4">
         <div className="text-4xl font-bold">
           <span className="text-brand-blue text-nxtgen-blue">Nxt</span>
-          <span className="text-brand-yellow text-nxtgen-yellow text-[#FFCC00]">Gen</span>
+          <span className="text-brand-yellow text-nxtgen-yellow text-[#FFCC00]">gen</span>
         </div>
         <p className="text-gray-400">
           Empowering education through innovative technology and seamless learning experiences.
