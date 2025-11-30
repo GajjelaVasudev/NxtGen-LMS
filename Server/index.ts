@@ -33,6 +33,7 @@ import {
 } from "./routes/messages.js";
 import {
   listRoles,
+  listRolePermissions,
   listPermissions,
   createRole,
   addPermissionToRole,
@@ -297,6 +298,7 @@ export function createServer() {
   // Roles / Permissions / Groups / Activity / Reports
   app.get('/api/admin/roles', listRoles);
   app.get('/api/admin/permissions', listPermissions);
+  app.get('/api/admin/roles/:roleId/permissions', listRolePermissions);
   app.post('/api/admin/roles', createRole);
   app.post('/api/admin/roles/:roleId/permissions', addPermissionToRole);
   app.delete('/api/admin/roles/:roleId/permissions/:permId', removePermissionFromRole);

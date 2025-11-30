@@ -119,6 +119,23 @@ export const listPermissions: RequestHandler = async (_req, res) => {
   }
 };
 
+// GET /api/admin/roles/:roleId/permissions
+export const listRolePermissions: RequestHandler = async (req, res) => {
+  const chk = await requireAdmin(req);
+  if (!chk.ok) return res.status(chk.status).json({ error: chk.msg });
+  const roleId = String(req.params.roleId || '');
+  if (!roleId) return res.status(400).json({ error: 'roleId required' });
+  try {
+    const { data, error } = await supabase.from('role_permissions').select('permission_id').eq('role_id', roleId);
+    if (error) return res.status(500).json({ error: error.message || 'Failed to fetch role permissions' });
+    const perms = (data || []).map((r: any) => r.permission_id).filter(Boolean);
+    return res.json({ permissions: perms });
+  } catch (ex) {
+    console.error('[admin/listRolePermissions] err', ex);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
+};
+
 // POST /api/admin/roles
 export const createRole: RequestHandler = async (req, res) => {
   const chk = await requireAdmin(req);

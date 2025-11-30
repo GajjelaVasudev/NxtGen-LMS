@@ -173,6 +173,9 @@ export default function UserManagement() {
     const stored = localStorage.getItem(ADMIN_STORAGE);
     return stored ? JSON.parse(stored).roles || systemRoles : systemRoles;
   });
+  // server-provided permissions and role->permissions mapping
+  const [serverPermissions, setServerPermissions] = useState<{id:string; description?:string}[]>([]);
+  const [rolePermissionsMap, setRolePermissionsMap] = useState<Record<string, string[]>>({});
   const [groups, setGroups] = useState<UserGroup[]>(() => {
     const stored = localStorage.getItem(ADMIN_STORAGE);
     return stored ? JSON.parse(stored).groups || userGroups : userGroups;
@@ -187,6 +190,10 @@ export default function UserManagement() {
   const [displayAddGroup, setDisplayAddGroup] = useState(false);
   const [activeUser, setActiveUser] = useState<SystemUser | null>(null);
   const [activeRole, setActiveRole] = useState<PermissionRole | null>(null);
+  // Local edit fields for the Edit User modal
+  const [editName, setEditName] = useState<string>("");
+  const [editEmail, setEditEmail] = useState<string>("");
+  const [editRole, setEditRole] = useState<string>("user");
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<{ id: string; message: string; type?: 'success' | 'error' }[]>([]);
@@ -212,8 +219,73 @@ export default function UserManagement() {
     forceComplete: false
   });
 
+  // Communications composer state
+  const [composed, setComposed] = useState<{ title: string; body: string; toRole: string; toUserEmail: string }>({ title: '', body: '', toRole: '', toUserEmail: '' });
+
+  // Composer component (inline) - sends via /api/inbox/send
+  function Composer() {
+    const [sending, setSending] = useState(false);
+    return (
+      <div>
+        <div className="mb-3">
+          <label className="block text-sm text-gray-700">Title</label>
+          <input value={composed.title} onChange={(e)=> setComposed(c => ({ ...c, title: e.target.value }))} className="w-full mt-1 px-3 py-2 border rounded" />
+        </div>
+        <div className="mb-3">
+          <label className="block text-sm text-gray-700">Message</label>
+          <textarea value={composed.body} onChange={(e)=> setComposed(c => ({ ...c, body: e.target.value }))} className="w-full mt-1 px-3 py-2 border rounded h-32" />
+        </div>
+        <div className="mb-3 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+          <div>
+            <label className="block text-sm text-gray-700">Send to role</label>
+            <select value={composed.toRole} onChange={(e)=> setComposed(c => ({ ...c, toRole: e.target.value }))} className="w-full mt-1 px-3 py-2 border rounded">
+              <option value="">(none) — broadcast</option>
+              {permissionRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-700">Or send to user (email)</label>
+            <input type="email" value={composed.toUserEmail} onChange={(e)=> setComposed(c => ({ ...c, toUserEmail: e.target.value }))} className="w-full mt-1 px-3 py-2 border rounded" />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={async ()=>{
+              // send
+              try {
+                setSending(true);
+                const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+                const supabase = makeSupabase();
+                let token: string | null = null;
+                if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
+                const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                else { setUnauthorized(true); pushToast('error','Admin session required'); return; }
+
+                const payload: any = { subject: composed.title, content: composed.body };
+                if (composed.toRole) payload.recipient_role = composed.toRole;
+                if (composed.toUserEmail) payload.to_user_id = composed.toUserEmail; // messages.send will canonicalize email
+
+                const res = await fetch(`${API}/inbox/send`, { method: 'POST', headers, body: JSON.stringify(payload) });
+                if (!res.ok) { const b = await res.json().catch(()=>({})); pushToast('error', b?.error || 'Failed to send'); return; }
+                pushToast('success', 'Announcement sent');
+                setComposed({ title: '', body: '', toRole: '', toUserEmail: '' });
+              } catch (ex:any) { console.error('send announcement failed', ex); pushToast('error', String(ex?.message || ex)); }
+              finally { setSending(false); }
+            }} className="px-4 py-2 bg-blue-600 text-white rounded">Send</button>
+            <button onClick={()=>{ setComposed({ title: '', body: '', toRole: '', toUserEmail: '' }); pushToast('success','Cleared'); }} className="px-4 py-2 border rounded">Clear</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Activity state (populated from server)
   const [activity, setActivity] = useState<UserActivity[]>([]);
+  const [adminCounts, setAdminCounts] = useState<{ users?: number; active?: number; inactive?: number; groups?: number } | null>(null);
+  const [activityFilterUser, setActivityFilterUser] = useState<string>("all");
+  const [activityFrom, setActivityFrom] = useState<string>("");
+  const [activityTo, setActivityTo] = useState<string>("");
+  const [activityLoading, setActivityLoading] = useState<boolean>(false);
+  const [activityDetail, setActivityDetail] = useState<UserActivity | null>(null);
 
   // Activity tracking (server-backed)
   // initial seed removed; activity is populated from server into `activity` state
@@ -222,6 +294,41 @@ export default function UserManagement() {
   useEffect(() => {
     localStorage.setItem(ADMIN_STORAGE, JSON.stringify({ users: systemUsers, roles: permissionRoles, groups }));
   }, [systemUsers, permissionRoles, groups]);
+
+  // Helper: fetch activity with optional filters
+  const fetchActivity = async (opts?: { userId?: string; from?: string; to?: string }) => {
+    try {
+      setActivityLoading(true);
+      const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
+      const headers: Record<string,string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else { setUnauthorized(true); return; }
+
+      const params = new URLSearchParams();
+      if (opts?.userId && opts.userId !== 'all') params.set('userId', opts.userId);
+      if (opts?.from) params.set('from', opts.from);
+      if (opts?.to) params.set('to', opts.to);
+
+      const res = await fetch(`${API}/admin/activity?${params.toString()}`, { headers });
+      if (!res.ok) {
+        if (res.status === 401) setUnauthorized(true);
+        console.warn('failed to fetch activity', res.status);
+        return;
+      }
+      const body = await res.json().catch(()=>({}));
+      if (body?.activity) {
+        const mapped = (body.activity as any[]).map(act => ({ id: act.id, userId: act.user_id || '', userName: act.metadata?.userName || act.user_id || '', action: act.action, timestamp: act.created_at, ipAddress: act.metadata?.ip || '', }));
+        setActivity(mapped as any);
+      }
+    } catch (ex) {
+      console.warn('fetchActivity failed', ex);
+    } finally {
+      setActivityLoading(false);
+    }
+  };
 
 
   // Fetch real users from server if current user is admin (fallback to local data otherwise)
@@ -316,6 +423,16 @@ export default function UserManagement() {
           }
         } catch (e) { console.warn('[roles] fetch failed', e); }
 
+        // Permissions list
+        try {
+          const p = await fetch(`${API}/admin/permissions`, { headers });
+          if (p.status === 401) { setUnauthorized(true); return; }
+          const pb = await p.json().catch(() => ({}));
+          if (pb?.permissions) {
+            setServerPermissions(pb.permissions.map((pp:any) => ({ id: pp.id, description: pp.description || '' })));
+          }
+        } catch (e) { console.warn('[permissions] fetch failed', e); }
+
         // Groups
         try {
           const g = await fetch(`${API}/admin/groups`, { headers });
@@ -326,6 +443,44 @@ export default function UserManagement() {
             setGroups(mapped);
           }
         } catch (e) { console.warn('[groups] fetch failed', e); }
+
+        // Admin counts: total users + active/inactive + groups
+        try {
+          // summary provides total users
+          const s = await fetch(`${API}/admin/reports/summary`, { headers });
+          if (s.status === 401) { setUnauthorized(true); return; }
+          const sb = await s.json().catch(() => ({}));
+          const counts: any = { users: sb?.summary?.users || undefined };
+
+          // fetch active count
+          try {
+            const a = await fetch(`${API}/admin/users?status=active&pageSize=1`, { headers });
+            if (a.status === 200) {
+              const ab = await a.json().catch(() => ({}));
+              counts.active = typeof ab.total === 'number' ? ab.total : (Array.isArray(ab.users) ? ab.users.length : undefined);
+            }
+          } catch (ex) { /* ignore */ }
+
+          // fetch inactive count
+          try {
+            const ia = await fetch(`${API}/admin/users?status=inactive&pageSize=1`, { headers });
+            if (ia.status === 200) {
+              const ib = await ia.json().catch(() => ({}));
+              counts.inactive = typeof ib.total === 'number' ? ib.total : (Array.isArray(ib.users) ? ib.users.length : undefined);
+            }
+          } catch (ex) { /* ignore */ }
+
+          // groups count
+          try {
+            const gr = await fetch(`${API}/admin/groups`, { headers });
+            if (gr.status === 200) {
+              const grb = await gr.json().catch(() => ({}));
+              counts.groups = Array.isArray(grb.groups) ? grb.groups.length : undefined;
+            }
+          } catch (ex) { /* ignore */ }
+
+          setAdminCounts(counts as any);
+        } catch (e) { console.warn('[adminCounts] fetch failed', e); }
 
         // Activity
         try {
@@ -447,6 +602,15 @@ export default function UserManagement() {
     })();
   };
 
+  // When opening the edit modal, populate local edit fields
+  useEffect(() => {
+    if (displayEditUser && activeUser) {
+      setEditName(activeUser.name || '');
+      setEditEmail(activeUser.email || '');
+      setEditRole(activeUser.role || 'user');
+    }
+  }, [displayEditUser, activeUser]);
+
   // Update a user's role on the server (admin only) and update local state
   const updateUserRoleOnServer = async (userId: string, newRole: string) => {
     setActionLoading((s) => ({ ...s, [userId]: true }));
@@ -486,6 +650,62 @@ export default function UserManagement() {
       pushToast('error', String(ex?.message || ex));
     } finally {
       setActionLoading((s) => ({ ...s, [userId]: false }));
+    }
+  };
+
+  // Load permissions assigned to a role (server) and cache in rolePermissionsMap
+  const loadRolePermissions = async (roleId: string) => {
+    try {
+      const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
+      const headers: Record<string,string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else { setUnauthorized(true); return []; }
+      const res = await fetch(`${API}/admin/roles/${encodeURIComponent(roleId)}/permissions`, { headers });
+      if (!res.ok) {
+        console.warn('Failed to load role permissions', res.status);
+        return [];
+      }
+      const body = await res.json().catch(() => ({}));
+      const perms: string[] = Array.isArray(body?.permissions) ? body.permissions : [];
+      setRolePermissionsMap((m) => ({ ...m, [roleId]: perms }));
+      return perms;
+    } catch (ex) {
+      console.warn('loadRolePermissions failed', ex);
+      return [];
+    }
+  };
+
+  const togglePermissionForRole = async (roleId: string, permissionId: string, enabled: boolean) => {
+    setActionLoading((s) => ({ ...s, [`role:${roleId}`]: true }));
+    try {
+      const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+      const supabase = makeSupabase();
+      let token: string | null = null;
+      if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
+      const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else { setUnauthorized(true); pushToast('error', 'Admin session required'); return; }
+
+      if (enabled) {
+        const res = await fetch(`${API}/admin/roles/${encodeURIComponent(roleId)}/permissions`, { method: 'POST', headers, body: JSON.stringify({ permission: permissionId }) });
+        if (!res.ok) { const b = await res.json().catch(()=>({})); pushToast('error', b?.error || 'Failed to add permission'); return; }
+        // update local map
+        setRolePermissionsMap((m) => ({ ...m, [roleId]: Array.from(new Set([...(m[roleId]||[]), permissionId])) }));
+        pushToast('success', 'Permission added');
+      } else {
+        const res = await fetch(`${API}/admin/roles/${encodeURIComponent(roleId)}/permissions/${encodeURIComponent(permissionId)}`, { method: 'DELETE', headers });
+        if (!res.ok) { const b = await res.json().catch(()=>({})); pushToast('error', b?.error || 'Failed to remove permission'); return; }
+        setRolePermissionsMap((m) => ({ ...m, [roleId]: (m[roleId]||[]).filter(p => p !== permissionId) }));
+        pushToast('success', 'Permission removed');
+      }
+    } catch (ex:any) {
+      console.error('togglePermissionForRole failed', ex);
+      pushToast('error', String(ex?.message || ex));
+    } finally {
+      setActionLoading((s) => ({ ...s, [`role:${roleId}`]: false }));
     }
   };
 
@@ -701,7 +921,7 @@ export default function UserManagement() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Users</p>
-                  <p className="text-2xl font-bold text-gray-900">{systemUsers.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{typeof adminCounts?.users === 'number' ? adminCounts.users : systemUsers.length}</p>
                 </div>
                 <Users className="w-10 h-10 text-blue-500" />
               </div>
@@ -710,7 +930,7 @@ export default function UserManagement() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Active</p>
-                  <p className="text-2xl font-bold text-green-600">{systemUsers.filter(u => u.status === "active").length}</p>
+                  <p className="text-2xl font-bold text-green-600">{typeof adminCounts?.active === 'number' ? adminCounts.active : systemUsers.filter(u => u.status === "active").length}</p>
                 </div>
                 <UserCheck className="w-10 h-10 text-green-500" />
               </div>
@@ -719,7 +939,7 @@ export default function UserManagement() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Inactive</p>
-                  <p className="text-2xl font-bold text-gray-600">{systemUsers.filter(u => u.status === "inactive").length}</p>
+                  <p className="text-2xl font-bold text-gray-600">{typeof adminCounts?.inactive === 'number' ? adminCounts.inactive : systemUsers.filter(u => u.status === "inactive").length}</p>
                 </div>
                 <UserX className="w-10 h-10 text-gray-400" />
               </div>
@@ -728,7 +948,7 @@ export default function UserManagement() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Groups</p>
-                  <p className="text-2xl font-bold text-purple-600">{groups.length}</p>
+                  <p className="text-2xl font-bold text-purple-600">{typeof adminCounts?.groups === 'number' ? adminCounts.groups : groups.length}</p>
                 </div>
                 <BarChart3 className="w-10 h-10 text-purple-500" />
               </div>
@@ -837,9 +1057,24 @@ export default function UserManagement() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${roleColorClass(user.role)}`}>
-                            {user.role === "contentCreator" ? "Creator" : user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={user.role}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                // update via server
+                                updateUserRoleOnServer(user.id, val);
+                              }}
+                              className="px-2 py-1 border rounded-md"
+                              disabled={!!actionLoading[user.id] || loading}
+                            >
+                              <option value="admin">Admin</option>
+                              <option value="instructor">Instructor</option>
+                              <option value="contentCreator">Creator</option>
+                              <option value="user">Student</option>
+                            </select>
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${roleColorClass(user.role)}`}>{user.role === "contentCreator" ? "Creator" : user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">{user.department || "-"}</td>
                         <td className="px-4 py-3">
@@ -947,6 +1182,80 @@ export default function UserManagement() {
             </div>
           )}
 
+          {/* ACCESS CONTROL TAB */}
+          {currentTab === 'access' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Access Control</h2>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      // reload permissions and role mappings
+                      const API = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL as string) || "/api";
+                      const supabase = makeSupabase();
+                      let token: string | null = null;
+                      if (supabase) { try { const resp: any = await supabase.auth.getSession?.(); token = resp?.data?.session?.access_token || null; } catch(_) { token = null; } }
+                      const headers: Record<string,string> = {};
+                      if (token) headers['Authorization'] = `Bearer ${token}`;
+                      else { setUnauthorized(true); return; }
+                      try {
+                        const p = await fetch(`${API}/admin/permissions`, { headers });
+                        const pb = await p.json().catch(()=>({}));
+                        if (pb?.permissions) setServerPermissions(pb.permissions.map((pp:any)=>({ id: pp.id, description: pp.description || '' })));
+                        // load mappings for each role
+                        for (const r of permissionRoles) {
+                          await loadRolePermissions(r.id);
+                        }
+                        pushToast('success', 'Access data reloaded');
+                      } catch (e:any) { pushToast('error', String(e?.message || e)); }
+                    }}
+                    className="px-3 py-2 bg-gray-100 rounded-md"
+                  >Reload</button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-1">
+                  <h3 className="text-sm font-medium mb-2">Roles</h3>
+                  <div className="space-y-2">
+                    {permissionRoles.map(r => (
+                      <button key={r.id} onClick={() => { /* select role to manage */ setCurrentTab('access'); /* populate mapping */ loadRolePermissions(r.id); }} className={`w-full text-left px-3 py-2 rounded border ${r.isCustom ? 'bg-yellow-50' : 'bg-white'}`}>{r.name}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <h3 className="text-sm font-medium mb-3">Permissions</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {serverPermissions.map(p => (
+                      <div key={p.id} className="flex items-center gap-3 p-3 border rounded">
+                        <div className="flex-1">
+                          <p className="font-medium">{p.id}</p>
+                          <p className="text-sm text-gray-500">{p.description}</p>
+                        </div>
+                        <div>
+                          {permissionRoles.map(r => {
+                            const assigned = (rolePermissionsMap[r.id] || []).includes(p.id);
+                            return (
+                              <label key={r.id} className="flex items-center gap-2 mr-2">
+                                <input
+                                  type="checkbox"
+                                  checked={assigned}
+                                  onChange={async (e) => await togglePermissionForRole(r.id, p.id, e.target.checked)}
+                                  disabled={!!actionLoading[`role:${r.id}`]}
+                                />
+                                <span className="text-xs">{r.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* GROUPS TAB */}
           {currentTab === 'groups' && (
             <div>
@@ -993,6 +1302,18 @@ export default function UserManagement() {
                   <button onClick={downloadActivityLog} className="px-3 py-2 bg-blue-600 text-white rounded-md">Export</button>
                 </div>
               </div>
+              <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+                <select value={activityFilterUser} onChange={(e)=>setActivityFilterUser(e.target.value)} className="px-3 py-2 border rounded">
+                  <option value="all">All Users</option>
+                  {systemUsers.map(u => <option key={u.id} value={u.id}>{u.name} — {u.email}</option>)}
+                </select>
+                <input type="date" value={activityFrom} onChange={(e)=>setActivityFrom(e.target.value)} className="px-3 py-2 border rounded" />
+                <input type="date" value={activityTo} onChange={(e)=>setActivityTo(e.target.value)} className="px-3 py-2 border rounded" />
+                <div className="flex gap-2">
+                  <button onClick={async ()=> await fetchActivity({ userId: activityFilterUser, from: activityFrom, to: activityTo })} className="px-3 py-2 bg-blue-600 text-white rounded-md">Filter</button>
+                  <button onClick={async ()=> { setActivityFilterUser('all'); setActivityFrom(''); setActivityTo(''); await fetchActivity({}); }} className="px-3 py-2 border rounded-md">Reset</button>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b">
@@ -1009,16 +1330,140 @@ export default function UserManagement() {
                         <td className="px-4 py-3 text-sm text-gray-700">{a.timestamp}</td>
                         <td className="px-4 py-3 text-sm text-gray-700">{a.userName || a.userId}</td>
                         <td className="px-4 py-3 text-sm text-gray-700">{a.action}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{a.ipAddress}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 flex items-center gap-2">
+                          <span>{a.ipAddress}</span>
+                          <button onClick={() => setActivityDetail(a)} className="px-2 py-1 bg-gray-100 rounded text-sm">Details</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {/* Activity detail modal */}
+              {activityDetail && (
+                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+                  <div className="w-full max-w-2xl bg-white rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold">Activity Details</h3>
+                      <button onClick={() => setActivityDetail(null)} className="p-2 text-gray-500 hover:bg-gray-100 rounded"><X size={18} /></button>
+                    </div>
+                    <div className="space-y-2">
+                      <p><strong>When:</strong> {activityDetail.timestamp}</p>
+                      <p><strong>User:</strong> {activityDetail.userName || activityDetail.userId}</p>
+                      <p><strong>Action:</strong> {activityDetail.action}</p>
+                      <p><strong>IP:</strong> {activityDetail.ipAddress}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PROFILE TAB */}
+          {currentTab === 'profile' && (
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Profile Settings</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded border">
+                  <h3 className="font-medium mb-2">Profile Controls</h3>
+                  <label className="flex items-center gap-3 mb-2">
+                    <input type="checkbox" checked={profileControls.nameEditable} onChange={(e)=> setProfileControls(prev => ({ ...prev, nameEditable: e.target.checked }))} />
+                    <span>Allow users to edit name</span>
+                  </label>
+                  <label className="flex items-center gap-3 mb-2">
+                    <input type="checkbox" checked={profileControls.photoUpload} onChange={(e)=> setProfileControls(prev => ({ ...prev, photoUpload: e.target.checked }))} />
+                    <span>Allow profile photo upload</span>
+                  </label>
+                  <label className="flex items-center gap-3 mb-2">
+                    <input type="checkbox" checked={profileControls.bioEditable} onChange={(e)=> setProfileControls(prev => ({ ...prev, bioEditable: e.target.checked }))} />
+                    <span>Allow bio editing</span>
+                  </label>
+                  <label className="flex items-center gap-3 mb-2">
+                    <input type="checkbox" checked={profileControls.forceComplete} onChange={(e)=> setProfileControls(prev => ({ ...prev, forceComplete: e.target.checked }))} />
+                    <span>Force profile completion on next login</span>
+                  </label>
+                  <div className="mt-4 flex gap-2">
+                    <button onClick={() => { localStorage.setItem('nxtgen_profile_controls', JSON.stringify(profileControls)); pushToast('success', 'Profile settings saved (local)'); }} className="px-3 py-2 bg-blue-600 text-white rounded">Save</button>
+                    <button onClick={() => { const stored = localStorage.getItem('nxtgen_profile_controls'); if (stored) setProfileControls(JSON.parse(stored)); pushToast('success','Loaded previous settings'); }} className="px-3 py-2 border rounded">Load</button>
+                  </div>
+                </div>
+                <div className="bg-white p-4 rounded border">
+                  <h3 className="font-medium mb-2">Password & Security</h3>
+                  <label className="flex items-center gap-3 mb-2">
+                    <input type="checkbox" checked={twoFactorAuth} onChange={(e)=> setTwoFactorAuth(e.target.checked)} />
+                    <span>Require two-factor authentication</span>
+                  </label>
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600">Session timeout (minutes)</p>
+                    <input type="number" value={sessionMinutes} onChange={(e)=> setSessionMinutes(Math.max(1, Number(e.target.value || 30)))} className="mt-1 px-3 py-2 border rounded w-32" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* COMMUNICATIONS / NOTIFICATIONS TAB */}
+          {currentTab === 'notifications' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Communications</h2>
+                <div className="flex gap-2">
+                  <button onClick={() => { setComposed({ title: '', body: '', toRole: '', toUserEmail: '' }); pushToast('success','Composer cleared'); }} className="px-3 py-2 border rounded">Clear</button>
+                </div>
+              </div>
+              <div className="bg-white p-4 rounded border">
+                <Composer />
+              </div>
             </div>
           )}
         </div>
       </div>
+      {/* Edit User Modal */}
+      {displayEditUser && activeUser && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-xl bg-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Edit User</h3>
+              <button onClick={() => { setDisplayEditUser(false); setActiveUser(null); }} className="p-2 text-gray-500 hover:bg-gray-100 rounded">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-700">Name</label>
+                <input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-md" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700">Email</label>
+                <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-md" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm text-gray-700">Role</label>
+                <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-md">
+                  <option value="admin">Admin</option>
+                  <option value="instructor">Instructor</option>
+                  <option value="contentCreator">Content Creator</option>
+                  <option value="user">Student</option>
+                </select>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => { setDisplayEditUser(false); setActiveUser(null); }} className="px-4 py-2 border rounded-md">Cancel</button>
+              <button
+                onClick={async () => {
+                  if (!activeUser) return;
+                  const changes: Partial<SystemUser> = { name: editName, email: editEmail, role: editRole };
+                  await modifyUser(activeUser.id, changes);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                disabled={!!actionLoading[activeUser?.id || '']}
+              >
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

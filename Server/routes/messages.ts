@@ -69,7 +69,7 @@ export const sendInboxMessage: RequestHandler = async (req, res) => {
   console.log('[inbox] sendInboxMessage called', { method: req.method, url: req.originalUrl, body: req.body });
   try {
     const payload = req.body || {};
-    const fromName = payload.fromName || payload.from_name || null;
+    let fromName = payload.fromName || payload.from_name || null;
     const subject = payload.subject;
     const body = payload.content || payload.body || null;
 
